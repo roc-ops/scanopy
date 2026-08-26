@@ -669,4 +669,58 @@ mod tests {
         let _listener = tokio::net::UnixListener::bind(&socket).unwrap();
         probe_socket(&socket).await.unwrap();
     }
+
+    // ------------------------------------------------------------------------------------
+    // Live-capture checks, driven by .github/workflows/lldpd-live.yml.
+    //
+    // The fixtures above prove the parser handles a capture; they cannot prove the capture
+    // still matches what lldpcli emits. The scheduled workflow takes fresh captures from a
+    // real lldpd (two instances exchanging LLDP over a veth pair inside the daemon image)
+    // and feeds them here, so a shape change in a new Debian lldpd package fails on our
+    // types rather than going unnoticed until it clears somebody's neighbours.
+    // ------------------------------------------------------------------------------------
+
+    fn capture(var: &str) -> Value {
+        let path = std::env::var(var)
+            .unwrap_or_else(|_| panic!("{var} must name a capture file; see lldpd-live.yml"));
+        let raw = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("reading capture {path}: {e}"));
+        serde_json::from_str(&raw).unwrap_or_else(|e| panic!("capture {path} is not JSON: {e}"))
+    }
+
+    /// A populated table from a live lldpd parses, and its rows carry the three fields the
+    /// server's L2 resolution and display actually consume.
+    #[test]
+    #[ignore = "needs captures from a live lldpd; run via .github/workflows/lldpd-live.yml"]
+    fn live_capture_parses_to_a_usable_neighbour() {
+        let neighbors = parse_neighbors(&capture("SCANOPY_LLDPD_NEIGHBORS_CAPTURE"))
+            .unwrap_or_else(|e| panic!("live lldpcli output no longer parses: {e}"));
+        assert!(!neighbors.is_empty(), "live capture held no neighbours");
+        for n in &neighbors {
+            assert!(
+                n.chassis_id.is_some(),
+                "{}: no chassis id",
+                n.local_interface
+            );
+            assert!(n.port_id.is_some(), "{}: no port id", n.local_interface);
+            assert!(
+                n.sys_name.is_some(),
+                "{}: no system name",
+                n.local_interface
+            );
+        }
+    }
+
+    /// What a live lldpd emits *before* hearing anything must still read as the
+    /// authoritative empty table — if this shape drifts, zero-neighbour hosts would start
+    /// landing in the read-failure branch and stale neighbours would never clear.
+    #[test]
+    #[ignore = "needs captures from a live lldpd; run via .github/workflows/lldpd-live.yml"]
+    fn live_empty_capture_is_an_authoritative_empty_table() {
+        let parsed = parse_neighbors(&capture("SCANOPY_LLDPD_EMPTY_CAPTURE"));
+        assert!(
+            matches!(parsed, Ok(ref v) if v.is_empty()),
+            "zero-neighbour shape no longer reads as empty: {parsed:?}"
+        );
+    }
 }
