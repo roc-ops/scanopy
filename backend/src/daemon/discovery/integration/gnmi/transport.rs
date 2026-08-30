@@ -35,7 +35,12 @@ pub const RPC_TIMEOUT: Duration = Duration::from_secs(60);
 pub trait GnmiTransport: Send {
     /// `Capabilities`: the cheapest authenticated round trip, so what `probe` checks. A wrong
     /// password fails here with `UNAUTHENTICATED`, a non-gNMI gRPC listener with `UNIMPLEMENTED`.
-    async fn capabilities(&mut self) -> Result<()>;
+    ///
+    /// Returns the names of the YANG models the device advertises, because which LLDP model to
+    /// ask for is a property of the device, not a guess: DriveNets serves `dn-lldp` and no
+    /// `openconfig-lldp`, so asking openconfig first and catching the error would mean one
+    /// failed round trip per scan and no way to tell "not served" from "served and empty".
+    async fn capabilities(&mut self) -> Result<Vec<String>>;
 
     /// `Subscribe` with `mode: ONCE` for the given paths, returning every notification the
     /// device sent before its `sync_response`. The one read the collector relies on: ArcOS
@@ -167,14 +172,20 @@ impl TonicTransport {
 
 #[async_trait]
 impl GnmiTransport for TonicTransport {
-    async fn capabilities(&mut self) -> Result<()> {
+    async fn capabilities(&mut self) -> Result<Vec<String>> {
         let call = self.client.capabilities(CapabilityRequest::default());
         tokio::select! {
             _ = self.cancel.cancelled() => Err(anyhow!("Discovery cancelled")),
             r = tokio::time::timeout(CONNECT_TIMEOUT, call) => {
-                r.map_err(|_| anyhow!("gNMI Capabilities timed out"))?
+                let response = r
+                    .map_err(|_| anyhow!("gNMI Capabilities timed out"))?
                     .map_err(|status| anyhow!("gNMI Capabilities failed: {status}"))?;
-                Ok(())
+                Ok(response
+                    .into_inner()
+                    .supported_models
+                    .into_iter()
+                    .map(|m| m.name)
+                    .collect())
             }
         }
     }
