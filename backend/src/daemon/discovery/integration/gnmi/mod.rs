@@ -116,6 +116,10 @@ pub(crate) struct Collection {
     /// Local chassis identity, when the device serves `/lldp/state` (ArcOS does not).
     pub local_chassis_id: Option<String>,
     pub local_chassis_id_type: Option<String>,
+    /// Which LLDP model these neighbours actually came from. Reported at info: when an edge is
+    /// missing or wrong, "which model produced this" is the first thing worth knowing, and a
+    /// line that says openconfig while a vendor model was substituted is worse than no line.
+    pub lldp_model: &'static str,
 }
 
 /// The subtrees one collection subscribes to, each its own Subscribe. Wildcard keys rather
@@ -143,8 +147,9 @@ pub(crate) enum Subtree {
 }
 
 impl Subtree {
-    /// Always collected: every device that reaches this collector serves openconfig-interfaces
-    /// (it is the one subtree whose failure aborts the collection).
+    /// Always asked for. `InterfaceState` is required -- its failure aborts the collection --
+    /// while `EthernetState` is optional and its failure is a debug-level skip, because ArcOS
+    /// serves no `mac-address` at all (see the module header).
     const BASE: [Subtree; 2] = [Subtree::InterfaceState, Subtree::EthernetState];
 
     /// Which LLDP subtrees to ask this device for, decided from what it ADVERTISES rather than
@@ -320,11 +325,15 @@ fn normalised_names(leaf: &Leaf) -> Vec<&str> {
     if names.first() == Some(&"drivenets-top") {
         if let Some(root) = names.iter().position(|n| *n == "lldp") {
             names.drain(..root);
-        }
-    }
-    for name in names.iter_mut() {
-        if *name == "oper-items" {
-            *name = "state";
+            // Scoped to a path we have just established IS the native LLDP tree. Applied to
+            // every leaf instead, this rewrites `oper-items` on devices that are not DriveNets
+            // and have their own meaning for the name -- clobbering real `state` leaves, last
+            // writer winning, silently.
+            for name in names.iter_mut() {
+                if *name == "oper-items" {
+                    *name = "state";
+                }
+            }
         }
     }
     names
@@ -580,13 +589,12 @@ pub(crate) async fn collect(transport: &mut dyn GnmiTransport) -> anyhow::Result
     // what this collector did before it asked at all.
     let models = transport.capabilities().await.unwrap_or_default();
     let lldp = Subtree::lldp_subtrees(&models);
-    if lldp == [Subtree::LldpNative] {
-        tracing::debug!(
-            "device advertises dn-lldp and no openconfig-lldp; collecting LLDP from the \
-             DriveNets-native model"
-        );
-    }
     let mut coll = Collection::default();
+    coll.lldp_model = if lldp == [Subtree::LldpNative] {
+        "dn-lldp"
+    } else {
+        "openconfig-lldp"
+    };
     for subtree in Subtree::BASE.iter().copied().chain(lldp.iter().copied()) {
         match transport.subscribe_once(vec![subtree.path()]).await {
             Ok(notifications) => {
@@ -672,7 +680,8 @@ impl DiscoveryIntegration for GnmiIntegration {
             ip = %ctx.ip,
             interfaces = coll.interfaces.len(),
             neighbors = coll.neighbors.len(),
-            "gNMI openconfig-interfaces/lldp collection complete"
+            lldp_model = coll.lldp_model,
+            "gNMI collection complete"
         );
         if let Some(chassis) = coll
             .local_chassis_id
@@ -711,6 +720,7 @@ mod tests {
     struct ScriptedDevice {
         served: BTreeMap<&'static str, &'static str>,
         models: Vec<String>,
+        capabilities_err: bool,
     }
 
     impl ScriptedDevice {
@@ -723,6 +733,13 @@ mod tests {
         /// tests keep exercising the openconfig path exactly as they did.
         fn advertising(mut self, models: &[&str]) -> Self {
             self.models = models.iter().map(|m| (*m).to_string()).collect();
+            self
+        }
+
+        /// A device whose `Capabilities` fails outright, so the model list is unreadable rather
+        /// than empty.
+        fn capabilities_failing(mut self) -> Self {
+            self.capabilities_err = true;
             self
         }
     }
@@ -821,6 +838,9 @@ mod tests {
     #[async_trait]
     impl GnmiTransport for ScriptedDevice {
         async fn capabilities(&mut self) -> anyhow::Result<Vec<String>> {
+            if self.capabilities_err {
+                anyhow::bail!("gNMI Capabilities failed: status: Unavailable");
+            }
             Ok(self.models.clone())
         }
         async fn subscribe_once(&mut self, paths: Vec<Path>) -> anyhow::Result<Vec<Notification>> {
@@ -1022,6 +1042,86 @@ mod tests {
         assert_eq!(
             Subtree::lldp_subtrees(&["dn-lldp".to_string()]),
             [Subtree::LldpNative]
+        );
+    }
+
+    /// `oper-items` is a DriveNets container name, and the rewrite that maps it onto `state`
+    /// must not touch a device that is not DriveNets. Before this was scoped, the rewrite ran on
+    /// EVERY leaf from every device: a reply carrying both containers had its real
+    /// `state/oper-status` overwritten by whatever `oper-items` happened to hold, last writer
+    /// winning, silently. Low likelihood -- it needs a device to return `oper-items` inside the
+    /// `/state` subtree we asked for -- but DriveNets is exactly the vendor that names containers
+    /// that way, and this collector subscribes `/interfaces/.../state` on DriveNets boxes.
+    #[tokio::test]
+    async fn an_oper_items_container_does_not_clobber_openconfig_state() {
+        const MIXED: &str = "
+            interfaces/interface[name=et1]/state/oper-status = UP
+            interfaces/interface[name=et1]/state/ifindex = 1
+            interfaces/interface[name=et1]/oper-items/oper-status = DOWN
+            interfaces/interface[name=et1]/oper-items/description = clobbered
+        ";
+        let mut device = ScriptedDevice::default().serve(Subtree::InterfaceState, MIXED);
+        let coll = collect(&mut device).await.expect("collection");
+        let et1 = coll.interfaces.get("et1").expect("et1");
+        assert_eq!(
+            et1.oper_status.as_deref(),
+            Some("UP"),
+            "openconfig state must win; oper-items is not this device's state container"
+        );
+        assert_eq!(
+            et1.description, None,
+            "an oper-items leaf must not be read as an openconfig state leaf"
+        );
+    }
+
+    #[test]
+    fn normalisation_folds_the_native_tree_and_leaves_everything_else_alone() {
+        let leaf = |path: &str| Leaf {
+            elems: parse_path(path).elem,
+            value: String::new(),
+        };
+        let names = |path: &str| {
+            normalised_names(&leaf(path))
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join("/")
+        };
+
+        // native LLDP: vendor root dropped, oper-items read as state
+        assert_eq!(
+            names("drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/1]/neighbors/neighbor[id=0]/oper-items/system-name"),
+            "lldp/interfaces/interface/neighbors/neighbor/state/system-name"
+        );
+        assert_eq!(
+            names("drivenets-top/protocols/lldp/oper-items/chassis-id"),
+            "lldp/state/chassis-id"
+        );
+        // openconfig passes through untouched
+        assert_eq!(
+            names("interfaces/interface[name=et1]/state/oper-status"),
+            "interfaces/interface/state/oper-status"
+        );
+        // vendor root but no lldp element: left alone, so it falls to absorb_leaf's `_` arm
+        assert_eq!(
+            names("drivenets-top/interfaces/interface[name=ge100-0/0/1]/oper-items/name"),
+            "drivenets-top/interfaces/interface/oper-items/name",
+            "the rewrite belongs to the native LLDP tree, not to every native path"
+        );
+    }
+
+    /// The error-swallowing branch the design rests on: `probe` has already completed a
+    /// Capabilities round trip, so a failure here means the model list is unreadable, NOT that
+    /// the device is unreachable. Collection must continue against openconfig -- the behaviour
+    /// this collector had before it asked at all -- rather than abandoning the host.
+    #[tokio::test]
+    async fn an_unreadable_model_list_still_collects_over_openconfig() {
+        let mut device = arcos().capabilities_failing();
+        let coll = collect(&mut device).await.expect("collection must not abort");
+        assert_eq!(coll.lldp_model, "openconfig-lldp");
+        assert!(!coll.interfaces.is_empty(), "interfaces still collected");
+        assert!(
+            !coll.neighbors.is_empty(),
+            "openconfig LLDP still read when the model list could not be had"
         );
     }
 
@@ -1266,10 +1366,14 @@ mod tests {
     // refuses every openconfig `/lldp` path ("No valid requests in the session"); its `type`
     // leaves mix IANA names with vendor ones (`irb`, `mgmt-ncx-member`).
     //
-    // It refuses them because it does not implement openconfig-lldp at all -- Capabilities
-    // advertises `dn-lldp` instead, and the data is under `/drivenets-top/protocols/lldp`. See
-    // `native_lldp_is_collected_when_only_dn_lldp_is_advertised`; this fixture stays as the
-    // no-LLDP-model case, which is still real for a device advertising neither.
+    // Why it refuses them was established later, on a DIFFERENT box -- cDNOS 26.2 in a
+    // container, whose Capabilities advertises `dn-lldp` and no `openconfig-lldp`, with the data
+    // under `/drivenets-top/protocols/lldp` (see
+    // `native_lldp_is_collected_when_only_dn_lldp_is_advertised`). Whether this 72XC's firmware
+    // does the same was never captured, so it is not asserted here.
+    //
+    // This fixture is therefore the ADVERTISES-NOTHING case: `ScriptedDevice::default()` sets no
+    // models, so selection falls through to openconfig and the device serves no LLDP at all.
     const DNOS_INTERFACE_STATE: &str = "
         interfaces/interface[name=ge10-0/0/0]/state/admin-status = UP
         interfaces/interface[name=ge10-0/0/0]/state/ifindex = 1
