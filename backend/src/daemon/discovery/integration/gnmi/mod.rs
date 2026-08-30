@@ -116,9 +116,15 @@ pub(crate) struct Collection {
     /// Local chassis identity, when the device serves `/lldp/state` (ArcOS does not).
     pub local_chassis_id: Option<String>,
     pub local_chassis_id_type: Option<String>,
-    /// Which LLDP model these neighbours actually came from. Reported at info: when an edge is
-    /// missing or wrong, "which model produced this" is the first thing worth knowing, and a
-    /// line that says openconfig while a vendor model was substituted is worse than no line.
+    /// Which LLDP model this collection ASKED FOR -- not what the neighbours provably came
+    /// from. The distinction is deliberate: `openconfig-lldp` here also covers a device that
+    /// advertises no LLDP model at all, and one whose Capabilities could not be read, because
+    /// both fall through to the openconfig default. Claiming those neighbours "came from
+    /// openconfig-lldp" would assert something never established.
+    ///
+    /// Reported at info because when an edge is missing, what we asked the device for is the
+    /// first thing worth knowing. Splitting the three cases apart wants an enum, which the
+    /// model-profile seam would provide.
     pub lldp_model: &'static str,
 }
 
@@ -322,17 +328,23 @@ pub(crate) fn absorb_notification(coll: &mut Collection, notification: &Notifica
 /// two, and a native device cannot drift away from the openconfig one it is meant to match.
 fn normalised_names(leaf: &Leaf) -> Vec<&str> {
     let mut names: Vec<&str> = leaf.elems.iter().map(|e| unqualified(&e.name)).collect();
-    if names.first() == Some(&"drivenets-top") {
-        if let Some(root) = names.iter().position(|n| *n == "lldp") {
-            names.drain(..root);
-            // Scoped to a path we have just established IS the native LLDP tree. Applied to
-            // every leaf instead, this rewrites `oper-items` on devices that are not DriveNets
-            // and have their own meaning for the name -- clobbering real `state` leaves, last
-            // writer winning, silently.
-            for name in names.iter_mut() {
-                if *name == "oper-items" {
-                    *name = "state";
-                }
+    // The native tree is recognisable only as BOTH facts together: the vendor root, and an
+    // `lldp` element beneath it. Either on its own is some other DriveNets path, which this
+    // collector never subscribes to and `absorb_leaf` discards.
+    let native_lldp_root = match names.first() {
+        Some(&"drivenets-top") => names.iter().position(|n| *n == "lldp"),
+        _ => None,
+    };
+    if let Some(root) = native_lldp_root {
+        names.drain(..root);
+        // Scoped to a path just established to BE the native LLDP tree. Applied to every leaf
+        // instead, this rewrites `oper-items` on devices that are not DriveNets and have their
+        // own meaning for the name -- overwriting real `state` leaves, last writer winning,
+        // silently. Measured, not theorised: see
+        // `an_oper_items_container_does_not_clobber_openconfig_state`.
+        for name in names.iter_mut() {
+            if *name == "oper-items" {
+                *name = "state";
             }
         }
     }
@@ -598,11 +610,13 @@ pub(crate) async fn collect(transport: &mut dyn GnmiTransport) -> anyhow::Result
     // what this collector did before it asked at all.
     let models = transport.capabilities().await.unwrap_or_default();
     let lldp = Subtree::lldp_subtrees(&models);
-    let mut coll = Collection::default();
-    coll.lldp_model = if lldp == [Subtree::LldpNative] {
-        "dn-lldp"
-    } else {
-        "openconfig-lldp"
+    let mut coll = Collection {
+        lldp_model: if lldp == [Subtree::LldpNative] {
+            "dn-lldp"
+        } else {
+            "openconfig-lldp"
+        },
+        ..Default::default()
     };
     for subtree in Subtree::BASE.iter().copied().chain(lldp.iter().copied()) {
         match transport.subscribe_once(vec![subtree.path()]).await {
@@ -1124,7 +1138,13 @@ mod tests {
     /// this collector had before it asked at all -- rather than abandoning the host.
     #[tokio::test]
     async fn an_unreadable_model_list_still_collects_over_openconfig() {
-        let mut device = arcos().capabilities_failing();
+        // Advertising dn-lldp matters: a SUCCESSFUL read would select the native subtree, which
+        // arcos() does not serve, so the neighbour assertions below would fail. Without it,
+        // "Capabilities failed" and "Capabilities returned []" are indistinguishable and the
+        // test passes whether or not the error path is ever taken.
+        let mut device = arcos()
+            .advertising(&["dn-lldp"])
+            .capabilities_failing();
         let coll = collect(&mut device).await.expect("collection must not abort");
         assert_eq!(coll.lldp_model, "openconfig-lldp");
         assert!(!coll.interfaces.is_empty(), "interfaces still collected");
