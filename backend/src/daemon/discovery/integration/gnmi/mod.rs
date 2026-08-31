@@ -66,6 +66,13 @@ pub struct GnmiIntegration;
 /// `Capabilities` round trip — that is what it probes with — and which LLDP model to read is
 /// decided from its answer. Asking a second time would be an extra RPC per scan on every gNMI
 /// device.
+///
+/// UNCOVERED, and load-bearing: nothing tests that `probe` actually populates this. `probe`
+/// builds a `TonicTransport` directly, so there is no seam to inject a fake, and a test suite
+/// that cannot reach `probe` cannot notice this field being left empty — which would make every
+/// device look like it advertises no LLDP model and return DriveNets to zero neighbours,
+/// silently. Injecting the transport would close it; until then this assignment is checked by
+/// eye, which is worth knowing before trusting the tests here.
 struct GnmiProbeHandle {
     credential: GnmiQueryCredential,
     models: Vec<String>,
@@ -237,6 +244,12 @@ impl Subtree {
 /// Everything from the state container down is identical across profiles, so nothing after the
 /// walk — `LldpChassisId`, `LldpPortId`, `collection_to_interfaces` — varies by profile.
 pub struct LldpModelProfile {
+    /// WHAT IS NOT IN HERE, so the next person knows which vendors the table absorbs: the list
+    /// KEY names (`interface[name=…]`, `neighbor[id=…]`) and the literal `lldp` element are
+    /// still fixed in `absorb_leaf` and `normalised_names`. A vendor openconfig-SHAPED except
+    /// for those needs code, not a static. `LldpMibProfile` draws the same line where it notes
+    /// the subtype enums are identical across MIB revisions.
+    ///
     /// The YANG module name the device advertises in `Capabilities`, which is what selects this
     /// profile. Compared unqualified, as every model name here is.
     pub module: &'static str,
@@ -881,8 +894,18 @@ mod tests {
 
     /// `collect` against a scripted device, given the models that device advertises — the list
     /// `probe` would have handed it.
+    /// Collect the way `execute` does, via the transport's own `capabilities()`.
+    ///
+    /// Reading `device.models` directly (as this did) leaves `ScriptedDevice::capabilities()`
+    /// dead in the test path, so nothing exercises the call production uses. It does NOT close
+    /// the whole gap: the assignment that matters is `models` in `probe`, and no test reaches
+    /// `probe` at all because it constructs a `TonicTransport` directly, with no seam to inject
+    /// a fake. Replacing that assignment with `Vec::new()` still passes the suite — every device
+    /// silently becomes `NoneAdvertised` and DriveNets returns no neighbours, which is the exact
+    /// defect this whole line of work exists to fix. Making `probe`'s transport injectable is
+    /// the real fix; see the note on `GnmiProbeHandle`.
     async fn collect_from(device: &mut ScriptedDevice) -> anyhow::Result<Collection> {
-        let models = device.models.clone();
+        let models = device.capabilities().await?;
         collect(device, &models).await
     }
 
