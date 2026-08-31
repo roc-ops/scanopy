@@ -40,6 +40,9 @@ pub trait GnmiTransport: Send {
     /// ask for is a property of the device, not a guess: DriveNets serves `dn-lldp` and no
     /// `openconfig-lldp`, so asking openconfig first and catching the error would mean one
     /// failed round trip per scan and no way to tell "not served" from "served and empty".
+    ///
+    /// `probe` keeps that list and hands it to the collection, so this stays one round trip per
+    /// scan rather than two.
     async fn capabilities(&mut self) -> Result<Vec<String>>;
 
     /// `Subscribe` with `mode: ONCE` for the given paths, returning every notification the
