@@ -19,6 +19,19 @@ export type HostVirtualization = components['schemas']['HostVirtualization'];
 export type ProxmoxVirtualization = components['schemas']['ProxmoxVirtualization'];
 export type IPAddress = components['schemas']['IPAddress'];
 export type Interface = components['schemas']['Interface'];
+/**
+ * GH #701: a port's resolved adjacencies, as a `Vec` rather than the old `Interface.neighbor`
+ * scalar. Carried on the `TopologyData` bundle (`neighbours`), never on `Interface` itself.
+ */
+export type InterfaceNeighborRow = components['schemas']['InterfaceNeighborRow'];
+/** The two neighbour-resolution states a row can be in — same tagged shape `Neighbor` always had. */
+export type Neighbor = components['schemas']['Neighbor'];
+/**
+ * Raw LLDP/CDP evidence behind `InterfaceNeighborRow` — a port's unresolved candidates, one per
+ * distinct record heard on it. Carried on the `TopologyData` bundle (`candidates`), never on
+ * `Interface` itself.
+ */
+export type InterfaceNeighborCandidate = components['schemas']['InterfaceNeighborCandidate'];
 export type Port = components['schemas']['Port'];
 export type Service = components['schemas']['Service'];
 export type TransportProtocol = components['schemas']['TransportProtocol'];

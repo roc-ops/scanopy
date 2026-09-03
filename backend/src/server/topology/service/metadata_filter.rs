@@ -28,7 +28,7 @@ use std::collections::{HashMap, HashSet};
 
 use uuid::Uuid;
 
-use crate::server::interfaces::r#impl::base::Interface;
+use crate::server::interface_neighbors::r#impl::base::InterfaceNeighborRow;
 use crate::server::shared::entities::EntityDiscriminants;
 use crate::server::topology::types::base::TopologyOptions;
 use crate::server::topology::types::views::{
@@ -113,13 +113,23 @@ pub fn server_hide_sets(options: &TopologyOptions) -> HashMap<EntityDiscriminant
 /// Interfaces named as another interface's neighbour.
 ///
 /// Built once and handed to every `filter_values` call. See `FilterValueContext` for why judging a
-/// port's own `neighbor` alone is wrong.
+/// port's own resolved rows alone is wrong. GH #701: reads the merged neighbour read-model
+/// (`InterfaceNeighborRow`) instead of `Interface.base.neighbor` — a port's adjacencies are a `Vec`
+/// now, so this is a plain map over every resolved row rather than a filter over interfaces.
 pub fn referenced_neighbour_interfaces<'a>(
-    interfaces: impl Iterator<Item = &'a Interface>,
+    neighbours: impl Iterator<Item = &'a InterfaceNeighborRow>,
 ) -> HashSet<Uuid> {
-    interfaces
-        .filter_map(|i| i.base.neighbor.as_ref().and_then(|n| n.interface_id()))
+    neighbours
+        .filter_map(|row| row.neighbor.interface_id())
         .collect()
+}
+
+/// Interfaces with at least one live row of their own in either resolved-neighbour table — the
+/// successor to reading `Interface.neighbor.is_some()` directly.
+pub fn interfaces_with_neighbours<'a>(
+    neighbours: impl Iterator<Item = &'a InterfaceNeighborRow>,
+) -> HashSet<Uuid> {
+    neighbours.map(|row| row.interface_id).collect()
 }
 
 /// Drop entities of one type that every rendering view hides.
@@ -142,7 +152,8 @@ pub fn retain_visible<T: HasFilterValues>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::server::interfaces::r#impl::base::{Interface, InterfaceBase, Neighbor};
+    use crate::server::interface_neighbors::r#impl::base::Neighbor;
+    use crate::server::interfaces::r#impl::base::{Interface, InterfaceBase};
     use crate::server::topology::types::base::{TopologyOptions, TopologyRequestOptions};
 
     fn options_hiding(view: TopologyView, values: &[&str]) -> TopologyOptions {
@@ -163,12 +174,26 @@ mod tests {
         }
     }
 
-    fn interface(id: Uuid, neighbor: Option<Neighbor>) -> Interface {
-        let mut base = InterfaceBase::default();
-        base.neighbor = neighbor;
-        let mut iface = Interface::new(base);
+    fn interface(id: Uuid) -> Interface {
+        let mut iface = Interface::new(InterfaceBase::default());
         iface.id = id;
         iface
+    }
+
+    fn neighbor_row(interface_id: Uuid, neighbor: Neighbor) -> InterfaceNeighborRow {
+        InterfaceNeighborRow {
+            id: Uuid::new_v4(),
+            interface_id,
+            neighbor,
+            neighbor_seen_at: None,
+        }
+    }
+
+    fn ctx(neighbours: &[InterfaceNeighborRow]) -> FilterValueContext {
+        FilterValueContext {
+            interfaces_referenced_as_neighbours: referenced_neighbour_interfaces(neighbours.iter()),
+            interfaces_with_neighbours: interfaces_with_neighbours(neighbours.iter()),
+        }
     }
 
     /// The behaviour the whole feature turns on: a port nothing points at, and which points at
@@ -182,14 +207,13 @@ mod tests {
         let unlinked = Uuid::new_v4();
 
         let mut interfaces = vec![
-            interface(linked_out, Some(Neighbor::Interface(linked_in))),
-            interface(linked_in, None),
-            interface(unlinked, None),
+            interface(linked_out),
+            interface(linked_in),
+            interface(unlinked),
         ];
+        let neighbours = vec![neighbor_row(linked_out, Neighbor::Interface(linked_in))];
+        let ctx = ctx(&neighbours);
 
-        let ctx = FilterValueContext {
-            interfaces_referenced_as_neighbours: referenced_neighbour_interfaces(interfaces.iter()),
-        };
         let dropped = retain_visible(
             &mut interfaces,
             hide_sets.get(&EntityDiscriminants::Interface),
@@ -213,7 +237,7 @@ mod tests {
         // Hidden in a view that declares no server-side filter for Interface at all.
         let hide_sets = server_hide_sets(&options_hiding(TopologyView::Workloads, &["Unlinked"]));
 
-        let mut interfaces = vec![interface(Uuid::new_v4(), None)];
+        let mut interfaces = vec![interface(Uuid::new_v4())];
         let dropped = retain_visible(
             &mut interfaces,
             hide_sets.get(&EntityDiscriminants::Interface),
@@ -235,7 +259,7 @@ mod tests {
     #[test]
     fn product_defaults_hide_unlinked_ports() {
         let hide_sets = server_hide_sets(&TopologyOptions::default());
-        let mut interfaces = vec![interface(Uuid::new_v4(), None)];
+        let mut interfaces = vec![interface(Uuid::new_v4())];
         let dropped = retain_visible(
             &mut interfaces,
             hide_sets.get(&EntityDiscriminants::Interface),
@@ -249,7 +273,7 @@ mod tests {
     #[test]
     fn an_empty_hide_set_keeps_everything() {
         let hide_sets = server_hide_sets(&options_hiding(TopologyView::L2Physical, &[]));
-        let mut interfaces = vec![interface(Uuid::new_v4(), None)];
+        let mut interfaces = vec![interface(Uuid::new_v4())];
         let dropped = retain_visible(
             &mut interfaces,
             hide_sets.get(&EntityDiscriminants::Interface),
