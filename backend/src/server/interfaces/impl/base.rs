@@ -309,9 +309,12 @@ pub struct InterfaceBase {
     /// Not the identity of the row. `match_existing_interface` tries `(host_id, if_name)` first
     /// and the live unique index is on that pair; the index tier only runs for a row that has one.
     pub if_index: Option<i32>,
-    /// SNMP ifDescr - interface description (e.g., GigabitEthernet0/1)
-    #[validate(length(min = 1, message = "Interface description is required"))]
-    pub if_descr: String,
+    /// SNMP ifDescr - interface description (e.g., GigabitEthernet0/1), where one was read.
+    ///
+    /// `None` for a source with nothing to put here — PROFINET DCP Identify carries no per-port
+    /// description at all. Same principle as `if_index`/`if_type`: an absent value is `None`, never
+    /// a fabricated string standing in for it.
+    pub if_descr: Option<String>,
     /// SNMP ifName - short interface name (e.g., Gi1/0/1)
     pub if_name: Option<String>,
     /// SNMP ifAlias - user-configured description
@@ -410,7 +413,7 @@ impl Default for InterfaceBase {
             host_id: Uuid::nil(),
             network_id: Uuid::nil(),
             if_index: None,
-            if_descr: String::new(),
+            if_descr: None,
             if_name: None,
             if_alias: None,
             if_type: None,
@@ -498,14 +501,13 @@ impl ChangeTriggersTopologyStaleness<Interface> for Interface {
 
 impl Display for Interface {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let descr = self.base.if_descr.as_deref().unwrap_or("(no description)");
         match self.base.if_index {
-            Some(if_index) => write!(
-                f,
-                "Interface {} (ifIndex {}): {}",
-                self.id, if_index, self.base.if_descr
-            ),
+            Some(if_index) => {
+                write!(f, "Interface {} (ifIndex {}): {}", self.id, if_index, descr)
+            }
             // A port learned from a neighbour's advertisement has no index to name it by.
-            None => write!(f, "Interface {}: {}", self.id, self.base.if_descr),
+            None => write!(f, "Interface {}: {}", self.id, descr),
         }
     }
 }
@@ -540,9 +542,23 @@ impl Interface {
         self.base.admin_status == Some(IfAdminStatus::Up)
     }
 
-    /// Get display name - prefer ifAlias if set, otherwise ifDescr
-    pub fn display_name(&self) -> &str {
-        self.base.if_alias.as_deref().unwrap_or(&self.base.if_descr)
+    /// Display name for UI/topology labels: ifAlias, then ifDescr, then — for a source with
+    /// neither, such as a PROFINET DCP identify — the MAC it was identified by, which is more
+    /// useful than a bare placeholder since it is the one thing every producer of this row has.
+    /// "Interface" only when none of those exist, mirroring the `"Unnamed host"`/`"Unknown Host"`
+    /// precedent elsewhere in this module for backend-owned fallback text (not user-facing app
+    /// chrome, so not paraglide — device data and its absence, like a hostname or an IP).
+    pub fn display_name(&self) -> String {
+        if let Some(alias) = self.base.if_alias.as_deref().filter(|s| !s.is_empty()) {
+            return alias.to_string();
+        }
+        if let Some(descr) = self.base.if_descr.as_deref().filter(|s| !s.is_empty()) {
+            return descr.to_string();
+        }
+        if let Some(mac) = self.base.mac_address.as_ref() {
+            return mac.value().0.to_string();
+        }
+        "Interface".to_string()
     }
 
     /// Returns true if this port has a resolved neighbor connection

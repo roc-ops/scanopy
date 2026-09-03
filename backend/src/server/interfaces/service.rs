@@ -193,9 +193,10 @@ impl InterfaceService {
     /// 3. `(host_id, mac_address)` with single-MAC guard — last resort for ports
     ///    that got both renamed and renumbered but kept their NIC
     ///
-    /// On match, preserves id + created_at + mac_address + if_name (via
-    /// `preserve_immutable_fields`) and overwrites the rest with the incoming payload.
-    /// Skips relationship validation (data from trusted SNMP source).
+    /// On match, preserves id + created_at + mac_address + the ifTable-shaped fields (if_name,
+    /// if_index, if_type, admin/oper status, if_descr) wherever the incoming payload has none of
+    /// its own — via `preserve_immutable_fields` — and overwrites the rest with the incoming
+    /// payload. Skips relationship validation (data from trusted SNMP source).
     ///
     /// `claimed` holds the ids of existing rows already matched (or created) by
     /// earlier interfaces in the *same* discovery batch. A row may be claimed by
@@ -345,7 +346,7 @@ mod tests {
     fn make_iface(if_index: i32, if_name: Option<&str>, mac: Option<&str>) -> Interface {
         let mut entry = make_indexless_iface(if_name, mac);
         entry.base.if_index = Some(if_index);
-        entry.base.if_descr = format!("ifIndex {if_index}");
+        entry.base.if_descr = Some(format!("ifIndex {if_index}"));
         entry
     }
 
@@ -354,7 +355,7 @@ mod tests {
     fn make_indexless_iface(if_name: Option<&str>, mac: Option<&str>) -> Interface {
         let mut base = InterfaceBase::default();
         base.host_id = Uuid::nil();
-        base.if_descr = if_name.unwrap_or_default().to_string();
+        base.if_descr = if_name.map(str::to_string);
         base.if_name = if_name.map(String::from);
         base.mac_address = mac
             .map(|s| s.parse::<MacAddress>().unwrap())
@@ -562,5 +563,36 @@ mod tests {
         assert_eq!(persisted.len(), 1, "the walk must not add a second eth0");
         assert_eq!(persisted[0].id, inferred_id, "same row, upgraded");
         assert_eq!(persisted[0].base.if_index, Some(3));
+    }
+
+    /// The acceptance bar for the PROFINET DCP item: "a host DCP also saw does not lose its
+    /// SNMP-discovered interfaces." A DCP submission carries no `if_name`/`if_index` at all — it
+    /// has neither, unlike the LLDP-minted shape `make_indexless_iface` was written for, which at
+    /// least has a name — so Tiers 1 and 2 both skip and only Tier 3 (MAC) can place it. If it
+    /// matched nothing it would insert as a *second* row for the same physical port; if the
+    /// existing row's Tier 1/2 identity were lost in the merge that would be its own bug. Neither
+    /// happens: the incoming MAC-only entry resolves onto the existing SNMP row, which keeps its
+    /// name and index.
+    #[test]
+    fn a_mac_only_dcp_submission_matches_the_snmp_row_sharing_its_mac_rather_than_duplicating_it() {
+        let mac = "aa:bb:cc:dd:ee:ff";
+        let snmp_row = make_iface(7, Some("Gi1/0/7"), Some(mac));
+        let existing_id = snmp_row.id;
+
+        let dcp_entry = make_indexless_iface(None, Some(mac));
+        let persisted = run_batch_from(vec![snmp_row], vec![dcp_entry], true);
+
+        assert_eq!(
+            persisted.len(),
+            1,
+            "must resolve onto the existing row, not add a second one"
+        );
+        assert_eq!(persisted[0].id, existing_id);
+        assert_eq!(
+            persisted[0].base.if_name.as_deref(),
+            Some("Gi1/0/7"),
+            "the SNMP row's identity must survive the merge"
+        );
+        assert_eq!(persisted[0].base.if_index, Some(7));
     }
 }

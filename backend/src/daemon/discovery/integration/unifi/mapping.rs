@@ -154,7 +154,7 @@ fn map_interfaces(
             host_id: Uuid::nil(),
             network_id,
             if_index: Some(if_index),
-            if_descr: name.clone(),
+            if_descr: Some(name.clone()),
             if_name: Some(name),
             if_type: Some(IF_TYPE_ETHERNET),
             admin_status: Some(IfAdminStatus::Up),
@@ -220,7 +220,7 @@ fn port_to_interface(port: &UnifiPort, network_id: Uuid, device_mac: Option<&str
         host_id: Uuid::nil(),
         network_id,
         if_index: Some(if_index),
-        if_descr: name.clone(),
+        if_descr: Some(name.clone()),
         if_name: Some(name),
         if_type: Some(IF_TYPE_ETHERNET),
         speed_bps: port
@@ -540,8 +540,17 @@ mod tests {
             .iter()
             .find(|d| d.ip.to_string() == "192.168.20.50")
             .expect("degenerate switch should be mapped");
-        assert_eq!(interface(device, 3).base.if_descr, "Port 3");
-        assert!(!interface(device, 8).base.if_descr.is_empty());
+        assert_eq!(
+            interface(device, 3).base.if_descr.as_deref(),
+            Some("Port 3")
+        );
+        assert!(
+            interface(device, 8)
+                .base
+                .if_descr
+                .as_ref()
+                .is_some_and(|d| !d.is_empty())
+        );
     }
 
     /// UniFi repeats the chassis MAC on every port. Recording it would make the MAC tier of

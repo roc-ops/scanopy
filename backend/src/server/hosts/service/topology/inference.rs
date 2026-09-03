@@ -347,7 +347,7 @@ impl HostService {
                 (Some(port_name), mac) => vec![Interface::new(InterfaceBase {
                     network_id,
                     host_id: Uuid::nil(), // Server assigns.
-                    if_descr: port_name.clone(),
+                    if_descr: Some(port_name.clone()),
                     if_name: Some(port_name.clone()),
                     mac_address: mac.map(|m| {
                         MacEvidence::new(MacEvidenceValue(m), AttributeSource::LldpChassisId)
@@ -361,7 +361,7 @@ impl HostService {
                 (None, Some(mac)) => vec![Interface::new(InterfaceBase {
                     network_id,
                     host_id: Uuid::nil(), // Server assigns.
-                    if_descr: mac.to_string(),
+                    if_descr: Some(mac.to_string()),
                     mac_address: Some(MacEvidence::new(
                         MacEvidenceValue(mac),
                         AttributeSource::LldpChassisId,

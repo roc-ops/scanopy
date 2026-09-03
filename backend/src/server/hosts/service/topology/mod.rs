@@ -48,7 +48,7 @@ fn unmatched_neighbour_warning(
 ) -> Option<DiscoveryWarning> {
     let detail = UnmatchedNeighbour {
         host_id: interface.base.host_id,
-        if_descr: interface.base.if_descr.clone(),
+        if_descr: interface.base.if_descr.clone().unwrap_or_default(),
         identifier,
         sys_name,
         address: interface
@@ -92,7 +92,7 @@ fn unplaced_far_end(interface: &Interface, reason: UnresolvedReason) -> Option<U
     let far_end_port = interface.advertised_far_end_port();
     Some(UnplacedFarEnd {
         host_id: interface.base.host_id,
-        if_descr: interface.base.if_descr.clone(),
+        if_descr: interface.base.if_descr.clone().unwrap_or_default(),
         sys_name: interface
             .base
             .lldp_sys_name
@@ -120,7 +120,7 @@ fn unresolved_port_warning(
 ) -> DiscoveryWarning {
     let detail = UnresolvedPort {
         host_id: interface.base.host_id,
-        if_descr: interface.base.if_descr.clone(),
+        if_descr: interface.base.if_descr.clone().unwrap_or_default(),
         remote_host_id,
         port_id,
         // `lldpRemPortDesc`, the last-resort tier. Carried because "the id failed and the
@@ -607,7 +607,7 @@ impl HostService {
             let interface = Interface::new(InterfaceBase {
                 network_id,
                 host_id,
-                if_descr: descr,
+                if_descr: Some(descr),
                 if_name: name,
                 // The port id a neighbour advertised for itself. Announced on a link anything
                 // could have spoken on, not something we asked the far end for.
@@ -623,7 +623,7 @@ impl HostService {
             {
                 Ok(created) => tracing::info!(
                     host_id = %host_id,
-                    port = %created.base.if_descr,
+                    port = %created.base.if_descr.as_deref().unwrap_or("?"),
                     "Recorded the port a neighbour named for a device that describes none itself"
                 ),
                 Err(e) => tracing::warn!(

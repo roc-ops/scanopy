@@ -142,6 +142,19 @@ fn a_devices_own_protocol_outranks_a_mib_which_outranks_a_controller() {
     assert!(queried < native, "a native protocol must outrank SNMP");
 }
 
+/// PROFINET DCP is a bare `AttributeSource` variant, not `Probe(ClientProbe)` (`ClientProbe` is
+/// scoped to TCP/UDP application probes reached over an already-open port; DCP is raw L2 with no
+/// port at all), but it must still land at the same `Native` tier a device's own protocol
+/// occupies via the `Probe` path above — outranking `ArpReply`, a third-party inference about the
+/// same MAC, for the same reason EtherNetIp outranks SNMP: the protocol is the subject's own.
+#[test]
+fn profinet_dcp_outranks_arp_for_the_same_field() {
+    assert!(
+        AttributeSource::ArpReply.rank() < AttributeSource::ProfinetDcp.rank(),
+        "a directed DCP identify exchange must outrank an inferred ARP reply"
+    );
+}
+
 /// A value we synthesised from an identifier is an inference, whatever transport carried the
 /// identifier. `"CIP vendor 1"` is our own construction, so it must not displace a manufacturer
 /// name SNMP read off the device — even though EtherNet/IP outranks SNMP for what the device

@@ -20,7 +20,8 @@
 		hosts_interfaces_remotePort,
 		hosts_interfaces_remoteSystemName,
 		hosts_snmp_chassisId,
-		hosts_snmp_sysDescr
+		hosts_snmp_sysDescr,
+		hosts_unnamedInterface
 	} from '$lib/paraglide/messages';
 
 	interface Props {
@@ -69,7 +70,7 @@
 
 <div class="space-y-6">
 	<ConfigHeader
-		title={iface.if_name || iface.if_descr}
+		title={iface.if_name || iface.if_descr || hosts_unnamedInterface()}
 		subtitle={iface.if_index == null ? null : hosts_interfaces_index({ index: iface.if_index })}
 	/>
 

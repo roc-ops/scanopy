@@ -759,11 +759,14 @@ fn interface_summary(i: &Interface, status: EntityFreshness, is_fresh: bool) -> 
     // Interface's Display includes its UUID. For the digest we want only the
     // human-readable bits: the description if discovery provided one, else
     // the ifIndex.
-    let label = match (i.base.if_descr.is_empty(), i.base.if_index) {
-        (false, _) => i.base.if_descr.clone(),
-        (true, Some(if_index)) => format!("ifIndex {if_index}"),
+    let label = match (
+        i.base.if_descr.as_deref().filter(|d| !d.is_empty()),
+        i.base.if_index,
+    ) {
+        (Some(descr), _) => descr.to_string(),
+        (None, Some(if_index)) => format!("ifIndex {if_index}"),
         // Neither a description nor an index: a port known only as a name a neighbour published.
-        (true, None) => i.base.if_name.clone().unwrap_or_default(),
+        (None, None) => i.base.if_name.clone().unwrap_or_default(),
     };
     InterfaceSummary {
         id: i.id,

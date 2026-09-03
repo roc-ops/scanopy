@@ -14813,19 +14813,19 @@
             ],
             "description": "Association between a service and a port / interface that the service is listening on",
             "example": {
-              "created_at": "2026-08-28T15:33:32.433053Z",
+              "created_at": "2026-09-03T19:40:33.403442Z",
               "first_discovery_id": null,
-              "id": "e0a1c70d-a31f-4375-867b-eed564b798b3",
+              "id": "32fceca0-d1ae-4e31-a8ee-7ebbff6d2c75",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-08-28T15:33:32.433053Z",
+              "last_seen_at": "2026-09-03T19:40:33.403442Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-08-28T15:33:32.433053Z",
-              "valid_from": "2026-08-28T15:33:32.433053Z",
+              "updated_at": "2026-09-03T19:40:33.403442Z",
+              "valid_from": "2026-09-03T19:40:33.403442Z",
               "valid_to": null
             }
           },
@@ -15916,7 +15916,8 @@
                   "string",
                   "null"
                 ],
-                "description": "Firmware or software revision of the device."
+                "description": "ENTITY-MIB entPhysicalFirmwareRev — firmware revision of the device. Read-only, as above.",
+                "readOnly": true
               },
               "firmware_revision_source": {
                 "$ref": "#/components/schemas/AttributeSource",
@@ -16236,19 +16237,19 @@
                 {
                   "bindings": [
                     {
-                      "created_at": "2026-08-28T15:33:32.412434Z",
+                      "created_at": "2026-09-03T19:40:33.377999Z",
                       "first_discovery_id": null,
-                      "id": "265c7546-daf8-4cba-bd0d-59b1bd493d79",
+                      "id": "1ff980d7-feb0-4b1a-ab53-e2bc8a532b8e",
                       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                       "last_discovery_id": null,
-                      "last_seen_at": "2026-08-28T15:33:32.412434Z",
+                      "last_seen_at": "2026-09-03T19:40:33.377999Z",
                       "lineage_id": null,
                       "network_id": "550e8400-e29b-41d4-a716-446655440002",
                       "port_id": "550e8400-e29b-41d4-a716-446655440006",
                       "service_id": "550e8400-e29b-41d4-a716-446655440007",
                       "type": "Port",
-                      "updated_at": "2026-08-28T15:33:32.412434Z",
-                      "valid_from": "2026-08-28T15:33:32.412434Z",
+                      "updated_at": "2026-09-03T19:40:33.377999Z",
+                      "valid_from": "2026-09-03T19:40:33.377999Z",
                       "valid_to": null
                     }
                   ],
@@ -16262,7 +16263,7 @@
                   "name": "nginx",
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "position": 0,
-                  "service_definition": "Ollama",
+                  "service_definition": "NCPA Agent",
                   "source": {
                     "type": "Manual"
                   },
@@ -17473,19 +17474,19 @@
             "example": {
               "bindings": [
                 {
-                  "created_at": "2026-08-28T15:33:32.428206Z",
+                  "created_at": "2026-09-03T19:40:33.397131Z",
                   "first_discovery_id": null,
-                  "id": "8877b1b0-2f43-4522-bf53-8b33a7c44e27",
+                  "id": "3e9ed059-2251-44d2-a018-cae45a59673f",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-08-28T15:33:32.428206Z",
+                  "last_seen_at": "2026-09-03T19:40:33.397131Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-08-28T15:33:32.428206Z",
-                  "valid_from": "2026-08-28T15:33:32.428206Z",
+                  "updated_at": "2026-09-03T19:40:33.397131Z",
+                  "valid_from": "2026-09-03T19:40:33.397131Z",
                   "valid_to": null
                 }
               ],
@@ -17499,7 +17500,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Ollama",
+              "service_definition": "NCPA Agent",
               "source": {
                 "type": "Manual"
               },
@@ -18201,7 +18202,7 @@
                 "items": {
                   "$ref": "#/components/schemas/TopologyHost"
                 },
-                "description": "Hosts included in this topology."
+                "description": "Hosts included in this topology, each carrying the title the map and the host list share."
               },
               "interfaces": {
                 "type": "array",
@@ -19303,6 +19304,13 @@
             ]
           },
           {
+            "type": "string",
+            "description": "A PROFINET DCP Identify exchange: we sent the request and the transport correlated the\nreply to the station that sent it. `Native`, not merely `Queried` — like [`Self::Probe`]\nover [`ClientProbe::ModbusTcp`]/`EtherNetIp`/`OpcUa`, the protocol is the device's own\nrather than a generic MIB approximating it. A bare variant rather than `Probe(ClientProbe)`\non purpose: [`ClientProbe`] is scoped to application probes reached over an already-open\nTCP/UDP port (`every_client_probe_variant_has_a_producer` enforces that every variant has an\n`AppProbe` producer), and DCP is raw Ethernet with no port at all.",
+            "enum": [
+              "ProfinetDcp"
+            ]
+          },
+          {
             "type": "object",
             "description": "A value the thing emitted about itself, over whatever transport [`ClientProbe`] names.",
             "required": [
@@ -19336,7 +19344,7 @@
             ]
           }
         ],
-        "description": "How a discovered value reached us.\n\nEvery variant here has something that writes it. Sources with no producer are deliberately\nabsent: a rung the applier can never see is a rung nothing can be tested against, and the tier\ndecision is better made by whoever writes the reader than guessed in advance.\n\n**Do not derive `Ord`.** A derive compares the variant and then the payload, which would make\n`Probe(Docker) < Probe(Snmp)` on declaration order alone. Ordering is only ever [`Self::rank`].\n\n**Externally tagged**, which is serde's default and is left unstated for that reason. Thirty-three\nof these variants carry nothing, and a tag on a variant with no content is a key that distinguishes\nnothing — `\"Unspecified\"`, not `{\"type\":\"Unspecified\"}`, in every row of fifteen columns. The two\nthat do carry a [`ClientProbe`] keep it under their own name, `{\"Probe\":\"Snmp\"}`, which tells them\napart from each other and from every bare name."
+        "description": "How a discovered value reached us.\n\nEvery variant here has something that writes it. Sources with no producer are deliberately\nabsent: a rung the applier can never see is a rung nothing can be tested against, and the tier\ndecision is better made by whoever writes the reader than guessed in advance.\n\n**Do not derive `Ord`.** A derive compares the variant and then the payload, which would make\n`Probe(Docker) < Probe(Snmp)` on declaration order alone. Ordering is only ever [`Self::rank`].\n\n**Externally tagged**, which is serde's default and is left unstated for that reason. Thirty-three\nof these variants carry nothing, and a tag on a variant with no content is a key that distinguishes\nnothing — `\"Unspecified\"`, not `{\"type\":\"Unspecified\"}`, in every row of every column. The two\nthat do carry a [`ClientProbe`] keep it under their own name, `{\"Probe\":\"Snmp\"}`, which tells them\napart from each other and from every bare name."
       },
       "BillingPlan": {
         "oneOf": [
@@ -19675,19 +19683,19 @@
         ],
         "description": "Association between a service and a port / interface that the service is listening on",
         "example": {
-          "created_at": "2026-08-28T15:33:32.412860Z",
+          "created_at": "2026-09-03T19:40:33.378574Z",
           "first_discovery_id": null,
-          "id": "ee498b23-59fa-4e74-bd7d-8dcdebffdb45",
+          "id": "25b24807-4a11-4858-9463-1ce00b4684fd",
           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
           "last_discovery_id": null,
-          "last_seen_at": "2026-08-28T15:33:32.412860Z",
+          "last_seen_at": "2026-09-03T19:40:33.378574Z",
           "lineage_id": null,
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "port_id": "550e8400-e29b-41d4-a716-446655440006",
           "service_id": "550e8400-e29b-41d4-a716-446655440007",
           "type": "Port",
-          "updated_at": "2026-08-28T15:33:32.412860Z",
-          "valid_from": "2026-08-28T15:33:32.412860Z",
+          "updated_at": "2026-09-03T19:40:33.378574Z",
+          "valid_from": "2026-09-03T19:40:33.378574Z",
           "valid_to": null
         }
       },
@@ -20052,7 +20060,39 @@
           "InstantOn",
           "ModbusTcp",
           "OpcUa",
-          "EtherNetIp"
+          "EtherNetIp",
+          "Sip",
+          "Ssh",
+          "Ftp",
+          "Telnet",
+          "Rtsp",
+          "Nut",
+          "ZabbixAgent",
+          "CheckMkAgent",
+          "Smb",
+          "Ldap",
+          "Kerberos",
+          "MySql",
+          "PostgreSql",
+          "MsSql",
+          "MongoDb",
+          "Redis",
+          "Cassandra",
+          "Kafka",
+          "Amqp",
+          "Mqtt",
+          "OracleTns",
+          "Rdp",
+          "Nfs",
+          "DnsTcp",
+          "DockerSwarm",
+          "Tls",
+          "Ike",
+          "OpenVpn",
+          "Zmtp",
+          "Bacula",
+          "BeszelAgent",
+          "H323"
         ]
       },
       "Color": {
@@ -20350,7 +20390,7 @@
               "id": "550e8400-e29b-41d4-a716-446655440007",
               "name": "nginx",
               "position": 0,
-              "service_definition": "Ollama",
+              "service_definition": "NCPA Agent",
               "tags": [],
               "virtualization_metadata": null,
               "virtualization_service_id": null
@@ -23407,6 +23447,44 @@
           },
           {
             "type": "object",
+            "title": "ConnectionsWithoutProtocolResponse",
+            "description": "Addresses on a routed subnet completed a TCP handshake and then answered nothing, so no\nhost was recorded at any of them.\n\nThe shape a middlebox in the path produces: a firewall session helper, a load balancer or a\nscrubbing appliance answering on behalf of addresses with nothing behind them. One warning\nper subnet rather than per address — the case that raises it raises it for every address in\nthe range, and 254 copies of a sentence is not 254 findings.",
+            "required": [
+              "cidr",
+              "declined",
+              "ports",
+              "code"
+            ],
+            "properties": {
+              "cidr": {
+                "type": "string",
+                "description": "The subnet the addresses are in."
+              },
+              "code": {
+                "type": "string",
+                "enum": [
+                  "ConnectionsWithoutProtocolResponse"
+                ]
+              },
+              "declined": {
+                "type": "integer",
+                "format": "int32",
+                "description": "How many addresses in it answered a connect and nothing else.",
+                "minimum": 0
+              },
+              "ports": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                },
+                "description": "The ports that completed a handshake, most frequent first."
+              }
+            }
+          },
+          {
+            "type": "object",
             "title": "ScanTimeLimitWithEstimate",
             "description": "The run hit its global time limit, with an estimate of the work left.",
             "required": [
@@ -23609,6 +23687,36 @@
               }
             ],
             "description": "A range was created from the addresses unplaceable far ends publish for themselves."
+          },
+          {
+            "type": "object",
+            "title": "NeighbourResolutionIncomplete",
+            "description": "Link resolution ran out of its time budget, so this scan's links are incomplete.\n\nThe pass runs on the completion request, which the daemon will abandon at its own timeout —\nso it is bounded, and stopping has to be *said* rather than logged. Without this the\ndegraded result is indistinguishable from a network that genuinely has no neighbours.",
+            "required": [
+              "budget_seconds",
+              "neighbours",
+              "code"
+            ],
+            "properties": {
+              "budget_seconds": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Seconds the pass was allowed before it was stopped.",
+                "minimum": 0
+              },
+              "code": {
+                "type": "string",
+                "enum": [
+                  "NeighbourResolutionIncomplete"
+                ]
+              },
+              "neighbours": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Interfaces carrying neighbour data it was working through, so the reader can tell\n\"this network is large\" from \"something is wrong\".",
+                "minimum": 0
+              }
+            }
           },
           {
             "type": "object",
@@ -24931,7 +25039,7 @@
         "properties": {
           "firmware_revision": {
             "type": "string",
-            "description": "Firmware or software revision of the device as a whole"
+            "description": "ENTITY-MIB entPhysicalFirmwareRev - firmware revision of the device as a whole"
           },
           "firmware_revision_source": {
             "$ref": "#/components/schemas/AttributeSource"
@@ -25074,7 +25182,8 @@
               "string",
               "null"
             ],
-            "description": "Firmware or software revision of the device."
+            "description": "ENTITY-MIB entPhysicalFirmwareRev — firmware revision of the device. Read-only, as above.",
+            "readOnly": true
           },
           "firmware_revision_source": {
             "$ref": "#/components/schemas/AttributeSource",
@@ -25394,19 +25503,19 @@
             {
               "bindings": [
                 {
-                  "created_at": "2026-08-28T15:33:32.411965Z",
+                  "created_at": "2026-09-03T19:40:33.377458Z",
                   "first_discovery_id": null,
-                  "id": "63e41ca6-c29e-4dc6-afa7-ae5614e6c925",
+                  "id": "b518edba-d544-4f1f-b524-218dff52d299",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-08-28T15:33:32.411965Z",
+                  "last_seen_at": "2026-09-03T19:40:33.377458Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-08-28T15:33:32.411965Z",
-                  "valid_from": "2026-08-28T15:33:32.411965Z",
+                  "updated_at": "2026-09-03T19:40:33.377458Z",
+                  "valid_from": "2026-09-03T19:40:33.377458Z",
                   "valid_to": null
                 }
               ],
@@ -25420,7 +25529,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Ollama",
+              "service_definition": "NCPA Agent",
               "source": {
                 "type": "Manual"
               },
@@ -26289,8 +26398,7 @@
             "type": "object",
             "required": [
               "host_id",
-              "network_id",
-              "if_descr"
+              "network_id"
             ],
             "properties": {
               "admin_status": {
@@ -26356,8 +26464,11 @@
                 "description": "SNMP ifAlias - user-configured description"
               },
               "if_descr": {
-                "type": "string",
-                "description": "SNMP ifDescr - interface description (e.g., GigabitEthernet0/1)"
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SNMP ifDescr - interface description (e.g., GigabitEthernet0/1), where one was read.\n\n`None` for a source with nothing to put here — PROFINET DCP Identify carries no per-port\ndescription at all. Same principle as `if_index`/`if_type`: an absent value is `None`, never\na fabricated string standing in for it."
               },
               "if_index": {
                 "type": [
@@ -28368,7 +28479,8 @@
                     "string",
                     "null"
                   ],
-                  "description": "Firmware or software revision of the device."
+                  "description": "ENTITY-MIB entPhysicalFirmwareRev — firmware revision of the device. Read-only, as above.",
+                  "readOnly": true
                 },
                 "firmware_revision_source": {
                   "$ref": "#/components/schemas/AttributeSource",
@@ -28688,19 +28800,19 @@
                   {
                     "bindings": [
                       {
-                        "created_at": "2026-08-28T15:33:32.402556Z",
+                        "created_at": "2026-09-03T19:40:33.366875Z",
                         "first_discovery_id": null,
-                        "id": "7ac63578-f21f-4fc9-9237-d10cd5df373a",
+                        "id": "ba96252a-c1cd-47ad-af49-85c97cc1b73c",
                         "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                         "last_discovery_id": null,
-                        "last_seen_at": "2026-08-28T15:33:32.402556Z",
+                        "last_seen_at": "2026-09-03T19:40:33.366875Z",
                         "lineage_id": null,
                         "network_id": "550e8400-e29b-41d4-a716-446655440002",
                         "port_id": "550e8400-e29b-41d4-a716-446655440006",
                         "service_id": "550e8400-e29b-41d4-a716-446655440007",
                         "type": "Port",
-                        "updated_at": "2026-08-28T15:33:32.402556Z",
-                        "valid_from": "2026-08-28T15:33:32.402556Z",
+                        "updated_at": "2026-09-03T19:40:33.366875Z",
+                        "valid_from": "2026-09-03T19:40:33.366875Z",
                         "valid_to": null
                       }
                     ],
@@ -28714,7 +28826,7 @@
                     "name": "nginx",
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "position": 0,
-                    "service_definition": "Ollama",
+                    "service_definition": "NCPA Agent",
                     "source": {
                       "type": "Manual"
                     },
@@ -28857,19 +28969,19 @@
               "example": {
                 "bindings": [
                   {
-                    "created_at": "2026-08-28T15:33:32.427330Z",
+                    "created_at": "2026-09-03T19:40:33.395904Z",
                     "first_discovery_id": null,
-                    "id": "830a2bbd-e88b-43da-853c-6f04a8268017",
+                    "id": "d2b3f5dc-23e4-4df7-a6bf-25dad2d77d3e",
                     "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                     "last_discovery_id": null,
-                    "last_seen_at": "2026-08-28T15:33:32.427330Z",
+                    "last_seen_at": "2026-09-03T19:40:33.395904Z",
                     "lineage_id": null,
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "port_id": "550e8400-e29b-41d4-a716-446655440006",
                     "service_id": "550e8400-e29b-41d4-a716-446655440007",
                     "type": "Port",
-                    "updated_at": "2026-08-28T15:33:32.427330Z",
-                    "valid_from": "2026-08-28T15:33:32.427330Z",
+                    "updated_at": "2026-09-03T19:40:33.395904Z",
+                    "valid_from": "2026-09-03T19:40:33.395904Z",
                     "valid_to": null
                   }
                 ],
@@ -28883,7 +28995,7 @@
                 "name": "nginx",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
                 "position": 0,
-                "service_definition": "Ollama",
+                "service_definition": "NCPA Agent",
                 "source": {
                   "type": "Manual"
                 },
@@ -30439,6 +30551,10 @@
             "description": "Port scan probes per second. Operators lower this for fragile devices or\nnoisy IDS, and a rescan must respect that as much as a discovery does.",
             "minimum": 0
           },
+          "trust_port_only_detections": {
+            "type": "boolean",
+            "description": "Carried into a rescan: a rescan of a host on a routed subnet runs the same evidence check,\nand it would be strange for a host to survive a scan and vanish on rescan, or the reverse."
+          },
           "use_npcap_arp": {
             "type": "boolean",
             "description": "On Windows, use Npcap broadcast ARP instead of SendARP."
@@ -30682,6 +30798,10 @@
             "format": "int32",
             "description": "Port scan probes per second (default: 500)",
             "minimum": 0
+          },
+          "trust_port_only_detections": {
+            "type": "boolean",
+            "description": "Whether an open TCP port alone is enough to record a host on a subnet the daemon reaches\n*through* something (default: false).\n\nOn a subnet the daemon has an interface on, ARP answers first and this never applies. On a\nrouted one every address arrives enumerated, and a middlebox that completes the TCP handshake\nfor addresses with nothing behind them — a FortiGate session helper, a load balancer, a\nscrubbing appliance — makes every address look open. With this off, such an address is\nrecorded only when something actually answered: a probe that spoke the protocol, an endpoint\nthat replied, a credential that authenticated.\n\nTurning it on restores the older behaviour for hosts whose every open port is one Scanopy\ncannot interrogate. That is a real class of host — a bespoke TCP service on a routed subnet —\nwhich is why the escape hatch exists rather than the rule simply being absolute."
           },
           "use_npcap_arp": {
             "type": "boolean",
@@ -30932,19 +31052,19 @@
         "example": {
           "bindings": [
             {
-              "created_at": "2026-08-28T15:33:32.412765Z",
+              "created_at": "2026-09-03T19:40:33.378430Z",
               "first_discovery_id": null,
-              "id": "e835e864-7e60-41cd-8ecd-fbb0815ad8dd",
+              "id": "5fd0cd70-5c74-4f01-a250-003fbd4ebfe5",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-08-28T15:33:32.412765Z",
+              "last_seen_at": "2026-09-03T19:40:33.378430Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-08-28T15:33:32.412765Z",
-              "valid_from": "2026-08-28T15:33:32.412765Z",
+              "updated_at": "2026-09-03T19:40:33.378430Z",
+              "valid_from": "2026-09-03T19:40:33.378430Z",
               "valid_to": null
             }
           ],
@@ -30958,7 +31078,7 @@
           "name": "nginx",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "position": 0,
-          "service_definition": "Ollama",
+          "service_definition": "NCPA Agent",
           "source": {
             "type": "Manual"
           },
@@ -32053,7 +32173,7 @@
             "items": {
               "$ref": "#/components/schemas/TopologyHost"
             },
-            "description": "Hosts included in this topology."
+            "description": "Hosts included in this topology, each carrying the title the map and the host list share."
           },
           "interfaces": {
             "type": "array",
@@ -32216,7 +32336,7 @@
             "default": {
               "Application": [
                 {
-                  "id": "a594d58e-21d1-4976-8682-51f8145b775c",
+                  "id": "2b3704d3-4f40-4154-aff9-e5d0fecfbda9",
                   "rule": {
                     "ByApplication": {
                       "tag_ids": []
@@ -32226,23 +32346,23 @@
               ],
               "L2Physical": [
                 {
-                  "id": "23f56dde-0f88-43ce-b4b8-6e7adfc5adf1",
+                  "id": "d3d28efc-9a79-44e6-ac67-1d1441daa234",
                   "rule": "ByHost"
                 }
               ],
               "L3Logical": [
                 {
-                  "id": "94a61dfa-beed-4c6c-859c-8fc4bc5d6d32",
+                  "id": "52e7b7a5-383c-4c43-a433-a4d4d63c1012",
                   "rule": "BySubnet"
                 },
                 {
-                  "id": "a3cbbd18-b707-4ab8-aa57-2a3a46c5b641",
+                  "id": "ed6c13fb-17b5-4567-83aa-9b39db3a9f62",
                   "rule": "MergeContainerBridges"
                 }
               ],
               "Workloads": [
                 {
-                  "id": "23f56dde-0f88-43ce-b4b8-6e7adfc5adf1",
+                  "id": "d3d28efc-9a79-44e6-ac67-1d1441daa234",
                   "rule": "ByHost"
                 }
               ]
@@ -32272,19 +32392,19 @@
             "description": "Rules deciding how entities are placed and inlined within containers.",
             "default": [
               {
-                "id": "561db9f1-9dd8-4715-82e2-c8f8fabe0f9c",
+                "id": "a8ee6dd1-7742-49ae-8043-56c423a38169",
                 "rule": "ByTrunkPort"
               },
               {
-                "id": "ba1bfebc-a55d-427d-80d8-56a74c28e57b",
+                "id": "d088153e-8df6-455e-91e4-68411746eea9",
                 "rule": "ByVLAN"
               },
               {
-                "id": "26634ff3-29ad-4cdb-b007-bcc1a9366988",
+                "id": "a57285af-88bd-4788-9af3-7b174340729d",
                 "rule": "ByPortOpStatus"
               },
               {
-                "id": "48b7996c-7936-465b-9ced-46fa555eb175",
+                "id": "e4a09711-a38d-412a-a103-7b0b2856b076",
                 "rule": {
                   "ByServiceCategory": {
                     "categories": [
@@ -32302,7 +32422,7 @@
                 }
               },
               {
-                "id": "7b7f986b-8215-4dda-8333-aca1883ac2f3",
+                "id": "84d6cbdf-564b-4568-b7f9-a00d503e79dc",
                 "rule": {
                   "ByTag": {
                     "tag_ids": [],
@@ -32311,15 +32431,15 @@
                 }
               },
               {
-                "id": "d3751188-02f4-474c-8633-847f678c5fdc",
+                "id": "d55efed7-e5d3-45aa-be00-3adc6e35fe8e",
                 "rule": "ByHypervisor"
               },
               {
-                "id": "a09dec7d-58f7-46db-bf08-8902f7334580",
+                "id": "ec564d9e-5131-453e-a890-5992edb8c7e2",
                 "rule": "ByContainerRuntime"
               },
               {
-                "id": "700d8eda-8756-4e1c-85fa-84c5adf5d959",
+                "id": "d28672fb-1949-4000-9d74-1dfd59c0e9f5",
                 "rule": "ByStack"
               }
             ]

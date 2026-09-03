@@ -447,7 +447,7 @@ pub fn interface() -> Interface {
             host_id: ids::HOST,
             network_id: ids::NETWORK,
             if_index: Some(1),
-            if_descr: "GigabitEthernet0/1".to_string(),
+            if_descr: Some("GigabitEthernet0/1".to_string()),
             if_name: Some("Gi0/1".to_string()),
             if_alias: Some("Uplink to Core Switch".to_string()),
             if_type: Some(6),               // ethernet

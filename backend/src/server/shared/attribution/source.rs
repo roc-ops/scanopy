@@ -152,6 +152,14 @@ pub enum AttributeSource {
     ArpReply,
     /// The daemon reading its own host: NIC and routing configuration, and its own hostname.
     DaemonSelfReport,
+    /// A PROFINET DCP Identify exchange: we sent the request and the transport correlated the
+    /// reply to the station that sent it. `Native`, not merely `Queried` — like [`Self::Probe`]
+    /// over [`ClientProbe::ModbusTcp`]/`EtherNetIp`/`OpcUa`, the protocol is the device's own
+    /// rather than a generic MIB approximating it. A bare variant rather than `Probe(ClientProbe)`
+    /// on purpose: [`ClientProbe`] is scoped to application probes reached over an already-open
+    /// TCP/UDP port (`every_client_probe_variant_has_a_producer` enforces that every variant has an
+    /// `AppProbe` producer), and DCP is raw Ethernet with no port at all.
+    ProfinetDcp,
 
     /// A value the thing emitted about itself, over whatever transport [`ClientProbe`] names.
     Probe(ClientProbe),
@@ -182,6 +190,11 @@ impl AttributeSource {
 
             Self::ArpReply | Self::DaemonSelfReport => M::Queried,
 
+            // The protocol is the device's own, not a generic transport a MIB approximates —
+            // same reasoning as `ClientProbe::method()`'s `Native` arms, just not delegated (see
+            // the variant's own doc comment for why).
+            Self::ProfinetDcp => M::Native,
+
             // Delegated, not because probes are special, but so that adding a probe forces the
             // tier decision at the probe's own definition instead of here — where it would be easy
             // to add a variant and never revisit this match.
@@ -205,6 +218,7 @@ impl AttributeSource {
             | Self::ForwardingTable
             | Self::ArpReply
             | Self::DaemonSelfReport
+            | Self::ProfinetDcp
             | Self::Probe(_) => Authorship::Machine,
         }
     }
@@ -265,6 +279,7 @@ impl AttributeSource {
                 AttributeSourceDiscriminants::ForwardingTable => vec![Self::ForwardingTable],
                 AttributeSourceDiscriminants::ArpReply => vec![Self::ArpReply],
                 AttributeSourceDiscriminants::DaemonSelfReport => vec![Self::DaemonSelfReport],
+                AttributeSourceDiscriminants::ProfinetDcp => vec![Self::ProfinetDcp],
                 AttributeSourceDiscriminants::Manual => vec![Self::Manual],
             })
             .collect()
@@ -317,6 +332,7 @@ impl AttributeSource {
             AttributeSourceDiscriminants::ForwardingTable => Self::ForwardingTable,
             AttributeSourceDiscriminants::ArpReply => Self::ArpReply,
             AttributeSourceDiscriminants::DaemonSelfReport => Self::DaemonSelfReport,
+            AttributeSourceDiscriminants::ProfinetDcp => Self::ProfinetDcp,
             AttributeSourceDiscriminants::Manual => Self::Manual,
         }
     }
