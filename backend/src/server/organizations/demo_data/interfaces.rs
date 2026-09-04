@@ -54,11 +54,6 @@ pub(super) fn generate_interfaces(
         if ids.is_empty() { None } else { Some(ids) }
     };
 
-    // HQ switch MAC (used as chassis ID)
-    let hq_switch_mac = "78:45:c4:ab:cd:01";
-    // DC switch MAC
-    let dc_switch_mac = "78:45:c4:ab:cd:02";
-
     // ========================================================================
     // HQ: pfSense firewall — multiple ip_addresses
     // ========================================================================
@@ -192,7 +187,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -244,7 +238,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -328,7 +321,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -380,7 +372,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -430,13 +421,6 @@ pub(super) fn generate_interfaces(
             .find(|n| n.id == host.base.network_id)
             .unwrap();
         let ip_address = find_ip_address(host.id);
-
-        let pfsense_host = find_host("pfsense-fw01");
-        let truenas_host = find_host("truenas-primary");
-        let proxmox_hv01 = find_host("proxmox-hv01");
-        let proxmox_hv02 = find_host("proxmox-hv02");
-        let docker_host = find_host("docker-prod01");
-        let ap_host = find_host("unifi-ap-lobby");
 
         // Port 1 ↔ pfsense-fw01
         interfaces.push(Interface {
@@ -740,7 +724,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -793,7 +776,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -836,7 +818,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -888,7 +869,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -940,7 +920,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -992,7 +971,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-
             legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
@@ -1042,11 +1020,6 @@ pub(super) fn generate_interfaces(
             .find(|n| n.id == host.base.network_id)
             .unwrap();
         let ip_address = find_ip_address(host.id);
-
-        let dc_fw = find_host("dc-fw01");
-        let dc_proxmox = find_host("dc-proxmox-hv01");
-        let dc_docker = find_host("dc-docker01");
-        let dc_haproxy = find_host("haproxy-lb01");
 
         // Port 1 ↔ dc-fw01
         interfaces.push(Interface {

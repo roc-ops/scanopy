@@ -39,7 +39,6 @@ use crate::server::{
     },
     interfaces::r#impl::base::{IfAdminStatus, IfOperStatus, Interface, InterfaceBase},
     ip_addresses::r#impl::base::{IPAddress, IPAddressBase},
-    lldp::{LldpChassisId, LldpPortId},
     networks::r#impl::{DEFAULT_STALE_AFTER_HOURS, Network, NetworkBase},
     ports::r#impl::base::{Port, PortType},
     services::r#impl::patterns::ClientProbe,
