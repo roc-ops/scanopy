@@ -43,6 +43,7 @@ use uuid::Uuid;
 pub mod demo_data_seeding;
 pub mod dependencies;
 pub mod host_create_with_children;
+pub mod host_interface_sync;
 pub mod host_naming;
 pub mod lldp_resolution;
 pub mod snmp_sim_resolution;

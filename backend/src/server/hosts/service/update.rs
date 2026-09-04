@@ -29,6 +29,7 @@ impl HostService {
             ip_addresses,
             ports,
             services,
+            interfaces,
             credential_assignments,
         } = request;
 
@@ -134,6 +135,12 @@ impl HostService {
         // Sync services only if provided (None means preserve existing)
         if let Some(services) = services {
             self.sync_services(&updated.id, &network_id, services, authentication.clone())
+                .await?;
+        }
+
+        // Sync interfaces only if provided (None means preserve existing)
+        if let Some(interfaces) = interfaces {
+            self.sync_interfaces(&updated.id, &network_id, interfaces, authentication.clone())
                 .await?;
         }
 
@@ -250,6 +257,57 @@ impl HostService {
                 // Create new port with client-provided ID
                 self.port_service
                     .create(port, authentication.clone())
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Sync interfaces for a host: delete removed, update existing, create new.
+    /// Client provides UUIDs - if ID exists for this host, update; if not, create.
+    async fn sync_interfaces(
+        &self,
+        host_id: &Uuid,
+        network_id: &Uuid,
+        inputs: Vec<InterfaceInput>,
+        authentication: AuthenticatedEntity,
+    ) -> Result<()> {
+        use std::collections::HashSet;
+
+        // Get existing interfaces for this host
+        let existing = self.interface_service.get_for_host(host_id).await?;
+        let existing_ids: HashSet<Uuid> = existing.iter().map(|i| i.id).collect();
+
+        // All input IDs (client-provided)
+        let input_ids: HashSet<Uuid> = inputs.iter().map(|i| i.id).collect();
+
+        // Delete interfaces that are not in the input list
+        let to_delete: Vec<Uuid> = existing_ids.difference(&input_ids).copied().collect();
+        if !to_delete.is_empty() {
+            self.interface_service
+                .delete_many(&to_delete, authentication.clone())
+                .await?;
+        }
+
+        // Process each input - create or update based on whether ID exists for this host
+        for input in inputs {
+            let id = input.id;
+            let mut interface = input.into_interface(*host_id, *network_id);
+
+            if existing_ids.contains(&id) {
+                // Update existing interface - preserve created_at from existing
+                if let Some(existing_iface) = existing.iter().find(|i| i.id == id) {
+                    interface.preserve_immutable_fields(existing_iface);
+                }
+
+                self.interface_service
+                    .update(&mut interface, authentication.clone())
+                    .await?;
+            } else {
+                // Create new interface with client-provided ID
+                self.interface_service
+                    .create(interface, authentication.clone())
                     .await?;
             }
         }

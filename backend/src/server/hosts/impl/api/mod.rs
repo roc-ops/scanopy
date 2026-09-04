@@ -527,11 +527,14 @@ impl BindingInput {
 // EXTERNAL API - IF ENTRY INPUT
 // =============================================================================
 
-/// Input for creating an SNMP interface entry (ifTable data).
-/// Used in CreateHostRequest. Server assigns UUIDs since nothing references
-/// Interface IDs at creation time (neighbor resolution is done server-side).
+/// Input for manually creating or updating an interface entry.
+/// Used in `UpdateHostRequest`, synced the same way as `ip_addresses`/`ports`/`services`:
+/// a client-provided `id` that already exists on this host is updated, one that doesn't is
+/// created, and an existing row missing from the list is deleted.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct InterfaceInput {
+    /// Client-provided UUID for this interface.
+    pub id: Uuid,
     /// SNMP ifIndex - stable identifier within device
     pub if_index: i32,
     /// SNMP ifDescr - interface description (e.g., GigabitEthernet0/1)
@@ -565,7 +568,7 @@ impl InterfaceInput {
     pub fn into_interface(self, host_id: Uuid, network_id: Uuid) -> Interface {
         let now = chrono::Utc::now();
         Interface {
-            id: Uuid::new_v4(),
+            id: self.id,
             created_at: now,
             updated_at: now,
             valid_from: now,
@@ -736,6 +739,12 @@ pub struct UpdateHostRequest {
     /// If None, existing services are preserved.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub services: Option<Vec<ServiceInput>>,
+
+    /// Interfaces to sync with this host.
+    /// If Some, server will create/update/delete to match this list.
+    /// If None, existing interfaces are preserved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interfaces: Option<Vec<InterfaceInput>>,
 
     /// Credential assignments for this host.
     /// If provided, replaces all existing credential assignments.

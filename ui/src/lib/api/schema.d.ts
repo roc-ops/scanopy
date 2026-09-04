@@ -1729,8 +1729,9 @@ export interface paths {
         get: operations["get_host_by_id"];
         /**
          * Update a host
-         * @description Updates host properties. Children (ip_addresses, ports, services)
-         *     are managed via their own endpoints.
+         * @description Updates host properties. Children (ip_addresses, ports, services, interfaces) are synced
+         *     from the fields on this same request body when provided — omit a field to leave that child
+         *     set untouched.
          *
          *     ### Tag Validation
          *
@@ -3205,19 +3206,19 @@ export interface components {
             /**
              * @description Association between a service and a port / interface that the service is listening on
              * @example {
-             *       "created_at": "2026-09-03T19:40:33.403442Z",
+             *       "created_at": "2026-09-04T22:35:46.329336Z",
              *       "first_discovery_id": null,
-             *       "id": "32fceca0-d1ae-4e31-a8ee-7ebbff6d2c75",
+             *       "id": "64da7a6b-1e30-4fbc-93da-1a90ff951aca",
              *       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *       "last_discovery_id": null,
-             *       "last_seen_at": "2026-09-03T19:40:33.403442Z",
+             *       "last_seen_at": "2026-09-04T22:35:46.329336Z",
              *       "lineage_id": null,
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *       "type": "Port",
-             *       "updated_at": "2026-09-03T19:40:33.403442Z",
-             *       "valid_from": "2026-09-03T19:40:33.403442Z",
+             *       "updated_at": "2026-09-04T22:35:46.329336Z",
+             *       "valid_from": "2026-09-04T22:35:46.329336Z",
              *       "valid_to": null
              *     }
              */
@@ -3842,19 +3843,19 @@ export interface components {
              *         {
              *           "bindings": [
              *             {
-             *               "created_at": "2026-09-03T19:40:33.377999Z",
+             *               "created_at": "2026-09-04T22:35:46.302589Z",
              *               "first_discovery_id": null,
-             *               "id": "1ff980d7-feb0-4b1a-ab53-e2bc8a532b8e",
+             *               "id": "f67ea33e-41b7-4e5b-bdc1-bacd6c1bdefb",
              *               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *               "last_discovery_id": null,
-             *               "last_seen_at": "2026-09-03T19:40:33.377999Z",
+             *               "last_seen_at": "2026-09-04T22:35:46.302589Z",
              *               "lineage_id": null,
              *               "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *               "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *               "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *               "type": "Port",
-             *               "updated_at": "2026-09-03T19:40:33.377999Z",
-             *               "valid_from": "2026-09-03T19:40:33.377999Z",
+             *               "updated_at": "2026-09-04T22:35:46.302589Z",
+             *               "valid_from": "2026-09-04T22:35:46.302589Z",
              *               "valid_to": null
              *             }
              *           ],
@@ -3868,7 +3869,7 @@ export interface components {
              *           "name": "nginx",
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "position": 0,
-             *           "service_definition": "NCPA Agent",
+             *           "service_definition": "Proxmox Datacenter Manager",
              *           "source": {
              *             "type": "Manual"
              *           },
@@ -4583,19 +4584,19 @@ export interface components {
              * @example {
              *       "bindings": [
              *         {
-             *           "created_at": "2026-09-03T19:40:33.397131Z",
+             *           "created_at": "2026-09-04T22:35:46.323639Z",
              *           "first_discovery_id": null,
-             *           "id": "3e9ed059-2251-44d2-a018-cae45a59673f",
+             *           "id": "2aaae2ee-b972-4867-ba93-edd65f6b4c81",
              *           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *           "last_discovery_id": null,
-             *           "last_seen_at": "2026-09-03T19:40:33.397131Z",
+             *           "last_seen_at": "2026-09-04T22:35:46.323639Z",
              *           "lineage_id": null,
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *           "type": "Port",
-             *           "updated_at": "2026-09-03T19:40:33.397131Z",
-             *           "valid_from": "2026-09-03T19:40:33.397131Z",
+             *           "updated_at": "2026-09-04T22:35:46.323639Z",
+             *           "valid_from": "2026-09-04T22:35:46.323639Z",
              *           "valid_to": null
              *         }
              *       ],
@@ -4609,7 +4610,7 @@ export interface components {
              *       "name": "nginx",
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "position": 0,
-             *       "service_definition": "NCPA Agent",
+             *       "service_definition": "Proxmox Datacenter Manager",
              *       "source": {
              *         "type": "Manual"
              *       },
@@ -5444,19 +5445,19 @@ export interface components {
         /**
          * @description Association between a service and a port / interface that the service is listening on
          * @example {
-         *       "created_at": "2026-09-03T19:40:33.378574Z",
+         *       "created_at": "2026-09-04T22:35:46.303334Z",
          *       "first_discovery_id": null,
-         *       "id": "25b24807-4a11-4858-9463-1ce00b4684fd",
+         *       "id": "743a1374-069a-45e7-84c9-ce04a9a3f347",
          *       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *       "last_discovery_id": null,
-         *       "last_seen_at": "2026-09-03T19:40:33.378574Z",
+         *       "last_seen_at": "2026-09-04T22:35:46.303334Z",
          *       "lineage_id": null,
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *       "type": "Port",
-         *       "updated_at": "2026-09-03T19:40:33.378574Z",
-         *       "valid_from": "2026-09-03T19:40:33.378574Z",
+         *       "updated_at": "2026-09-04T22:35:46.303334Z",
+         *       "valid_from": "2026-09-04T22:35:46.303334Z",
          *       "valid_to": null
          *     }
          */
@@ -5770,7 +5771,7 @@ export interface components {
          *           "id": "550e8400-e29b-41d4-a716-446655440007",
          *           "name": "nginx",
          *           "position": 0,
-         *           "service_definition": "NCPA Agent",
+         *           "service_definition": "Proxmox Datacenter Manager",
          *           "tags": [],
          *           "virtualization_metadata": null,
          *           "virtualization_service_id": null
@@ -7831,19 +7832,19 @@ export interface components {
          *         {
          *           "bindings": [
          *             {
-         *               "created_at": "2026-09-03T19:40:33.377458Z",
+         *               "created_at": "2026-09-04T22:35:46.301782Z",
          *               "first_discovery_id": null,
-         *               "id": "b518edba-d544-4f1f-b524-218dff52d299",
+         *               "id": "1349fc68-99f8-4b0c-930d-b41462796ac5",
          *               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *               "last_discovery_id": null,
-         *               "last_seen_at": "2026-09-03T19:40:33.377458Z",
+         *               "last_seen_at": "2026-09-04T22:35:46.301782Z",
          *               "lineage_id": null,
          *               "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *               "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *               "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *               "type": "Port",
-         *               "updated_at": "2026-09-03T19:40:33.377458Z",
-         *               "valid_from": "2026-09-03T19:40:33.377458Z",
+         *               "updated_at": "2026-09-04T22:35:46.301782Z",
+         *               "valid_from": "2026-09-04T22:35:46.301782Z",
          *               "valid_to": null
          *             }
          *           ],
@@ -7857,7 +7858,7 @@ export interface components {
          *           "name": "nginx",
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "position": 0,
-         *           "service_definition": "NCPA Agent",
+         *           "service_definition": "Proxmox Datacenter Manager",
          *           "source": {
          *             "type": "Manual"
          *           },
@@ -8543,12 +8544,18 @@ export interface components {
             vlan_membership?: boolean;
         };
         /**
-         * @description Input for creating an SNMP interface entry (ifTable data).
-         *     Used in CreateHostRequest. Server assigns UUIDs since nothing references
-         *     Interface IDs at creation time (neighbor resolution is done server-side).
+         * @description Input for manually creating or updating an interface entry.
+         *     Used in `UpdateHostRequest`, synced the same way as `ip_addresses`/`ports`/`services`:
+         *     a client-provided `id` that already exists on this host is updated, one that doesn't is
+         *     created, and an existing row missing from the list is deleted.
          */
         InterfaceInput: {
             admin_status?: null | components["schemas"]["IfAdminStatus"];
+            /**
+             * Format: uuid
+             * @description Client-provided UUID for this interface.
+             */
+            id: string;
             /** @description SNMP ifAlias - user-configured description */
             if_alias?: string | null;
             /** @description SNMP ifDescr - interface description (e.g., GigabitEthernet0/1) */
@@ -10556,19 +10563,19 @@ export interface components {
          * @example {
          *       "bindings": [
          *         {
-         *           "created_at": "2026-09-03T19:40:33.378430Z",
+         *           "created_at": "2026-09-04T22:35:46.303128Z",
          *           "first_discovery_id": null,
-         *           "id": "5fd0cd70-5c74-4f01-a250-003fbd4ebfe5",
+         *           "id": "7bc9b827-3e4f-4c0c-8a0f-e99db81019ca",
          *           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *           "last_discovery_id": null,
-         *           "last_seen_at": "2026-09-03T19:40:33.378430Z",
+         *           "last_seen_at": "2026-09-04T22:35:46.303128Z",
          *           "lineage_id": null,
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *           "type": "Port",
-         *           "updated_at": "2026-09-03T19:40:33.378430Z",
-         *           "valid_from": "2026-09-03T19:40:33.378430Z",
+         *           "updated_at": "2026-09-04T22:35:46.303128Z",
+         *           "valid_from": "2026-09-04T22:35:46.303128Z",
          *           "valid_to": null
          *         }
          *       ],
@@ -10582,7 +10589,7 @@ export interface components {
          *       "name": "nginx",
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "position": 0,
-         *       "service_definition": "NCPA Agent",
+         *       "service_definition": "Proxmox Datacenter Manager",
          *       "source": {
          *         "type": "Manual"
          *       },
@@ -11254,7 +11261,7 @@ export interface components {
              * @default {
              *       "Application": [
              *         {
-             *           "id": "2b3704d3-4f40-4154-aff9-e5d0fecfbda9",
+             *           "id": "117cbf67-32a5-4836-8c2d-4b0bcc03ad4d",
              *           "rule": {
              *             "ByApplication": {
              *               "tag_ids": []
@@ -11264,23 +11271,23 @@ export interface components {
              *       ],
              *       "L2Physical": [
              *         {
-             *           "id": "d3d28efc-9a79-44e6-ac67-1d1441daa234",
+             *           "id": "45b9edef-1f75-4d14-bc2c-fa8f635accb7",
              *           "rule": "ByHost"
              *         }
              *       ],
              *       "L3Logical": [
              *         {
-             *           "id": "52e7b7a5-383c-4c43-a433-a4d4d63c1012",
+             *           "id": "77f1a66c-0743-4021-9054-8bf2cbd57ee8",
              *           "rule": "BySubnet"
              *         },
              *         {
-             *           "id": "ed6c13fb-17b5-4567-83aa-9b39db3a9f62",
+             *           "id": "f8f9b6b0-d747-4e1f-be15-6fa2121c1144",
              *           "rule": "MergeContainerBridges"
              *         }
              *       ],
              *       "Workloads": [
              *         {
-             *           "id": "d3d28efc-9a79-44e6-ac67-1d1441daa234",
+             *           "id": "45b9edef-1f75-4d14-bc2c-fa8f635accb7",
              *           "rule": "ByHost"
              *         }
              *       ]
@@ -11293,19 +11300,19 @@ export interface components {
              * @description Rules deciding how entities are placed and inlined within containers.
              * @default [
              *       {
-             *         "id": "a8ee6dd1-7742-49ae-8043-56c423a38169",
+             *         "id": "bd59b0e0-dd4b-4dc1-add4-8add8fcd38b1",
              *         "rule": "ByTrunkPort"
              *       },
              *       {
-             *         "id": "d088153e-8df6-455e-91e4-68411746eea9",
+             *         "id": "91760058-1f58-45be-9dae-f73bfe751203",
              *         "rule": "ByVLAN"
              *       },
              *       {
-             *         "id": "a57285af-88bd-4788-9af3-7b174340729d",
+             *         "id": "fd53f540-dd3e-41d6-9749-46dfb1d87aa1",
              *         "rule": "ByPortOpStatus"
              *       },
              *       {
-             *         "id": "e4a09711-a38d-412a-a103-7b0b2856b076",
+             *         "id": "678942e2-b02e-473e-ad6d-4dcee64b47ea",
              *         "rule": {
              *           "ByServiceCategory": {
              *             "categories": [
@@ -11323,7 +11330,7 @@ export interface components {
              *         }
              *       },
              *       {
-             *         "id": "84d6cbdf-564b-4568-b7f9-a00d503e79dc",
+             *         "id": "235f7898-eae0-4c65-9f6c-5e7be7c39f6c",
              *         "rule": {
              *           "ByTag": {
              *             "tag_ids": [],
@@ -11332,15 +11339,15 @@ export interface components {
              *         }
              *       },
              *       {
-             *         "id": "d55efed7-e5d3-45aa-be00-3adc6e35fe8e",
+             *         "id": "e7a8441e-e939-4d74-9bdc-cb93c6c41df5",
              *         "rule": "ByHypervisor"
              *       },
              *       {
-             *         "id": "ec564d9e-5131-453e-a890-5992edb8c7e2",
+             *         "id": "3c4392c3-eca1-438c-9a9d-8cb50f3fd4e5",
              *         "rule": "ByContainerRuntime"
              *       },
              *       {
-             *         "id": "d28672fb-1949-4000-9d74-1dfd59c0e9f5",
+             *         "id": "3e79a92a-ff01-4124-9e8d-2e2215c91109",
              *         "rule": "ByStack"
              *       }
              *     ]
@@ -11504,6 +11511,12 @@ export interface components {
              * @description Server-assigned unique identifier.
              */
             id: string;
+            /**
+             * @description Interfaces to sync with this host.
+             *     If Some, server will create/update/delete to match this list.
+             *     If None, existing interfaces are preserved.
+             */
+            interfaces?: components["schemas"]["InterfaceInput"][] | null;
             /**
              * @description Interfaces to sync with this host.
              *     If Some, server will create/update/delete to match this list.

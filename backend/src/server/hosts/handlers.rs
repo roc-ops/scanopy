@@ -651,8 +651,9 @@ async fn create_host(
 
 /// Update a host
 ///
-/// Updates host properties. Children (ip_addresses, ports, services)
-/// are managed via their own endpoints.
+/// Updates host properties. Children (ip_addresses, ports, services, interfaces) are synced
+/// from the fields on this same request body when provided — omit a field to leave that child
+/// set untouched.
 ///
 /// ### Tag Validation
 ///

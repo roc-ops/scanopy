@@ -167,6 +167,7 @@ async fn save_from_ui(
                 ip_addresses: None,
                 ports: None,
                 services: None,
+                interfaces: None,
                 credential_assignments: None,
             },
             AuthenticatedEntity::System,
