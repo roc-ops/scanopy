@@ -14,7 +14,7 @@
 	import AnimatedProgressBar from '$lib/features/discovery/components/cards/AnimatedProgressBar.svelte';
 	import ProgressTrack from '$lib/shared/components/data/ProgressTrack.svelte';
 	import OsSelector from '../../OsSelector.svelte';
-	import { Loader2, CheckCircle2, AlertTriangle, SlidersHorizontal } from 'lucide-svelte';
+	import { Download, Loader2, CheckCircle2, AlertTriangle, SlidersHorizontal } from 'lucide-svelte';
 	import type { DaemonConnectionStatus } from '../../../stores/daemon-setup';
 	import { tooltip } from '$lib/shared/actions/tooltip';
 	import {
@@ -22,11 +22,17 @@
 		daemons_advancedTooltip,
 		daemons_docsMacvlan,
 		daemons_docsMacvlanLinkText,
+		common_ossign,
+		daemons_docsMsiSigning,
 		daemons_docsMultiVlan,
 		daemons_docsMultiVlanLinkText,
 		daemons_fixValidationErrors,
 		daemons_fixValidationErrorsBody,
 		daemons_installCommandDescription,
+		daemons_msiDownloadButton,
+		daemons_msiOmittedConfigBody,
+		daemons_msiOmittedConfigTitle,
+		daemons_msiRenameHint,
 		common_firstDiscoveryEmailHint,
 		common_viewTopology,
 		daemons_troubleshoot_waitingTitle,
@@ -46,12 +52,15 @@
 	} from '$lib/paraglide/messages';
 
 	type LinuxMethod = 'binary' | 'docker';
+	type WindowsMethod = 'exe' | 'msi';
 
 	interface Props {
 		selectedOS: DaemonOS;
 		onOsSelect: (os: DaemonOS) => void;
 		linuxMethod?: LinuxMethod;
 		onLinuxMethodChange?: (method: LinuxMethod) => void;
+		windowsMethod?: WindowsMethod;
+		onWindowsMethodChange?: (method: WindowsMethod) => void;
 		runCommand: string;
 		/** Server-assembled install artifacts (single source of truth), key already filled. */
 		artifacts?: InstallArtifacts | null;
@@ -78,6 +87,8 @@
 		onOsSelect,
 		linuxMethod = 'binary',
 		onLinuxMethodChange,
+		windowsMethod = 'exe',
+		onWindowsMethodChange,
 		runCommand,
 		artifacts = null,
 		hasErrors,
@@ -104,6 +115,8 @@
 
 	const windowsDownloadUrl =
 		'https://github.com/scanopy/scanopy/releases/latest/download/scanopy-daemon-windows-amd64.exe';
+	const windowsMsiDownloadUrl =
+		'https://github.com/scanopy/scanopy/releases/latest/download/scanopy-daemon-windows-amd64.msi';
 	const windowsInstallCommand = `Invoke-WebRequest -Uri "${windowsDownloadUrl}" -OutFile "scanopy-daemon-windows-amd64.exe"`;
 	const installScript = `bash -c "$(curl -fsSL https://raw.githubusercontent.com/scanopy/scanopy/refs/heads/main/install.sh)"`;
 
@@ -355,6 +368,8 @@
 				onOsSelect={handleOsSelect}
 				{linuxMethod}
 				onLinuxMethodChange={(method) => onLinuxMethodChange?.(method)}
+				{windowsMethod}
+				onWindowsMethodChange={(method) => onWindowsMethodChange?.(method)}
 			>
 				{#snippet afterLabel()}
 					<DocsHint
@@ -420,17 +435,47 @@
 						preventSelect={true}
 					/>
 				{:else if selectedOS === 'windows'}
-					<p class="text-secondary text-sm">
-						{daemons_installCommandDescription()}
-					</p>
-					<CodeContainer
-						language="powershell"
-						expandable={false}
-						maxHeight=""
-						code={combinedWindowsCommand}
-						onCopy={() => handleCopy('combined-install')}
-						preventSelect={true}
+					<DocsHint
+						text={daemons_docsMsiSigning()}
+						href="https://ossign.org"
+						linkText={common_ossign()}
 					/>
+					{#if windowsMethod === 'exe'}
+						<p class="text-secondary text-sm">
+							{daemons_installCommandDescription()}
+						</p>
+						<CodeContainer
+							language="powershell"
+							expandable={false}
+							maxHeight=""
+							code={combinedWindowsCommand}
+							onCopy={() => handleCopy('combined-install')}
+							preventSelect={true}
+						/>
+					{:else if artifacts?.msi.filename}
+						<div class="flex flex-wrap items-center gap-2">
+							<a
+								href={windowsMsiDownloadUrl}
+								download={artifacts.msi.filename}
+								class="btn-secondary inline-flex items-center gap-1"
+							>
+								<Download class="h-4 w-4" />
+								{daemons_msiDownloadButton()}
+							</a>
+							<span class="text-secondary font-mono text-xs">{artifacts.msi.filename}</span>
+						</div>
+						<p class="text-tertiary text-xs">
+							{daemons_msiRenameHint({ filename: artifacts.msi.filename })}
+						</p>
+						{#if artifacts.msi.omitted_config_keys.length > 0}
+							<InlineWarning
+								title={daemons_msiOmittedConfigTitle()}
+								body={daemons_msiOmittedConfigBody({
+									keys: artifacts.msi.omitted_config_keys.join(', ')
+								})}
+							/>
+						{/if}
+					{/if}
 				{:else if selectedOS === 'freebsd'}
 					<p class="text-secondary text-sm">
 						{daemons_installCommandDescription()}
