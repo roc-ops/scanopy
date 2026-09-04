@@ -24,10 +24,13 @@ pub mod switch_dlink_01;
 pub mod switch_exos_01;
 pub mod switch_flaky_01;
 pub mod switch_macport_01;
+pub mod switch_mcast_rcv_01;
+pub mod switch_mcast_src_01;
 pub mod switch_mute_01;
 pub mod switch_netgear_01;
 pub mod switch_offsite_01;
 pub mod switch_omada_01;
+pub mod switch_segment_gw_01;
 pub mod switch_shortports_01;
 pub mod switch_slowbulk_01;
 pub mod switch_stuck_01;
@@ -71,5 +74,9 @@ pub fn all() -> Vec<SimDevice> {
         switch_slowbulk_01::device(),
         switch_shortports_01::device(),
         switch_offsite_01::device(),
+        // GH #701: shared L2 segment, each port hearing two neighbours.
+        switch_mcast_rcv_01::device(),
+        switch_mcast_src_01::device(),
+        switch_segment_gw_01::device(),
     ]
 }

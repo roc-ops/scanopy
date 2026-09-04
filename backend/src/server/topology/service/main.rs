@@ -19,6 +19,10 @@ use crate::server::{
     bindings::{r#impl::base::Binding, service::BindingService},
     dependencies::{r#impl::base::Dependency, service::DependencyService},
     hosts::{r#impl::base::Host, service::HostService},
+    interface_neighbors::{
+        r#impl::base::{InterfaceNeighborCandidate, InterfaceNeighborRow},
+        service::InterfaceNeighborService,
+    },
     interfaces::{r#impl::base::Interface, service::InterfaceService},
     ip_addresses::{r#impl::base::IPAddress, service::IPAddressService},
     networks::service::NetworkService,
@@ -59,6 +63,7 @@ pub struct TopologyService {
     pub(crate) port_service: Arc<PortService>,
     pub(crate) binding_service: Arc<BindingService>,
     pub(crate) interface_service: Arc<InterfaceService>,
+    pub(crate) interface_neighbor_service: Arc<InterfaceNeighborService>,
     pub(crate) tag_service: Arc<TagService>,
     pub(crate) vlan_service: Arc<VlanService>,
     pub(crate) network_service: Arc<NetworkService>,
@@ -180,6 +185,10 @@ pub struct BuildGraphParams<'a> {
     pub ports: &'a [Port],
     pub bindings: &'a [Binding],
     pub interfaces: &'a [Interface],
+    /// GH #701: the merged neighbour read-model — see `TopologyContext::neighbours`.
+    pub neighbours: &'a [InterfaceNeighborRow],
+    /// Raw candidate evidence — see `TopologyContext::candidates`.
+    pub candidates: &'a [InterfaceNeighborCandidate],
     pub entity_tags: &'a [Tag],
     pub vlans: &'a [Vlan],
     pub old_nodes: &'a [Node],
@@ -201,6 +210,7 @@ impl TopologyService {
         port_service: Arc<PortService>,
         binding_service: Arc<BindingService>,
         interface_service: Arc<InterfaceService>,
+        interface_neighbor_service: Arc<InterfaceNeighborService>,
         tag_service: Arc<TagService>,
         vlan_service: Arc<VlanService>,
         network_service: Arc<NetworkService>,
@@ -218,6 +228,7 @@ impl TopologyService {
             port_service,
             binding_service,
             interface_service,
+            interface_neighbor_service,
             tag_service,
             vlan_service,
             network_service,
@@ -304,6 +315,18 @@ impl TopologyService {
                 snapshot_id,
             ))
             .await?;
+        // GH #701: the merged neighbour read-model, pinned to the same live/snapshot state as
+        // `interfaces` above. `candidates` are never Snapshotable (disposable, replaced wholesale
+        // every scan — see `interface_neighbors`), so they're always read live regardless of
+        // `snapshot_id`; a historical snapshot's L2 view renders from `neighbours` alone.
+        let neighbours = self
+            .interface_neighbor_service
+            .resolved_for_network(network_id, snapshot_id)
+            .await?;
+        let candidates = self
+            .interface_neighbor_service
+            .candidates_for_network(network_id)
+            .await?;
         let services = self
             .service_service
             .get_all_as_of_snapshot(
@@ -334,7 +357,7 @@ impl TopologyService {
             // all degraded to `Neighbor::Host` still has an L2 topology to show — dashed
             // `NeighborLink` edges between host containers — and hiding the view is the one
             // outcome that leaves the operator nothing to look at.
-            l2_physical: interfaces.iter().any(|i| i.base.neighbor.is_some()),
+            l2_physical: !neighbours.is_empty(),
             application: tags.iter().any(|t| t.base.is_application),
         };
         let available_views: Vec<TopologyView> = TopologyView::iter()
@@ -354,6 +377,8 @@ impl TopologyService {
             ports,
             bindings,
             interfaces,
+            neighbours,
+            candidates,
             services,
             vlans,
             tags,
@@ -408,14 +433,13 @@ impl TopologyService {
     /// querying raw entity tables — independent of whatever the topology
     /// was last rebuilt under.
     pub async fn get_view_support(&self, network_id: Uuid) -> Result<TopologyViewSupport, Error> {
-        let interfaces = self
-            .interface_service
-            .get_all(StorableFilter::<Interface>::new_from_network_ids(&[
-                network_id,
-            ]))
-            .await?;
-        // Device-level neighbours count too — see the equivalent in `get_topology_data`.
-        let l2_physical = interfaces.iter().any(|i| i.base.neighbor.is_some());
+        // Device-level neighbours count too — see the equivalent in `get_topology_data`. Live
+        // only: this check has no snapshot context, and the live view is what it governs.
+        let l2_physical = !self
+            .interface_neighbor_service
+            .resolved_for_network(network_id, None)
+            .await?
+            .is_empty();
 
         let application = match self.network_service.get_by_id(&network_id).await? {
             Some(network) => self
@@ -474,7 +498,10 @@ impl TopologyService {
 
         let ctx = FilterValueContext {
             interfaces_referenced_as_neighbours: metadata_filter::referenced_neighbour_interfaces(
-                data.interfaces.iter(),
+                data.neighbours.iter(),
+            ),
+            interfaces_with_neighbours: metadata_filter::interfaces_with_neighbours(
+                data.neighbours.iter(),
             ),
         };
 
@@ -589,6 +616,8 @@ impl TopologyService {
                 ports: &data.ports,
                 bindings: &data.bindings,
                 interfaces: &data.interfaces,
+                neighbours: &data.neighbours,
+                candidates: &data.candidates,
                 entity_tags: &data.tags,
                 vlans: &data.vlans,
                 // No stored prior graph to preserve handles from — overrides
@@ -617,6 +646,8 @@ impl TopologyService {
             ports,
             bindings,
             interfaces,
+            neighbours,
+            candidates,
             entity_tags,
             vlans,
             old_edges,
@@ -640,7 +671,9 @@ impl TopologyService {
             vlans,
             options,
             view,
-        );
+        )
+        .with_neighbours(neighbours)
+        .with_candidates(candidates);
 
         // Build grouping config from request options
         let grouping = GroupingConfig::from_request_options(&options.request, view);

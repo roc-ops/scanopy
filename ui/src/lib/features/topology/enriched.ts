@@ -22,7 +22,14 @@ import type {
 	Vlan
 } from './types/base';
 import type { TopologyView } from './queries';
-import type { Host, IPAddress, Interface, Port } from '$lib/features/hosts/types/base';
+import type {
+	Host,
+	IPAddress,
+	Interface,
+	Port,
+	InterfaceNeighborRow,
+	InterfaceNeighborCandidate
+} from '$lib/features/hosts/types/base';
 import type { Service } from '$lib/features/services/types/base';
 import type { Subnet } from '$lib/features/subnets/types/base';
 import type { Dependency } from '$lib/features/dependencies/types/base';
@@ -36,6 +43,13 @@ export interface EntityBundle {
 	ports: Port[];
 	bindings: Binding[];
 	interfaces: Interface[];
+	/**
+	 * GH #701: resolved adjacencies + their raw evidence, built on request alongside `nodes`/`edges`
+	 * — see `TopologyData.neighbours`/`.candidates`. Optional for the same reason those are: a
+	 * caller that never asked for them (or an older cached response) simply has none to flatten.
+	 */
+	neighbours?: InterfaceNeighborRow[];
+	candidates?: InterfaceNeighborCandidate[];
 	dependencies: Dependency[];
 	vlans: Vlan[];
 	entity_tags: Tag[];
@@ -52,6 +66,8 @@ export const EMPTY_ENTITY_BUNDLE: EntityBundle = {
 	ports: [],
 	bindings: [],
 	interfaces: [],
+	neighbours: [],
+	candidates: [],
 	dependencies: [],
 	vlans: [],
 	entity_tags: []
@@ -90,6 +106,12 @@ export function toRenderableTopology(
 	const ipAddresses = bundle.ip_addresses.filter((i) => hostIds.has(i.host_id));
 	const ports = bundle.ports.filter((p) => hostIds.has(p.host_id));
 	const interfaces = bundle.interfaces.filter((i) => hostIds.has(i.host_id));
+	// Resolved adjacencies + raw evidence are scoped through the interfaces they belong to, the
+	// same way ports/ip_addresses are scoped through hosts above — neither row carries its own
+	// host or interface array to filter against directly.
+	const interfaceIds = new Set(interfaces.map((i) => i.id));
+	const neighbours = (bundle.neighbours ?? []).filter((n) => interfaceIds.has(n.interface_id));
+	const candidates = (bundle.candidates ?? []).filter((c) => interfaceIds.has(c.base.interface_id));
 	const bindings = bundle.bindings.filter((b) => b.network_id === networkId);
 	// Tags are org-scoped; keep the ones referenced by entities here, plus tags
 	// referenced by grouping rules (ByTag / ByApplication) — those may apply to no
@@ -122,6 +144,8 @@ export function toRenderableTopology(
 		ports,
 		bindings,
 		interfaces,
+		neighbours,
+		candidates,
 		dependencies,
 		vlans,
 		entity_tags: entityTags,

@@ -289,34 +289,47 @@ export interface FilterValueContext {
 }
 
 /**
- * Interfaces that some other interface names as its neighbour, per topology.
+ * Which interfaces are "linked", per topology: those with a resolved adjacency row of their own
+ * (`own`), and those some other interface's row names as its `Interface`-type target (`referenced`)
+ * — GH #701 replaced the old single-valued `Interface.neighbor` with a `Vec` of rows on the
+ * topology bundle (`neighbours`), so both halves now come from iterating that array rather than a
+ * per-interface field.
  *
  * A link is recorded on one side. In the seeded reproduction 728 interfaces carry a neighbour and
  * 721 are the *target* of one, but only 12 have it set both ways — so judging "linked" from an
- * interface's own `neighbor` alone marks the far end of nearly every link as unlinked. With the
+ * interface's own resolution alone marks the far end of nearly every link as unlinked. With the
  * link-state filter hiding unlinked ports that silently deleted one endpoint of almost every
  * physical link, and `buildFlowEdges` drops an edge whose endpoint is not in the node set: 11 edges
  * drew where there were ~704, which is exactly the count of the 12 bidirectional pairs.
  *
- * Cached per topology object so the reverse pass runs once rather than per interface.
+ * Cached per topology object so the pass over `neighbours` runs once rather than per interface.
  */
-const linkTargetsByTopology = new WeakMap<RenderableTopology, Set<string>>();
+interface NeighbourIndex {
+	/** Interfaces with at least one resolved adjacency row of their own. */
+	own: ReadonlySet<string>;
+	/** Interfaces some other row names as its `Interface`-type target — see doc above. */
+	referenced: ReadonlySet<string>;
+}
 
-/** Shared empty set for the no-topology-in-context case, so the extractor allocates nothing. */
-const EMPTY_ID_SET: ReadonlySet<string> = new Set<string>();
+const neighbourIndexByTopology = new WeakMap<RenderableTopology, NeighbourIndex>();
 
-function interfacesReferencedAsNeighbours(topology: RenderableTopology): Set<string> {
-	const cached = linkTargetsByTopology.get(topology);
+/** Shared empty index for the no-topology-in-context case, so the extractor allocates nothing. */
+const EMPTY_NEIGHBOUR_INDEX: NeighbourIndex = { own: new Set(), referenced: new Set() };
+
+function neighbourIndex(topology: RenderableTopology): NeighbourIndex {
+	const cached = neighbourIndexByTopology.get(topology);
 	if (cached) return cached;
 
-	const targets = new Set<string>();
-	for (const iface of topology.interfaces ?? []) {
-		const neighbor = (iface as { neighbor?: { type?: string; id?: string } | null }).neighbor;
+	const own = new Set<string>();
+	const referenced = new Set<string>();
+	for (const row of topology.neighbours ?? []) {
+		if (row.interface_id) own.add(row.interface_id);
 		// Only a port-level resolution makes a specific port linked; `Host` names a device, not a port.
-		if (neighbor?.type === 'Interface' && neighbor.id) targets.add(neighbor.id);
+		if (row.neighbor?.type === 'Interface' && row.neighbor.id) referenced.add(row.neighbor.id);
 	}
-	linkTargetsByTopology.set(topology, targets);
-	return targets;
+	const index: NeighbourIndex = { own, referenced };
+	neighbourIndexByTopology.set(topology, index);
+	return index;
 }
 
 export type FilterValueExtractor = (entity: unknown, ctx: FilterValueContext) => string | null;
@@ -341,14 +354,16 @@ export const FILTER_VALUE_EXTRACTORS: Record<string, Record<string, FilterValueE
 		// values. A partial resolution (`Neighbor::Host` — the remote device known but not the
 		// port) counts as linked: it still draws an edge, so hiding it would break the diagram.
 		//
-		// Linked in *either* direction. A link is recorded on one side, so an interface with no
-		// neighbour of its own is still linked if another interface names it — see
-		// `interfacesReferencedAsNeighbours`.
+		// Linked in *either* direction: a port with a resolved row of its own (`own`), or one no
+		// row names but that some other interface's row targets (`referenced`) — a link is
+		// recorded on one side, so an interface with no neighbour of its own is still linked if
+		// another interface names it. See `neighbourIndex`.
 		LinkState: (i, ctx) => {
-			const iface = i as { id: string; neighbor?: unknown | null };
-			if (iface.neighbor != null) return 'Linked';
-			const targets = ctx.topology ? interfacesReferencedAsNeighbours(ctx.topology) : EMPTY_ID_SET;
-			return targets.has(iface.id) ? 'Linked' : 'Unlinked';
+			const iface = i as { id: string };
+			const { own, referenced } = ctx.topology
+				? neighbourIndex(ctx.topology)
+				: EMPTY_NEIGHBOUR_INDEX;
+			return own.has(iface.id) || referenced.has(iface.id) ? 'Linked' : 'Unlinked';
 		}
 	}
 };

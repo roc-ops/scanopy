@@ -71,6 +71,7 @@ pub(super) fn generate_interfaces(
 
         // WAN interface
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -81,6 +82,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -96,18 +98,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: None,
-                lldp_port_id: None,
-                lldp_sys_name: None,
-                lldp_port_desc: None,
-                lldp_mgmt_addr: None,
-                lldp_sys_desc: None,
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: None,
                 vlan_ids: None,
@@ -116,6 +106,7 @@ pub(super) fn generate_interfaces(
 
         // LAN interface — connected to HQ switch port 1
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -126,6 +117,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(2),
@@ -141,18 +133,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(hq_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/1".to_string())),
-                lldp_sys_name: Some("unifi-usw-48".to_string()),
-                lldp_port_desc: Some("Port 1 - pfSense uplink".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 1, 3))),
-                lldp_sys_desc: Some("UniFi USW-48-PoE".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 1),
                 vlan_ids: find_vlans(network.id, &[10, 20, 30, 100]),
@@ -167,6 +147,7 @@ pub(super) fn generate_interfaces(
 
         // OPT1 interface (disabled)
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -177,6 +158,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(3),
@@ -192,18 +174,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: None,
-                lldp_port_id: None,
-                lldp_sys_name: None,
-                lldp_port_desc: None,
-                lldp_mgmt_addr: None,
-                lldp_sys_desc: None,
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: None,
                 vlan_ids: None,
@@ -222,6 +192,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -232,6 +204,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -247,18 +220,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(hq_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/2".to_string())),
-                lldp_sys_name: Some("unifi-usw-48".to_string()),
-                lldp_port_desc: Some("Port 2 - TrueNAS uplink".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 1, 3))),
-                lldp_sys_desc: Some("UniFi USW-48-PoE".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -283,6 +244,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -293,6 +256,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -308,18 +272,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(hq_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/3".to_string())),
-                lldp_sys_name: Some("unifi-usw-48".to_string()),
-                lldp_port_desc: Some("Port 3 - Proxmox HV01 uplink".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 1, 3))),
-                lldp_sys_desc: Some("UniFi USW-48-PoE".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -334,6 +286,7 @@ pub(super) fn generate_interfaces(
 
         // Loopback
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -344,6 +297,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(2),
@@ -356,18 +310,6 @@ pub(super) fn generate_interfaces(
                 oper_status: Some(IfOperStatus::Up),
                 mac_address: None,
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: None,
-                lldp_port_id: None,
-                lldp_sys_name: None,
-                lldp_port_desc: None,
-                lldp_mgmt_addr: None,
-                lldp_sys_desc: None,
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: None,
                 vlan_ids: None,
@@ -386,6 +328,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -396,6 +340,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -411,18 +356,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(hq_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/4".to_string())),
-                lldp_sys_name: Some("unifi-usw-48".to_string()),
-                lldp_port_desc: Some("Port 4 - Proxmox HV02 uplink".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 1, 3))),
-                lldp_sys_desc: Some("UniFi USW-48-PoE".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -447,6 +380,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -457,6 +392,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -472,18 +408,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(hq_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/5".to_string())),
-                lldp_sys_name: Some("unifi-usw-48".to_string()),
-                lldp_port_desc: Some("Port 5 - Docker host uplink".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 1, 3))),
-                lldp_sys_desc: Some("UniFi USW-48-PoE".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -516,6 +440,7 @@ pub(super) fn generate_interfaces(
 
         // Port 1 ↔ pfsense-fw01
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -526,6 +451,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -541,19 +467,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("00:0d:b9:4a:f2:01".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("igb1".to_string())),
-                lldp_sys_name: Some("pfsense-fw01".to_string()),
-                lldp_port_desc: Some("LAN".to_string()),
-                lldp_mgmt_addr: pfsense_host
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 1, 1))),
-                lldp_sys_desc: Some("pfSense 2.7.0-RELEASE".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 1),
                 vlan_ids: find_vlans(network.id, &[10, 20, 30, 100]),
@@ -568,6 +481,7 @@ pub(super) fn generate_interfaces(
 
         // Port 2 ↔ truenas-primary
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -578,6 +492,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(2),
@@ -593,19 +508,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("3c:ec:ef:12:34:01".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("lagg0".to_string())),
-                lldp_sys_name: Some("truenas-primary".to_string()),
-                lldp_port_desc: Some("LACP Bond".to_string()),
-                lldp_mgmt_addr: truenas_host
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 40, 20))),
-                lldp_sys_desc: Some("TrueNAS SCALE".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -620,6 +522,7 @@ pub(super) fn generate_interfaces(
 
         // Port 3 ↔ proxmox-hv01
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -630,6 +533,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(3),
@@ -645,19 +549,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("d4:be:d9:56:78:01".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("eno1".to_string())),
-                lldp_sys_name: Some("proxmox-hv01".to_string()),
-                lldp_port_desc: Some("Primary NIC".to_string()),
-                lldp_mgmt_addr: proxmox_hv01
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 20, 5))),
-                lldp_sys_desc: Some("Proxmox VE 8.1".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -672,6 +563,7 @@ pub(super) fn generate_interfaces(
 
         // Port 4 ↔ proxmox-hv02
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -682,6 +574,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(4),
@@ -697,19 +590,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("d4:be:d9:56:78:02".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("eno1".to_string())),
-                lldp_sys_name: Some("proxmox-hv02".to_string()),
-                lldp_port_desc: Some("Primary NIC".to_string()),
-                lldp_mgmt_addr: proxmox_hv02
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 20, 6))),
-                lldp_sys_desc: Some("Proxmox VE 8.1".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -724,6 +604,7 @@ pub(super) fn generate_interfaces(
 
         // Port 5 ↔ docker-prod01
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -734,6 +615,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(5),
@@ -749,19 +631,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("aa:bb:cc:dd:ee:01".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("eth0".to_string())),
-                lldp_sys_name: Some("docker-prod01".to_string()),
-                lldp_port_desc: Some("Primary NIC".to_string()),
-                lldp_mgmt_addr: docker_host
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 20, 20))),
-                lldp_sys_desc: Some("Debian 12".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -776,6 +645,7 @@ pub(super) fn generate_interfaces(
 
         // Port 6 ↔ unifi-ap-lobby (deferred via NeighborUpdate)
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -786,6 +656,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(6),
@@ -801,19 +672,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("fc:ec:da:aa:bb:01".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("eth0".to_string())),
-                lldp_sys_name: Some("unifi-ap-lobby".to_string()),
-                lldp_port_desc: Some("Ethernet".to_string()),
-                lldp_mgmt_addr: ap_host
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 30, 100))),
-                lldp_sys_desc: Some("UniFi AP U6-Pro".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 1),
                 vlan_ids: find_vlans(network.id, &[10, 20, 30, 100]),
@@ -829,6 +687,7 @@ pub(super) fn generate_interfaces(
         // Ports 7-48 — empty/down
         for port_num in 7..=48 {
             interfaces.push(Interface {
+                legacy_neighbor_evidence: Default::default(),
                 valid_from: now,
                 valid_to: None,
                 lineage_id: None,
@@ -839,6 +698,7 @@ pub(super) fn generate_interfaces(
                 created_at: now,
                 updated_at: now,
                 base: InterfaceBase {
+                    neighbor_candidates: Default::default(),
                     host_id: host.id,
                     network_id: network.id,
                     if_index: Some(port_num),
@@ -861,18 +721,6 @@ pub(super) fn generate_interfaces(
                         AttributeSource::ArpReply,
                     )),
                     ip_address_id: None,
-                    neighbor: None,
-                    neighbor_seen_at: None,
-                    lldp_chassis_id: None,
-                    lldp_port_id: None,
-                    lldp_sys_name: None,
-                    lldp_port_desc: None,
-                    lldp_mgmt_addr: None,
-                    lldp_sys_desc: None,
-                    cdp_device_id: None,
-                    cdp_port_id: None,
-                    cdp_platform: None,
-                    cdp_address: None,
                     fdb_macs: None,
                     native_vlan_id: None,
                     vlan_ids: None,
@@ -892,6 +740,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -902,6 +752,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -917,18 +768,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(hq_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/6".to_string())),
-                lldp_sys_name: Some("unifi-usw-48".to_string()),
-                lldp_port_desc: Some("Port 6 - UniFi AP".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(10, 0, 1, 3))),
-                lldp_sys_desc: Some("UniFi USW-48-PoE".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 1),
                 vlan_ids: find_vlans(network.id, &[10, 20, 30, 100]),
@@ -954,6 +793,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -964,6 +805,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: None,
@@ -976,18 +818,6 @@ pub(super) fn generate_interfaces(
                 oper_status: None,
                 mac_address: None,
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: None,
-                lldp_port_id: None,
-                lldp_sys_name: None,
-                lldp_port_desc: None,
-                lldp_mgmt_addr: None,
-                lldp_sys_desc: None,
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: None,
                 vlan_ids: None,
@@ -1006,6 +836,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1016,6 +848,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -1031,18 +864,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(dc_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/1".to_string())),
-                lldp_sys_name: Some("dc-switch-01".to_string()),
-                lldp_port_desc: Some("Port 1 - Firewall uplink".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(172, 16, 0, 2))),
-                lldp_sys_desc: Some("Managed Switch".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 1),
                 vlan_ids: find_vlans(network.id, &[10, 20, 30, 100]),
@@ -1067,6 +888,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1077,6 +900,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -1092,18 +916,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(dc_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/2".to_string())),
-                lldp_sys_name: Some("dc-switch-01".to_string()),
-                lldp_port_desc: Some("Port 2 - Proxmox uplink".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(172, 16, 0, 2))),
-                lldp_sys_desc: Some("Managed Switch".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -1128,6 +940,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1138,6 +952,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -1153,18 +968,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(dc_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/3".to_string())),
-                lldp_sys_name: Some("dc-switch-01".to_string()),
-                lldp_port_desc: Some("Port 3 - Docker host uplink".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(172, 16, 0, 2))),
-                lldp_sys_desc: Some("Managed Switch".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -1189,6 +992,8 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
+
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1199,6 +1004,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -1214,18 +1020,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress(dc_switch_mac.to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("Port 1/0/4".to_string())),
-                lldp_sys_name: Some("dc-switch-01".to_string()),
-                lldp_port_desc: Some("Port 4 - HAProxy uplink".to_string()),
-                lldp_mgmt_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(172, 16, 0, 2))),
-                lldp_sys_desc: Some("Managed Switch".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -1256,6 +1050,7 @@ pub(super) fn generate_interfaces(
 
         // Port 1 ↔ dc-fw01
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1266,6 +1061,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(1),
@@ -1281,19 +1077,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: ip_address.map(|i| i.id),
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("a0:36:9f:11:22:01".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("port1".to_string())),
-                lldp_sys_name: Some("dc-fw01".to_string()),
-                lldp_port_desc: Some("LAN".to_string()),
-                lldp_mgmt_addr: dc_fw
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(172, 16, 0, 1))),
-                lldp_sys_desc: Some("FortiGate-100F".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 1),
                 vlan_ids: find_vlans(network.id, &[10, 20, 30, 100]),
@@ -1308,6 +1091,7 @@ pub(super) fn generate_interfaces(
 
         // Port 2 ↔ dc-proxmox-hv01
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1318,6 +1102,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(2),
@@ -1333,19 +1118,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("d4:be:d9:aa:bb:01".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("eno1".to_string())),
-                lldp_sys_name: Some("dc-proxmox-hv01".to_string()),
-                lldp_port_desc: Some("Primary NIC".to_string()),
-                lldp_mgmt_addr: dc_proxmox
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(172, 16, 10, 5))),
-                lldp_sys_desc: Some("Proxmox VE 8.1".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -1360,6 +1132,7 @@ pub(super) fn generate_interfaces(
 
         // Port 3 ↔ dc-docker01
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1370,6 +1143,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(3),
@@ -1385,19 +1159,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("aa:bb:cc:dd:ee:02".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("eth0".to_string())),
-                lldp_sys_name: Some("dc-docker01".to_string()),
-                lldp_port_desc: Some("Primary NIC".to_string()),
-                lldp_mgmt_addr: dc_docker
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(172, 16, 10, 20))),
-                lldp_sys_desc: Some("Debian 12".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -1412,6 +1173,7 @@ pub(super) fn generate_interfaces(
 
         // Port 4 ↔ haproxy-lb01
         interfaces.push(Interface {
+            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1422,6 +1184,7 @@ pub(super) fn generate_interfaces(
             created_at: now,
             updated_at: now,
             base: InterfaceBase {
+                neighbor_candidates: Default::default(),
                 host_id: host.id,
                 network_id: network.id,
                 if_index: Some(4),
@@ -1437,19 +1200,6 @@ pub(super) fn generate_interfaces(
                     AttributeSource::ArpReply,
                 )),
                 ip_address_id: None,
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: Some(LldpChassisId::MacAddress("11:22:33:44:55:01".to_string())),
-                lldp_port_id: Some(LldpPortId::InterfaceName("eth0".to_string())),
-                lldp_sys_name: Some("haproxy-lb01".to_string()),
-                lldp_port_desc: Some("Primary NIC".to_string()),
-                lldp_mgmt_addr: dc_haproxy
-                    .map(|_| std::net::IpAddr::V4(std::net::Ipv4Addr::new(172, 16, 30, 10))),
-                lldp_sys_desc: Some("HAProxy 2.8".to_string()),
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
                 fdb_macs: None,
                 native_vlan_id: find_vlan(network.id, 20),
                 vlan_ids: None,
@@ -1465,6 +1215,7 @@ pub(super) fn generate_interfaces(
         // Ports 5-24 — empty/down
         for port_num in 5..=24 {
             interfaces.push(Interface {
+                legacy_neighbor_evidence: Default::default(),
                 valid_from: now,
                 valid_to: None,
                 lineage_id: None,
@@ -1475,6 +1226,7 @@ pub(super) fn generate_interfaces(
                 created_at: now,
                 updated_at: now,
                 base: InterfaceBase {
+                    neighbor_candidates: Default::default(),
                     host_id: host.id,
                     network_id: network.id,
                     if_index: Some(port_num),
@@ -1497,18 +1249,6 @@ pub(super) fn generate_interfaces(
                         AttributeSource::ArpReply,
                     )),
                     ip_address_id: None,
-                    neighbor: None,
-                    neighbor_seen_at: None,
-                    lldp_chassis_id: None,
-                    lldp_port_id: None,
-                    lldp_sys_name: None,
-                    lldp_port_desc: None,
-                    lldp_mgmt_addr: None,
-                    lldp_sys_desc: None,
-                    cdp_device_id: None,
-                    cdp_port_id: None,
-                    cdp_platform: None,
-                    cdp_address: None,
                     fdb_macs: None,
                     native_vlan_id: None,
                     vlan_ids: None,

@@ -44,6 +44,8 @@
 				ports: d.ports,
 				bindings: d.bindings,
 				interfaces: d.interfaces,
+				neighbours: d.neighbours,
+				candidates: d.candidates,
 				dependencies: d.dependencies,
 				vlans: d.vlans,
 				entity_tags: d.tags,

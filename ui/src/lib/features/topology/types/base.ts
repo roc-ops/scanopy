@@ -1,6 +1,13 @@
 import type { components } from '$lib/api/schema';
 import type { Service } from '$lib/features/services/types/base';
-import type { Host, IPAddress, Interface, Port } from '$lib/features/hosts/types/base';
+import type {
+	Host,
+	IPAddress,
+	Interface,
+	Port,
+	InterfaceNeighborRow,
+	InterfaceNeighborCandidate
+} from '$lib/features/hosts/types/base';
 import type { Subnet } from '$lib/features/subnets/types/base';
 import type { Dependency } from '$lib/features/dependencies/types/base';
 import type { Tag } from '$lib/features/tags/types/base';
@@ -46,6 +53,10 @@ export interface RenderableTopology extends Topology {
 	ports: Port[];
 	bindings: Binding[];
 	interfaces: Interface[];
+	/** GH #701: resolved adjacencies for `interfaces` above — see `InterfaceNeighborRow`. */
+	neighbours: InterfaceNeighborRow[];
+	/** Raw LLDP/CDP evidence behind `neighbours` — see `InterfaceNeighborCandidate`. */
+	candidates: InterfaceNeighborCandidate[];
 	dependencies: Dependency[];
 	vlans: Vlan[];
 	entity_tags: Tag[];
