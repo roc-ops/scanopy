@@ -28,8 +28,6 @@
 
 mod channel;
 mod identify;
-#[cfg(test)]
-mod live_test;
 mod packet;
 
 pub use identify::{is_available, is_dcp_capable, scan_interface};
