@@ -578,7 +578,7 @@ impl InterfaceInput {
                 host_id,
                 network_id,
                 if_index: Some(self.if_index),
-                if_descr: self.if_descr,
+                if_descr: Some(self.if_descr),
                 if_name: None,
                 if_alias: self.if_alias,
                 // Straight through. These were coerced to "other"/Up/Up, which recorded a

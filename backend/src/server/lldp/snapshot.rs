@@ -179,16 +179,18 @@ impl LldpInventorySnapshot {
                 }
             }
 
-            claim(
-                &mut snapshot.host_by_interface_descr,
-                interface.base.if_descr.clone(),
-                host_id,
-            );
-            claim(
-                &mut snapshot.interface_by_host_descr,
-                (host_id, interface.base.if_descr.clone()),
-                interface.id,
-            );
+            if let Some(ref if_descr) = interface.base.if_descr {
+                claim(
+                    &mut snapshot.host_by_interface_descr,
+                    if_descr.clone(),
+                    host_id,
+                );
+                claim(
+                    &mut snapshot.interface_by_host_descr,
+                    (host_id, if_descr.clone()),
+                    interface.id,
+                );
+            }
             if let Some(ref if_name) = interface.base.if_name {
                 claim(
                     &mut snapshot.interface_by_host_name,

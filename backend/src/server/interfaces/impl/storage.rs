@@ -35,7 +35,7 @@ pub struct InterfaceCsvRow {
     pub host_id: Uuid,
     pub network_id: Uuid,
     pub if_index: Option<i32>,
-    pub if_descr: String,
+    pub if_descr: Option<String>,
     pub if_name: Option<String>,
     pub if_alias: Option<String>,
     pub if_type: Option<i32>,
@@ -194,7 +194,7 @@ impl Storable for Interface {
             SqlValue::Uuid(host_id),
             SqlValue::Uuid(network_id),
             SqlValue::OptionalI32(if_index),
-            SqlValue::String(if_descr),
+            SqlValue::OptionalString(if_descr),
             SqlValue::OptionalString(if_name),
             SqlValue::OptionalString(if_alias),
             SqlValue::OptionalI32(if_type),
@@ -452,6 +452,30 @@ impl Entity for Interface {
         if existing.base.if_name.is_some() && self.base.if_name.is_none() {
             self.base.if_name = existing.base.if_name.clone();
         }
+        // The rest of the ifTable-shaped fields, guarded the same way and for the same reason:
+        // `None` on an *incoming* row means "this source has nothing to say about it", never "the
+        // device stopped reporting it" — the two are indistinguishable at this layer, and only the
+        // first is safe to assume. Without this, a match resolved on Tier 3 (MAC) by a source that
+        // carries only a MAC — the PROFINET DCP case, which reports none of these — replaces the
+        // whole row with its own near-empty one, silently erasing an SNMP walk's if_index/if_type/
+        // statuses/if_descr the moment DCP and SNMP see the same device. A real SNMP re-walk still
+        // overwrites its own prior reading, exactly as it always has — the guard only stops a
+        // narrower source from clobbering fields it never claimed to know.
+        if existing.base.if_index.is_some() && self.base.if_index.is_none() {
+            self.base.if_index = existing.base.if_index;
+        }
+        if existing.base.if_type.is_some() && self.base.if_type.is_none() {
+            self.base.if_type = existing.base.if_type;
+        }
+        if existing.base.admin_status.is_some() && self.base.admin_status.is_none() {
+            self.base.admin_status = existing.base.admin_status;
+        }
+        if existing.base.oper_status.is_some() && self.base.oper_status.is_none() {
+            self.base.oper_status = existing.base.oper_status;
+        }
+        if existing.base.if_descr.is_some() && self.base.if_descr.is_none() {
+            self.base.if_descr = existing.base.if_descr.clone();
+        }
         // Preserve the server-derived L2 neighbor. Daemons never send `neighbor` —
         // it is resolved server-side after a scan completes (resolve_lldp_links /
         // resolve_fdb_links). Without this, every re-scan overwrites the resolved
@@ -656,6 +680,48 @@ mod tests {
     }
 
     #[test]
+    fn preserve_immutable_fields_keeps_existing_iftable_fields_when_incoming_has_none_of_them() {
+        // The shape a PROFINET DCP submission takes: matched onto an existing SNMP-walked row by
+        // MAC alone, carrying none of the ifTable fields that row already has.
+        let mut existing = make_interface(5, Some("eth0"), None);
+        existing.base.if_type = Some(6);
+        existing.base.admin_status = Some(IfAdminStatus::Up);
+        existing.base.oper_status = Some(IfOperStatus::Up);
+        existing.base.if_descr = Some("GigabitEthernet0/1".to_string());
+
+        let mut incoming = InterfaceBase::default();
+        incoming.host_id = existing.base.host_id;
+        incoming.network_id = existing.base.network_id;
+        let mut incoming = Interface::new(incoming);
+
+        incoming.preserve_immutable_fields(&existing);
+
+        assert_eq!(incoming.base.if_index, existing.base.if_index);
+        assert_eq!(incoming.base.if_type, existing.base.if_type);
+        assert_eq!(incoming.base.admin_status, existing.base.admin_status);
+        assert_eq!(incoming.base.oper_status, existing.base.oper_status);
+        assert_eq!(incoming.base.if_descr, existing.base.if_descr);
+    }
+
+    #[test]
+    fn preserve_immutable_fields_allows_iftable_fields_to_be_updated_when_incoming_has_them() {
+        // A real SNMP re-walk still overwrites its own prior reading — the guard only protects a
+        // narrower source from clobbering fields it never claimed to know, never a real update.
+        let mut existing = make_interface(5, Some("eth0"), None);
+        existing.base.if_type = Some(6);
+        existing.base.oper_status = Some(IfOperStatus::Up);
+
+        let mut incoming = make_interface(5, Some("eth0"), None);
+        incoming.base.if_type = Some(117);
+        incoming.base.oper_status = Some(IfOperStatus::Down);
+
+        incoming.preserve_immutable_fields(&existing);
+
+        assert_eq!(incoming.base.if_type, Some(117));
+        assert_eq!(incoming.base.oper_status, Some(IfOperStatus::Down));
+    }
+
+    #[test]
     fn preserve_immutable_fields_keeps_existing_neighbor_when_incoming_is_none() {
         // GH #649: daemons never send `neighbor` (it is resolved server-side after a
         // scan). Before the fix, a re-scan's incoming None wiped the resolved neighbor,
@@ -705,7 +771,6 @@ mod tests {
 /// A scan that could not finish reading a group of data must not erase what is already stored.
 #[cfg(test)]
 mod preserve_uncollected_tests {
-    use super::*;
     use crate::server::interfaces::r#impl::base::{
         Interface, InterfaceBase, InterfaceDataComplete,
     };

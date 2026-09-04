@@ -421,7 +421,7 @@ mod tests {
     fn iface(if_index: i32, mac: &str) -> Interface {
         let mut base = InterfaceBase::default();
         base.if_index = Some(if_index);
-        base.if_descr = format!("Slot0/{if_index}");
+        base.if_descr = Some(format!("Slot0/{if_index}"));
         base.mac_address = Some(MacEvidence::new(
             MacEvidenceValue(mac.parse::<MacAddress>().unwrap()),
             SNMP_MAC,

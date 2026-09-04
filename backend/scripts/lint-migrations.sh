@@ -73,6 +73,7 @@ NO_READER_DROP_FILES=(
 # in each migration documents this. Suppress ban-drop-not-null.
 DROP_NOT_NULL_FILES=(
     "$MIGRATIONS_DIR/20260827130000_interfaces_unknown_port_facts.sql"
+    "$MIGRATIONS_DIR/20260903120000_interfaces_if_descr_optional.sql"
 )
 
 # Filter file lists.

@@ -134,6 +134,29 @@ impl ViewBuilder for L2Builder {
             }
         }
 
+        // Hosts with no IP address at all, identified only by an interface carrying MAC
+        // evidence — a PROFINET DCP identify is the case this exists for. Neither of the two
+        // conditions above ever fires for such a host: it has no neighbour data (DCP is a
+        // broadcast identify, not a directed LLDP/CDP exchange) and is never the target of a
+        // resolved link, so without this it appears in **no view at all** — L3 is structurally
+        // blind to it too, since `subnet_graph_builder` iterates `ip_addresses`.
+        //
+        // Gated on "no IP" specifically so this never changes behaviour for any host that
+        // already has one: those are already visible via L3, and already require neighbour data
+        // to additionally qualify for L2 — that rule is untouched. Drawn as a standalone
+        // container with no edges, the same as any other qualifying host whose interfaces happen
+        // to carry no resolved neighbour.
+        for host in ctx.hosts {
+            if ctx.get_ip_addresses_for_host(host.id).is_empty()
+                && ctx
+                    .get_interfaces_for_host(host.id)
+                    .iter()
+                    .any(|entry| entry.base.mac_address.is_some())
+            {
+                qualifying_host_ids.insert(host.id);
+            }
+        }
+
         // 3. Create Host containers for qualifying hosts
         let host_lookup: HashMap<Uuid, &crate::server::hosts::r#impl::base::Host> =
             ctx.hosts.iter().map(|h| (h.id, h)).collect();
@@ -258,7 +281,7 @@ mod tests {
     use crate::server::{
         hosts::r#impl::base::{Host, HostBase},
         interfaces::r#impl::base::{Interface, InterfaceBase, Neighbor, if_type},
-        ip_addresses::r#impl::base::{IPAddress, IPAddressBase},
+        ip_addresses::r#impl::base::{IPAddress, IPAddressBase, MacEvidence, MacEvidenceValue},
         lldp::LldpChassisId,
         topology::{
             service::context::TopologyContext,
@@ -297,7 +320,7 @@ mod tests {
             base: InterfaceBase {
                 host_id,
                 if_index: Some(if_index),
-                if_descr: format!("GigabitEthernet0/{if_index}"),
+                if_descr: Some(format!("GigabitEthernet0/{if_index}")),
                 if_name: Some(format!("Gi0/{if_index}")),
                 if_type: Some(if_type),
                 speed_bps: Some(1_000_000_000),
@@ -365,6 +388,55 @@ mod tests {
         // No LLDP neighbors → no qualifying hosts → empty
         assert!(nodes.is_empty());
         assert!(edges.is_empty());
+    }
+
+    /// A host with no IP address at all and no neighbour data — a PROFINET DCP identify, the
+    /// case §7 of the DCP plan exists for — still qualifies for L2, drawn as a standalone
+    /// container with no edges. The interface carries only a MAC, no neighbour: the "hosts with
+    /// neighbor data" condition above never fires for it, and it is never a link target, so
+    /// without this it would join `test_hosts_without_neighbors_excluded`'s host in appearing in
+    /// no view at all — except that host also has no MAC, which is the one thing distinguishing
+    /// the two cases.
+    #[test]
+    fn a_no_ip_host_identified_only_by_a_mac_still_gets_a_standalone_container() {
+        let h1 = make_host("press-line-3");
+        let mut ie1 = make_if_entry(h1.id, 1, 6, None);
+        ie1.base.if_type = None; // DCP reports no ifType — unread, not a claim
+        ie1.base.mac_address = Some(MacEvidence::new(
+            MacEvidenceValue("00:ad:24:af:4e:00".parse().unwrap()),
+            AttributeSource::ProfinetDcp,
+        ));
+        let hosts = vec![h1.clone()];
+        let interfaces = vec![ie1];
+        let options = TopologyOptions::default();
+        let ctx = TopologyContext::new(
+            &hosts,
+            &[], // no ip_addresses — the condition this test exists for
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &interfaces,
+            &[],
+            &[],
+            &options,
+            crate::server::topology::types::views::TopologyView::L3Logical,
+        );
+
+        let builder = L2Builder;
+        let (nodes, edges) = builder.build(&ctx, &l2_grouping());
+
+        assert!(edges.is_empty(), "no neighbour, so no edge to draw");
+        let container = nodes
+            .iter()
+            .find(|n| matches!(n.node_type, NodeType::Container { entity_id: Some(id), .. } if id == h1.id))
+            .expect("the no-IP, MAC-identified host must still get a container");
+        assert_eq!(container.header.as_deref(), Some("press-line-3"));
+        let port = nodes
+            .iter()
+            .find(|n| matches!(n.node_type, NodeType::Element { host_id, .. } if host_id == h1.id));
+        assert!(port.is_some(), "its interface must still render as a port");
     }
 
     /// A host container says which device it is even when the host carries no name.

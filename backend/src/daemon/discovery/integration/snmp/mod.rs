@@ -1471,7 +1471,7 @@ fn convert_snmp_if_entry(
         host_id: Uuid::nil(), // Placeholder - server will set correct host_id
         network_id,
         if_index: Some(entry.if_index),
-        if_descr: entry.if_descr.clone().unwrap_or_default(),
+        if_descr: entry.if_descr.clone(),
         if_name: entry.if_name.clone(),
         if_alias: entry.if_alias.clone(),
         // Straight through: an ifTable that omitted ifType said nothing about it, and `1`
@@ -1612,7 +1612,7 @@ mod tests {
 
         // ifTable data survives the enrichment-free conversion.
         assert_eq!(interface.base.if_index, Some(7));
-        assert_eq!(interface.base.if_descr, "Port 7");
+        assert_eq!(interface.base.if_descr.as_deref(), Some("Port 7"));
         assert_eq!(interface.base.if_name.as_deref(), Some("swp7"));
         assert_eq!(interface.base.if_type, Some(6));
         assert_eq!(interface.base.speed_bps, Some(1_000_000_000));

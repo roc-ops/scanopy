@@ -1505,7 +1505,7 @@ mod tests {
             host_id: Uuid::new_v4(),
             network_id: Uuid::new_v4(),
             if_index: Some(if_index),
-            if_descr: name.to_string(),
+            if_descr: Some(name.to_string()),
             if_name: Some(name.to_string()),
             if_alias: None,
             if_type: Some(6),

@@ -423,7 +423,7 @@ mod tests {
                 host_id,
                 network_id,
                 if_index: Some(if_index),
-                if_descr: format!("eth{if_index}"),
+                if_descr: Some(format!("eth{if_index}")),
                 if_type: Some(6),
                 ip_address_id: Some(ip_address_id),
                 ..Default::default()

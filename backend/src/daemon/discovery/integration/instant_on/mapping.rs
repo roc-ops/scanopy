@@ -182,7 +182,7 @@ fn map_interfaces(
             host_id: Uuid::nil(),
             network_id,
             if_index: Some(1),
-            if_descr: name.clone(),
+            if_descr: Some(name.clone()),
             if_name: Some(name),
             if_type: Some(IF_TYPE_ETHERNET),
             admin_status: Some(IfAdminStatus::Up),
@@ -252,7 +252,7 @@ fn port_to_interface(port: &InstantOnPort, position: usize, network_id: Uuid) ->
         host_id: Uuid::nil(),
         network_id,
         if_index: Some(if_index),
-        if_descr: name.clone(),
+        if_descr: Some(name.clone()),
         if_name: Some(name),
         if_type: Some(IF_TYPE_ETHERNET),
         speed_bps: port
@@ -568,7 +568,10 @@ mod tests {
         );
         // The member-qualified id survives as the interface name, so an operator can find the
         // port on the physical switch.
-        assert_eq!(interface(stack, 2_001_001).base.if_descr, "2/1/1");
+        assert_eq!(
+            interface(stack, 2_001_001).base.if_descr.as_deref(),
+            Some("2/1/1")
+        );
     }
 
     /// A standalone switch numbers ports flatly, and must keep doing so — the stack handling
@@ -577,9 +580,9 @@ mod tests {
     fn standalone_switch_ports_keep_their_own_numbering() {
         let devices = map();
         let edge = find(&devices, "Edge Switch");
-        assert_eq!(interface(edge, 24).base.if_descr, "Uplink");
+        assert_eq!(interface(edge, 24).base.if_descr.as_deref(), Some("Uplink"));
         // An unnamed port falls back to its port id rather than a synthesized label.
-        assert_eq!(interface(edge, 2).base.if_descr, "2");
+        assert_eq!(interface(edge, 2).base.if_descr.as_deref(), Some("2"));
     }
 
     /// An access point reports no ports at all. It must map cleanly to one synthesized uplink
@@ -590,7 +593,7 @@ mod tests {
         let devices = map();
         let ap = find(&devices, "Office AP");
         assert_eq!(ap.interfaces.len(), 1);
-        assert_eq!(ap.interfaces[0].base.if_descr, "eth0");
+        assert_eq!(ap.interfaces[0].base.if_descr.as_deref(), Some("eth0"));
         assert_eq!(ap.device_type.as_deref(), Some("ACCESS_POINT"));
     }
 
