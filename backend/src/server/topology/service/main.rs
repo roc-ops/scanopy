@@ -190,6 +190,25 @@ pub struct BuildGraphParams<'a> {
     pub view: TopologyView,
 }
 
+/// Whether any interface in this set qualifies its network for the L2 Physical view.
+///
+/// Two conditions, matching `l2_builder.rs`'s `qualifying_host_ids` exactly (kept in sync
+/// deliberately — this answers "should the tab even be offered", that answers "which hosts does
+/// it draw", and a network can only offer the tab honestly if at least one host would qualify):
+/// a resolved neighbour (port-precise or device-level), or a host with no IP address at all,
+/// identified only by an interface's MAC — the PROFINET DCP identify case, which has neither a
+/// neighbour nor an IP for `subnet_graph_builder.rs` to place it by.
+fn any_interface_qualifies_l2_physical(
+    interfaces: &[Interface],
+    ip_addresses: &[IPAddress],
+) -> bool {
+    let hosts_with_ip: HashSet<Uuid> = ip_addresses.iter().map(|ip| ip.base.host_id).collect();
+    interfaces.iter().any(|i| {
+        i.base.neighbor.is_some()
+            || (i.base.mac_address.is_some() && !hosts_with_ip.contains(&i.base.host_id))
+    })
+}
+
 impl TopologyService {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -330,11 +349,7 @@ impl TopologyService {
         // snapshot can't populate (no LLDP neighbors → no L2; no app tags → no
         // Application).
         let support = TopologyViewSupport {
-            // Any resolved neighbour, port-precise or device-level. A network whose links have
-            // all degraded to `Neighbor::Host` still has an L2 topology to show — dashed
-            // `NeighborLink` edges between host containers — and hiding the view is the one
-            // outcome that leaves the operator nothing to look at.
-            l2_physical: interfaces.iter().any(|i| i.base.neighbor.is_some()),
+            l2_physical: any_interface_qualifies_l2_physical(&interfaces, &ip_addresses),
             application: tags.iter().any(|t| t.base.is_application),
         };
         let available_views: Vec<TopologyView> = TopologyView::iter()
@@ -414,8 +429,13 @@ impl TopologyService {
                 network_id,
             ]))
             .await?;
-        // Device-level neighbours count too — see the equivalent in `get_topology_data`.
-        let l2_physical = interfaces.iter().any(|i| i.base.neighbor.is_some());
+        let ip_addresses = self
+            .ip_address_service
+            .get_all(StorableFilter::<IPAddress>::new_from_network_ids(&[
+                network_id,
+            ]))
+            .await?;
+        let l2_physical = any_interface_qualifies_l2_physical(&interfaces, &ip_addresses);
 
         let application = match self.network_service.get_by_id(&network_id).await? {
             Some(network) => self
@@ -762,5 +782,64 @@ fn apply_snapshot<T: Storable>(
     match snapshot_id {
         None => f.live(),
         Some(id) => f.snapshot_id(&id),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::server::interfaces::r#impl::base::InterfaceBase;
+    use crate::server::ip_addresses::r#impl::base::{IPAddressBase, MacEvidence, MacEvidenceValue};
+    use crate::server::shared::attribution::AttributeSource;
+
+    fn interface(host_id: Uuid, mac: Option<&str>) -> Interface {
+        Interface::new(InterfaceBase {
+            host_id,
+            mac_address: mac.map(|m| {
+                MacEvidence::new(
+                    MacEvidenceValue(m.parse().unwrap()),
+                    AttributeSource::ProfinetDcp,
+                )
+            }),
+            ..Default::default()
+        })
+    }
+
+    fn ip_address(host_id: Uuid) -> IPAddress {
+        IPAddress::new(IPAddressBase {
+            host_id,
+            ip_address: "10.0.0.1".parse().unwrap(),
+            ..Default::default()
+        })
+    }
+
+    /// The case this function exists for: a network whose only L2-relevant data is a PROFINET
+    /// DCP-identified host (no IP, no neighbour) must still offer the L2 Physical tab —
+    /// otherwise the view `l2_builder.rs` would draw a container in is never reachable.
+    #[test]
+    fn a_no_ip_mac_only_host_qualifies_the_network_for_l2() {
+        let host_id = Uuid::new_v4();
+        let interfaces = vec![interface(host_id, Some("aa:bb:cc:dd:ee:ff"))];
+        assert!(any_interface_qualifies_l2_physical(&interfaces, &[]));
+    }
+
+    /// The condition is "no IP *at all*", not "this interface has no IP" — a host with an IP
+    /// recorded elsewhere (its own `IPAddress` row) doesn't qualify the network on its MAC
+    /// alone; it's already visible via L3, and must still require a neighbour like any other.
+    #[test]
+    fn a_mac_carrying_interface_on_a_host_that_has_an_ip_does_not_qualify_on_its_own() {
+        let host_id = Uuid::new_v4();
+        let interfaces = vec![interface(host_id, Some("aa:bb:cc:dd:ee:ff"))];
+        let ip_addresses = vec![ip_address(host_id)];
+        assert!(!any_interface_qualifies_l2_physical(
+            &interfaces,
+            &ip_addresses
+        ));
+    }
+
+    #[test]
+    fn no_mac_and_no_neighbour_does_not_qualify() {
+        let interfaces = vec![interface(Uuid::new_v4(), None)];
+        assert!(!any_interface_qualifies_l2_physical(&interfaces, &[]));
     }
 }
