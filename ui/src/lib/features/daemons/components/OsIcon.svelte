@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { DaemonOS } from '../utils';
+	import { common_linux } from '$lib/paraglide/messages';
 
 	interface Props {
 		os: DaemonOS;
@@ -31,13 +32,7 @@
 		/>
 	</svg>
 {:else}
-	<!-- Linux: a simplified original penguin shape (not traced from any icon set) so the body,
-	     belly, beak, and feet can each carry their own real color rather than one flat fill. -->
-	<svg viewBox="0 0 24 24" class={className} xmlns="http://www.w3.org/2000/svg">
-		<ellipse cx="9" cy="21.2" rx="1.8" ry="0.9" fill="#F5A623" />
-		<ellipse cx="15" cy="21.2" rx="1.8" ry="0.9" fill="#F5A623" />
-		<ellipse cx="12" cy="12" rx="6.5" ry="9" fill="#111111" />
-		<ellipse cx="12" cy="13.5" rx="3.7" ry="6.3" fill="#FFFFFF" />
-		<polygon points="10.4,7.6 13.6,7.6 12,9.4" fill="#F5A623" />
-	</svg>
+	<!-- Linux: the actual Tux mascot (Larry Ewing / Simon Budig / Garrett LeSage, Wikimedia
+	     Commons "Tux.svg", Attribution license), not a redrawn approximation. -->
+	<img src="/logos/tux.png" alt={common_linux()} class={className} />
 {/if}
