@@ -6,7 +6,7 @@
 	import InlineWarning from '$lib/shared/components/feedback/InlineWarning.svelte';
 	import TroubleshootingChecklist from './TroubleshootingChecklist.svelte';
 	import { useConfigQuery } from '$lib/shared/stores/config-query';
-	import type { DaemonOS } from '../../../utils';
+	import { downloadDaemonMsi, type DaemonOS } from '../../../utils';
 	import { osInstallCommand, type InstallArtifacts } from '../../../types/base';
 	import type { DaemonMode } from '../../../types/base';
 	import { trackEvent } from '$lib/shared/utils/analytics';
@@ -115,8 +115,6 @@
 
 	const windowsDownloadUrl =
 		'https://github.com/scanopy/scanopy/releases/latest/download/scanopy-daemon-windows-amd64.exe';
-	const windowsMsiDownloadUrl =
-		'https://github.com/scanopy/scanopy/releases/latest/download/scanopy-daemon-windows-amd64.msi';
 	const windowsInstallCommand = `Invoke-WebRequest -Uri "${windowsDownloadUrl}" -OutFile "scanopy-daemon-windows-amd64.exe"`;
 	const installScript = `bash -c "$(curl -fsSL https://raw.githubusercontent.com/scanopy/scanopy/refs/heads/main/install.sh)"`;
 
@@ -207,6 +205,23 @@
 	function handleOsSelect(os: DaemonOS) {
 		onOsSelect(os);
 		trackEvent('daemon_install_os_selected', { os });
+	}
+
+	// MSI download: fetched through our own server so the browser can save it under the
+	// per-daemon filename (see downloadDaemonMsi). Falls back to the direct GitHub link (which
+	// needs a manual rename) if our server can't reach GitHub.
+	let isDownloadingMsi = $state(false);
+	let msiNeedsRename = $state(false);
+
+	async function handleDownloadMsi(filename: string) {
+		isDownloadingMsi = true;
+		try {
+			const savedUnderFilename = await downloadDaemonMsi(filename);
+			msiNeedsRename = !savedUnderFilename;
+			trackEvent('daemon_install_msi_downloaded', { renamed: !savedUnderFilename });
+		} finally {
+			isDownloadingMsi = false;
+		}
 	}
 
 	function handleCopy(context: string) {
@@ -454,19 +469,26 @@
 						/>
 					{:else if artifacts?.msi.filename}
 						<div class="flex flex-wrap items-center gap-2">
-							<a
-								href={windowsMsiDownloadUrl}
-								download={artifacts.msi.filename}
+							<button
+								type="button"
 								class="btn-secondary inline-flex items-center gap-1"
+								disabled={isDownloadingMsi}
+								onclick={() => handleDownloadMsi(artifacts.msi.filename)}
 							>
-								<Download class="h-4 w-4" />
+								{#if isDownloadingMsi}
+									<Loader2 class="h-4 w-4 animate-spin" />
+								{:else}
+									<Download class="h-4 w-4" />
+								{/if}
 								{daemons_msiDownloadButton()}
-							</a>
+							</button>
 							<span class="text-secondary font-mono text-xs">{artifacts.msi.filename}</span>
 						</div>
-						<p class="text-tertiary text-xs">
-							{daemons_msiRenameHint({ filename: artifacts.msi.filename })}
-						</p>
+						{#if msiNeedsRename}
+							<p class="text-tertiary text-xs">
+								{daemons_msiRenameHint({ filename: artifacts.msi.filename })}
+							</p>
+						{/if}
 						{#if artifacts.msi.omitted_config_keys.length > 0}
 							<InlineWarning
 								title={daemons_msiOmittedConfigTitle()}
