@@ -42,19 +42,18 @@ V3_CTX_AUTH_PASS="${V3_CTX_AUTH_PASS:-ctxauthpass12345}"
 V3_CTX_PRIV_PASS="${V3_CTX_PRIV_PASS:-ctxprivpass12345}"
 V3_USER="${V3_USER:-scanopyv3}"
 
-# Deploy target: the Proxmox VM that hosts the LXC agents, reached over SSH at the first host in
-# the lab (its management IP doubles as switch-core-01's macvlan address). The VM accepts publickey
+# Deploy target: the Proxmox VM's durable management address (see lxc/setup.sh's "durable
+# management address" step) — a static secondary address on eth0, independent of every lab
+# macvlan address, so the way in stays reachable even when the lab itself is completely down.
+# It used to default to the first lab host's address instead (which doubled as its management
+# IP), which is exactly how a broken lab also broke the deploy path. The VM accepts publickey
 # auth only, so the key is required. Override either with SNMP_VM_HOST / SNMP_SSH_KEY.
-#
-# Resolved lazily: the lab's addresses come from the generated lab.env, and `fixtures` is what
-# creates it, so this cannot be read at startup.
 vm_host() {
     if [ -n "${SNMP_VM_HOST:-}" ]; then
         echo "$SNMP_VM_HOST"
         return
     fi
-    require_lab_env
-    echo "${HOSTS[0]}"
+    echo "192.168.4.21"
 }
 SSH_KEY="${SNMP_SSH_KEY:-$HOME/.ssh/snmp-test-vm}"
 REMOTE_DIR="/root/snmp-test"
@@ -87,7 +86,7 @@ verify_guest_subnet_fixture() {
         "$host" "guest-subnet" "$got_index" "$got_name"
     printf "      expected ipAdEntIfIndex=%s and ifName=%s\n" "$if_index" "$if_name"
     printf "      check for a duplicate registration:\n"
-    printf "      ssh root@%s 'journalctl -u snmpd-ap-wireless-01 | grep -i duplicate'\n" "${HOSTS[0]}"
+    printf "      ssh root@%s 'journalctl -u snmpd-ap-wireless-01 | grep -i duplicate'\n" "$(vm_host)"
     return 1
 }
 
@@ -124,7 +123,7 @@ verify_vlan_context_fixture() {
         "$host" "vlan-context" "$v3_default" "$v3_context" "$v2c_context"
     printf "      expected default=1 v3ctx=9 v2cctx=9\n"
     printf "      a context walk of 0 usually means the proxied back end is down:\n"
-    printf "      ssh root@%s 'systemctl status snmpd-switch-cisco-01-vlan20'\n" "${HOSTS[0]}"
+    printf "      ssh root@%s 'systemctl status snmpd-switch-cisco-01-vlan20'\n" "$(vm_host)"
     return 1
 }
 
@@ -195,21 +194,104 @@ cmd_verify() {
     fi
 }
 
+# ICMP-only reachability said nothing useful while the lab was dead for five days — every
+# `snmpd-*` unit can be thrashing in `auto-restart` and this would still just print unreachable
+# addresses, no different from any other outage. This instead SSHes to the management address
+# (see vm_host()) and checks, on the VM itself, exactly the three things that can go wrong: the
+# macvlan link missing, its address missing, or the unit having given up (`failed`).
 cmd_status() {
     require_lab_env
+    if [ ! -f "$SSH_KEY" ]; then
+        printf "${RED}✗${NC} SSH key not found: %s\n" "$SSH_KEY"
+        exit 1
+    fi
+    local ssh_opts=(-i "$SSH_KEY" -o ConnectTimeout=10)
+    local VM_HOST
+    VM_HOST="$(vm_host)"
+
     echo "SNMP Test Environment Status"
     echo "=============================="
     echo ""
-    echo "Checking reachability (ICMP)..."
-    for i in "${!HOSTS[@]}"; do
-        local host="${HOSTS[$i]}"
-        local name="${SYSNAMES[$i]}"
-        if ping -c 1 -W 1 "$host" &>/dev/null; then
-            printf "  ${GREEN}✓${NC} %-18s  %s\n" "$host" "$name"
-        else
-            printf "  ${RED}✗${NC} %-18s  %s  (unreachable)\n" "$host" "$name"
-        fi
-    done
+    echo "Checking links, addresses and units on root@${VM_HOST}..."
+    echo ""
+
+    local remote_report
+    if ! remote_report=$(ssh "${ssh_opts[@]}" "root@${VM_HOST}" bash -s -- "${HOSTS[@]}" <<'REMOTE'
+set -u
+links_missing=()
+addrs_missing=()
+i=0
+for ip in "$@"; do
+    mv="mv-snmp${i}"
+    if ! ip link show "$mv" &>/dev/null; then
+        links_missing+=("$mv ($ip)")
+    elif ! ip -4 addr show "$mv" | grep -q " ${ip}/"; then
+        addrs_missing+=("$mv (want $ip)")
+    fi
+    i=$((i + 1))
+done
+units_failed=()
+while IFS= read -r u; do
+    [ -n "$u" ] && units_failed+=("$u")
+done < <(systemctl list-units 'snmpd-*' 'snmp-bulk-refuser-*' --all --no-legend --plain --state=failed | awk '{print $1}')
+
+echo "LINKS_MISSING:${#links_missing[@]}"
+printf '%s\n' "${links_missing[@]}"
+echo "ADDRS_MISSING:${#addrs_missing[@]}"
+printf '%s\n' "${addrs_missing[@]}"
+echo "UNITS_FAILED:${#units_failed[@]}"
+printf '%s\n' "${units_failed[@]}"
+REMOTE
+    ); then
+        printf "${RED}✗${NC} Could not reach root@%s over SSH.\n" "$VM_HOST"
+        exit 1
+    fi
+
+    local mode="" n_links=0 n_addrs=0 n_failed=0
+    local links=() addrs=() failed=()
+    while IFS= read -r line; do
+        case "$line" in
+            LINKS_MISSING:*)
+                mode=links
+                n_links="${line#LINKS_MISSING:}"
+                continue
+                ;;
+            ADDRS_MISSING:*)
+                mode=addrs
+                n_addrs="${line#ADDRS_MISSING:}"
+                continue
+                ;;
+            UNITS_FAILED:*)
+                mode=failed
+                n_failed="${line#UNITS_FAILED:}"
+                continue
+                ;;
+        esac
+        case "$mode" in
+            links) links+=("$line") ;;
+            addrs) addrs+=("$line") ;;
+            failed) failed+=("$line") ;;
+        esac
+    done <<< "$remote_report"
+
+    if [ "$n_links" = "0" ] && [ "$n_addrs" = "0" ] && [ "$n_failed" = "0" ]; then
+        printf "${GREEN}healthy${NC} — all %d links up, all addresses assigned, no failed units.\n" "${#HOSTS[@]}"
+        return
+    fi
+
+    if [ "$n_links" != "0" ]; then
+        printf "${RED}links missing${NC} (%s):\n" "$n_links"
+        printf '  %s\n' "${links[@]:-}"
+    fi
+    if [ "$n_addrs" != "0" ]; then
+        printf "${RED}addresses missing${NC} (%s):\n" "$n_addrs"
+        printf '  %s\n' "${addrs[@]:-}"
+    fi
+    if [ "$n_failed" != "0" ]; then
+        printf "${RED}units failed${NC} (%s):\n" "$n_failed"
+        printf '  %s\n' "${failed[@]:-}"
+        echo "  Check with: journalctl -u <unit>"
+    fi
 }
 
 # Push this tools/snmp tree to the VM and (re)build every agent. Idempotent: it
@@ -273,7 +355,7 @@ case "${1:-}" in
         echo "  fixtures — Generate lxc/generated/ from the typed device definitions"
         echo "  deploy — Generate, copy tools/snmp to the VM, and rebuild every agent (needs SSH key)"
         echo "  verify — Query each SNMP host and check sysName"
-        echo "  status — Ping each host to check reachability"
+        echo "  status — Check links/addresses/unit health on the VM (needs SSH key)"
         exit 1
         ;;
 esac
