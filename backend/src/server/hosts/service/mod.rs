@@ -8,7 +8,7 @@ use crate::server::{
     hosts::r#impl::{
         api::{
             BindingInput, ConflictBehavior, CreateHostRequest, HostResponse, IPAddressInput,
-            PortInput, ServiceInput, UpdateHostRequest,
+            InterfaceInput, PortInput, ServiceInput, UpdateHostRequest,
         },
         attributes::{
             HostChassisIdValue, HostManagementUrlValue, HostSysContactValue, HostSysDescrValue,

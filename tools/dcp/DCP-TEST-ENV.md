@@ -1,56 +1,73 @@
 # PROFINET DCP Test Environment
 
-**Status: proposed, not provisioned.** §12 of the OT-discovery scoping report is blunt about this
-gap: DCP needs a responder on the same L2 segment and no such environment exists. This document is
-a concrete proposal for closing it, written because designing it is cheap and useful even before
-anyone provisions it — not a description of something already running.
+Mirrors `tools/snmp/`'s shape: a real fixture on a real VM, and a real daemon scan against it —
+not an in-process mock standing in for both sides. §12 of the OT-discovery scoping report says
+plainly that no such environment exists yet; this is it, plus what's still needed to stand it up.
 
-## What exists today (Tier 1 — in-repo, no external infrastructure)
+## What this is
 
-`dcp-test-env.sh` + the `--ignored` test `dcp_live_round_trip_over_a_real_veth_pair`
-(`backend/src/daemon/discovery/service/network/dcp/live_test.rs`) round-trip a real DCP Identify
-exchange over a real Linux veth pair. This proves the daemon's own encoder against its own decoder
-over the actual kernel/NIC-driver path — real EtherType/multicast filtering, real byte order —
-which the in-memory unit tests (`packet.rs`, `identify.rs`) cannot exercise. **It does not prove
-interop with a real PROFINET device.** Linux-only, needs root/CAP_NET_ADMIN; this session (macOS
-sandbox, no root) never ran it — see the branch's Work Summary.
+`dcp-sim.py` is a standalone PROFINET DCP Identify responder — a fake device. It does **not**
+import or share code with `backend/src/daemon/discovery/service/network/dcp/`, on purpose: a sim
+built from the client's own encoder/decoder can only confirm the client agrees with itself. Written
+independently from the same wire-format reference (Wireshark's `packet-pn-dcp.c` dissector — see
+`dcp/packet.rs`'s own module doc), so a daemon scan against it is a real test of whether the two
+independent implementations agree on the wire format, the way a real `snmpd` agent is for SNMP.
 
-## What's missing (Tier 2 — a genuine third-party responder)
+Stdlib-only Python (`socket` with `AF_PACKET`), matching `tools/snmp/lxc/snmp-bulk-refuser.py`'s
+own precedent — no scapy dependency to install. Linux-only (`AF_PACKET` is Linux-specific), so it
+runs on the VM, not on a developer's Mac.
 
-The precedent this project already has for "test a probe against a real implementation" is
-`tools/probe-servers/` + `live_servers.rs`: real protocol servers in local Docker containers,
-built from source (`Dockerfile.kerberos` et al.) when no suitable image exists. DCP can't reuse
-that shape directly — Docker's default bridge network NATs rather than carrying raw multicast
-Ethernet, and there's no TCP/UDP port to `docker run -p` forward. Two adjustments, same principle:
+## What's deployed vs. what's still needed
 
-**A real, spec-conformant device stack, not a hand-rolled mock.** [p-net](https://github.com/rtlabs-com/p-net)
-(RT-Labs, BSD-3, C) is an open-source PROFINET device stack used for real vendor
-pre-certification — genuinely independent of this codebase's own understanding of the wire
-format, which is the entire point: it would catch a mistaken byte-layout claim this branch's own
-tests, built from the same understanding, structurally cannot. Its `pn_dev` sample application
-already answers DCP Identify out of the box.
+**Written, and its pure encode/decode logic checked locally** (`build_identify_response`/
+`parse_identify_request` round-tripped against `dcp-verify.py`'s own independent parse/build —
+see the two scripts' docstrings): `dcp-sim.py`, `setup.sh` (systemd unit installer), `dcp-verify.py`
+(a standalone protocol-level check — send one Identify Request, print whatever answers — the DCP
+equivalent of `snmpget` in `tools/snmp/snmp-test-env.sh verify`), `dcp-test-env.sh`
+(deploy/verify/status orchestration).
 
-**Networking: `Dockerfile.p-net` + a macvlan network, or a small Proxmox VM.** Raw L2 multicast
-needs the container (or VM) to have a real presence on the segment:
-- **Docker `macvlan`**: `docker network create -d macvlan --subnet=<segment> -o parent=<host-nic>
-  dcp-segment`, then run the p-net container attached to it. Lighter weight than a VM, but ties
-  the daemon-under-test to running on the same host's network namespace as the container (or a
-  second macvlan endpoint) — workable for local manual verification, awkward for CI.
-- **A dedicated Proxmox VM**, mirroring `tools/snmp/lxc/`'s existing pattern (a host harness
-  script + systemd units) on its own segment/VLAN the test daemon can also reach. Closer to how
-  the SNMP simulator environment already works, and the natural home if this is meant to be a
-  standing environment other engineers reach for, not a one-off.
+**Not yet provisioned**: the VM itself. `dcp-test-env.sh deploy` needs `DCP_VM_HOST` pointed at a
+real box — this session has no Proxmox access to create one. Once a VM/LXC exists with a network
+interface on a segment reachable by wherever the daemon will run:
 
-**Recommendation**: start with the Docker macvlan route for a first manual verification pass (low
-setup cost, answers "does a real device stack accept our exact bytes" quickly), and only invest in
-the Proxmox VM if DCP verification becomes a recurring need the way SNMP's already is.
+```
+export DCP_VM_HOST=<vm-management-address>
+tools/dcp/dcp-test-env.sh deploy
+```
 
-## What Tier 2 would prove, and what it still wouldn't
+## The part that's genuinely different from SNMP: reachability
 
-Answers the two biggest unverified claims in the branch: whether a real implementation's Identify
-Response is unicast or multicast (`packet.rs`'s module doc flags this as unconfirmed), and whether
-the exact block/TLV layout this branch built from Wireshark's dissector matches what a real stack
-sends. It would **not** prove interop with any specific vendor's device in the field — p-net is a
-reference stack, not a Siemens/Rockwell/Beckhoff PLC, and §11 of the scoping report's own caution
-about vendor-specific quirks (S7comm's COTP behaviour, for the closest analogy) applies here too:
-real hardware can diverge from a reference implementation in ways only a real device surfaces.
+SNMP is IP/UDP — the lab VM just needs to be routable, and `verify`/a real daemon scan can run
+from anywhere with IP reachability. **DCP is raw Ethernet and does not route.** Whatever runs
+`dcp-verify.py` or the actual daemon-under-test needs a real NIC on the *same L2 segment* as the
+VM's DCP-facing interface — SSH/ping reachability to the VM's management address does not
+establish this. In practice that means either the daemon runs on the Proxmox host itself (bridged
+to the same segment), or another VM/LXC is bridged to it.
+
+## Running a real daemon scan against it
+
+Once the VM is up and `dcp-verify.py` confirms it answers:
+
+1. Run a Scanopy daemon (this branch's build) on a host with a NIC on the sim's segment, with that
+   interface in its `--interfaces` allowlist (or no filter, to include everything).
+2. Point it at a real (or dev) Scanopy server and run discovery.
+3. Confirm: a host appears with no IP addresses, one interface carrying the sim's MAC, sourced
+   `AttributeSource::ProfinetDcp`, and (if the response's Name of Station block parsed) a name
+   matching whatever `--name` the sim was deployed with.
+
+This is the actual end-to-end proof the unit tests (`dcp/packet.rs`, `dcp/identify.rs`) cannot
+provide on their own — they're honest about testing this daemon's understanding of the wire format
+against itself, not against an independent implementation or a real device.
+
+## What this still doesn't prove
+
+`dcp-sim.py` is a reference implementation written for this purpose, not a real PROFINET device —
+it settles whether the daemon's parser/builder agree with an independent reading of the same spec
+material, not whether a real Siemens/Rockwell/Beckhoff device behaves identically. In particular it
+does not resolve the unicast-vs-multicast question `dcp/packet.rs`'s module doc flags as unverified
+— `dcp-sim.py` replies unicast because that's what the daemon's current receive filter assumes, not
+because it's confirmed as the real-world answer. For that, the options are the same as before:
+IEC 61158-6-10 itself, or a genuine third-party stack. RT-Labs' [p-net](https://github.com/rtlabs-com/p-net)
+(BSD-3, used for real vendor pre-certification) remains the candidate if that level of confidence is
+ever needed — its `pn_dev` sample app already answers DCP Identify — but building and deploying it
+is a larger lift than this simple responder and hasn't been done here.
