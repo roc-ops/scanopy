@@ -483,8 +483,11 @@ impl TopologyService {
                 network_id,
             ]))
             .await?;
-        let l2_physical =
-            any_interface_qualifies_l2_physical(&interfaces, &ip_addresses, has_resolved_neighbours);
+        let l2_physical = any_interface_qualifies_l2_physical(
+            &interfaces,
+            &ip_addresses,
+            has_resolved_neighbours,
+        );
 
         let application = match self.network_service.get_by_id(&network_id).await? {
             Some(network) => self
@@ -899,7 +902,11 @@ mod tests {
     #[test]
     fn no_mac_and_no_neighbour_does_not_qualify() {
         let interfaces = vec![interface(Uuid::new_v4(), None)];
-        assert!(!any_interface_qualifies_l2_physical(&interfaces, &[], false));
+        assert!(!any_interface_qualifies_l2_physical(
+            &interfaces,
+            &[],
+            false
+        ));
     }
 
     /// The other half of the predicate, which moved out of `Interface` and into its own tables
