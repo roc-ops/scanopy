@@ -167,13 +167,13 @@ mod ip_addr_serde {
 ///   here", so a value containing one is by definition not what the device advertised.
 ///
 /// Deliberately *not* rejected: the empty string (its resolution already declines, and rejecting
-/// it here would discard a neighbour whose `sysName` tier can still identify it), non-ASCII text
-/// (a UTF-8 port description in any language is a legitimate identifier), and surrounding
-/// whitespace (trimmed at lookup, not at storage, so what is stored stays what the device said).
+/// it here would discard a neighbour whose `sysName` tier can still identify it) and non-ASCII
+/// text (a UTF-8 port description in any language is a legitimate identifier).
 ///
-/// NUL is a control character, so it fails this — which is why nothing calls this predicate on a
-/// raw value. [`accept_port_identifier`] strips NULs first and is the entry point every boundary
-/// uses; see it for why the two are not the same case.
+/// NUL and surrounding whitespace ARE control characters by this predicate — `\t \n \r \x0b
+/// \x0c` all answer `char::is_control()` — which is why nothing calls it on a raw value.
+/// [`accept_port_identifier`] normalises both away first and is the entry point every boundary
+/// uses; see it for why padding is not payload.
 pub fn usable_identifier(value: &str) -> bool {
     !value
         .chars()
@@ -187,7 +187,14 @@ pub fn usable_identifier(value: &str) -> bool {
 /// ([`decode_tlv_name`]) funnels through it too, once its bytes have survived a strict UTF-8
 /// decode, so all four boundaries apply one rule to one shape of value.
 ///
-/// NULs are stripped *first*, and are not what this rejects. They are padding, not content:
+/// NULs and surrounding whitespace are removed *first*, and are not what this rejects. Both are
+/// padding, not content, and normalising them here rather than at a call site is the whole point
+/// of a shared gate: UniFi used to trim before calling in, so `"swp2\n"` was stored by that
+/// transport and refused by the other three — one identifier with two answers depending on how it
+/// was polled, which is the defect this gate exists to remove. `resolve_device_local_port` trims
+/// again at lookup, so trimming at storage costs nothing and loses nothing.
+///
+/// On NULs specifically: they are padding, not content:
 /// D-Link's DGS series NUL-terminates its port identifiers — `31 00` for port `"1"` — which used
 /// to fail the write of the whole host, because these strings land in the `lldp_chassis_id` /
 /// `lldp_port_id` JSONB columns and PostgreSQL rejects the escape outright (SQLSTATE 22P05, GH
@@ -201,9 +208,15 @@ pub fn usable_identifier(value: &str) -> bool {
 /// plain string would print the very bytes that make it unreadable, and `from_utf8_lossy` would
 /// add a U+FFFD that the device never sent.
 pub fn accept_port_identifier<'a>(source: &str, value: &'a str) -> Option<Cow<'a, str>> {
-    let stripped = strip_nuls(value);
-    if usable_identifier(&stripped) {
-        return Some(stripped);
+    let normalised = match strip_nuls(value) {
+        Cow::Borrowed(s) => match s.trim() {
+            t if t.len() == s.len() => Cow::Borrowed(s),
+            t => Cow::Owned(t.to_string()),
+        },
+        Cow::Owned(s) => Cow::Owned(s.trim().to_string()),
+    };
+    if usable_identifier(&normalised) {
+        return Some(normalised);
     }
     tracing::warn!(
         source,
@@ -1361,6 +1374,28 @@ mod resolution_tests {
     /// GH #668: D-Link NUL-terminates its port identifiers, so `lldpRemPortId` arrives as
     /// `31 00`. The byte is valid UTF-8, so nothing rejected it — it reached `jsonb`, which
     /// cannot store the escape, and would never have matched an interface named "1" anyway.
+    #[test]
+    fn every_transport_normalises_padding_the_same_way() {
+        // The gate's whole claim is that one identifier gets one answer however it was polled.
+        // It did not hold: UniFi trimmed before calling in, so "swp2\n" was stored by that
+        // transport and refused by the other three. Padding is normalised inside the gate now,
+        // and this pins it -- a divergence here is the defect, not a style difference.
+        for padded in ["swp2\n", " swp2", "swp2\t", "\r\nswp2 "] {
+            assert_eq!(
+                accept_port_identifier("test", padded).as_deref(),
+                Some("swp2"),
+                "padding should be normalised, not refused: {padded:?}"
+            );
+        }
+        // ... and padding is not a licence to accept a payload that is not text.
+        assert_eq!(
+            accept_port_identifier("test", " \u{fffd}\nv ").as_deref(),
+            None
+        );
+        // An identifier that is only padding says nothing, and says it the same way everywhere.
+        assert_eq!(accept_port_identifier("test", "   ").as_deref(), Some(""));
+    }
+
     #[test]
     fn tlv_text_decoding_strips_nul_padding() {
         assert_eq!(

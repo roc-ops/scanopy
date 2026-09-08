@@ -480,7 +480,7 @@ impl HostService {
 /// accidentally rescued the SR Linux row: a description is worth *storing* whatever it holds, and
 /// it is shown to operators, but a control character in it makes it no more a port name than it
 /// made the port id one. `lldp_port_desc` cannot carry U+FFFD — it is strictly decoded and
-/// NUL-stripped where it is collected — so control characters are the whole of what this catches.
+/// NUL-stripped on the SNMP path where it is collected (gNMI and lldpd are not, so a NUL-padded description simply fails the exact-match lookup) — so control characters are the whole of what this catches.
 ///
 /// Filtered at the lookup rather than at the write on purpose. The stored value is untouched and
 /// the caller's verdict stays `unresolved`, so the row is still counted and still warned about; it

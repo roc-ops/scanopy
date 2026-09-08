@@ -310,7 +310,8 @@ fn apply_lldp_table(interfaces: &mut [Interface], device: &UnifiDevice) {
         interface.base.lldp_port_id = entry
             .port_id
             .as_deref()
-            .map(str::trim)
+            // No trim here: the gate normalises padding, and trimming first was what made this
+            // transport accept "swp2\n" while SNMP, gNMI and lldpd refused it.
             .and_then(|p| accept_port_identifier("unifi", p))
             .filter(|p| !p.is_empty())
             .map(|p| LldpPortId::from_identifier_str(&p));
