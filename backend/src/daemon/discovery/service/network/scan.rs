@@ -226,25 +226,35 @@ impl NetworkScan {
         // function every other discovery source uses — once joined near the end of this function.
         // Spawned now rather than awaited inline so its listen window (a few seconds per
         // interface) overlaps the rest of the pipeline instead of adding to it.
+        //
+        // Runs on a dedicated `std::thread::spawn`, fired synchronously right here, mirroring
+        // `arp::scan_subnet`'s shape rather than going through `tokio::task::spawn_blocking`.
+        // `datalink::channel()` opens a raw BPF/AF_PACKET fd, and on macOS opening one at fd >=
+        // 1024 used to abort the process (see vendor/pnet_datalink/README.md; fixed there). ARP
+        // avoids ever being anywhere near that by opening its channel on its own OS thread,
+        // started before deep-scan's fd-heavy work has ramped up — not queued behind whatever
+        // else the Tokio blocking pool happens to be running. DCP gets the same guarantee here:
+        // the thread below starts immediately, so its `datalink::channel()` call runs at a
+        // predictably low fd rather than at a scheduling-dependent one. Only the *result*, not
+        // the channel open, crosses back into async code — via a oneshot that the thread fills
+        // once its whole sweep (every interface) is done.
         let dcp_capable_interfaces: Vec<_> = filtered_own_nics(&interface_filter)
             .into_iter()
             .filter(dcp::is_dcp_capable)
             .collect();
-        let dcp_sweep = tokio::spawn(async move {
+        let (dcp_tx, dcp_sweep) = tokio::sync::oneshot::channel();
+        std::thread::spawn(move || {
             let mut found = Vec::new();
             for interface in dcp_capable_interfaces {
                 let name = interface.name.clone();
-                match tokio::task::spawn_blocking(move || dcp::scan_interface(&interface)).await {
-                    Ok(Ok(responses)) => found.extend(responses),
-                    Ok(Err(e)) => {
-                        tracing::warn!(interface = %name, error = %e, "DCP sweep failed on interface")
-                    }
+                match dcp::scan_interface(&interface) {
+                    Ok(responses) => found.extend(responses),
                     Err(e) => {
-                        tracing::warn!(interface = %name, error = %e, "DCP sweep task panicked")
+                        tracing::warn!(interface = %name, error = %e, "DCP sweep failed on interface")
                     }
                 }
             }
-            found
+            let _ = dcp_tx.send(found);
         });
 
         // ---------------------------------------------------------------
@@ -1313,7 +1323,7 @@ impl NetworkScan {
                     tracing::info!(dcp_count, "PROFINET DCP sweep found devices");
                 }
             }
-            Err(e) => tracing::warn!(error = %e, "DCP sweep task failed to join"),
+            Err(e) => tracing::warn!(error = %e, "DCP sweep thread failed to report back"),
         }
 
         let discovered = hosts_discovered.load(Ordering::Relaxed);
