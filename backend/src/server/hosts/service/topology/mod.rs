@@ -741,10 +741,25 @@ impl HostService {
             .unwrap_or(0)
     }
 
+    /// Interfaces with an unresolved single-MAC FDB entry — cheaper than `resolve_fdb_links`
+    /// itself since it never fetches or hydrates a row. Only for the warning raised when
+    /// resolution is cut short, the same reasoning as `neighbour_bearing_interface_count` above.
+    pub async fn unresolved_fdb_interface_count(&self, network_id: Uuid) -> u32 {
+        self.interface_service
+            .storage()
+            .count(StorableFilter::<Interface>::new_for_unresolved_fdb_in_network(network_id))
+            .await
+            .unwrap_or(0) as u32
+    }
+
     /// Resolve FDB (bridge forwarding database) single-MAC ports to neighbor links.
     /// Called after resolve_lldp_links — only processes ports without LLDP/CDP data
     /// that have exactly one learned MAC address (direct physical connection).
-    pub async fn resolve_fdb_links(&self, network_id: Uuid) -> Result<u32> {
+    pub async fn resolve_fdb_links(
+        &self,
+        network_id: Uuid,
+        scan_time: DateTime<Utc>,
+    ) -> Result<u32> {
         let resolver = LldpResolverImpl::new(
             self.interface_service.clone(),
             self.ip_address_service.clone(),
@@ -755,9 +770,11 @@ impl HostService {
         let unresolved = self.interface_service.get_all(filter).await?;
 
         let mut resolved_count: u32 = 0;
-        let scan_time = Utc::now();
 
         for interface in unresolved {
+            // The SQL filter above already restricts to exactly one learned MAC
+            // (`jsonb_array_length(fdb_col) = 1`); this re-check is defense-in-depth against a
+            // future filter regression, not a path a passing filter can reach.
             let mac = match &interface.base.fdb_macs {
                 Some(macs) if macs.len() == 1 => &macs[0],
                 _ => continue,

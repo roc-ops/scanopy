@@ -21469,6 +21469,36 @@
           },
           {
             "type": "object",
+            "title": "FdbResolutionIncomplete",
+            "description": "FDB link resolution ran out of its time budget, so this scan's FDB-derived links are\nincomplete.\n\nDistinct from `NeighbourResolutionIncomplete`: that pass runs first and this one is\nstrictly sequenced after it, so a reader needs to know which pass stopped to judge how\nmuch of Physical Topology is affected.",
+            "required": [
+              "budget_seconds",
+              "interfaces",
+              "code"
+            ],
+            "properties": {
+              "budget_seconds": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Seconds the pass was allowed before it was stopped.",
+                "minimum": 0
+              },
+              "code": {
+                "type": "string",
+                "enum": [
+                  "FdbResolutionIncomplete"
+                ]
+              },
+              "interfaces": {
+                "type": "integer",
+                "format": "int32",
+                "description": "Interfaces with an unresolved single-MAC FDB entry it was working through.",
+                "minimum": 0
+              }
+            }
+          },
+          {
+            "type": "object",
             "title": "WarningsTruncated",
             "description": "The run produced more warnings than the scan record holds. Emitted rather than dropping\nthe tail silently — a list that simply stops reads as though that was all of them.",
             "required": [

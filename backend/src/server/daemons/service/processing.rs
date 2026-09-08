@@ -663,6 +663,53 @@ impl DaemonService {
                     });
             }
         }
+
+        // Sequenced strictly after LLDP/CDP resolution, and only after its outcome is already
+        // folded in: the FDB filter selects ports LLDP/CDP left untouched, so running this first
+        // would let it act on rows LLDP was about to claim. A second, independent budget rather
+        // than one wrapping both passes keeps the two outcomes attributable — an operator seeing
+        // this timeout knows which pass stalled, not just that "resolution" did. Worst case this
+        // adds RESOLUTION_BUDGET's own 10s on top of LLDP's, well inside the daemon's 30s request
+        // timeout, which the constant is already sized against.
+        let fdb_started = std::time::Instant::now();
+        let fdb_outcome = tokio::time::timeout(
+            RESOLUTION_BUDGET,
+            host_service.resolve_fdb_links(update.network_id, scan_time),
+        )
+        .await;
+
+        metrics::histogram!("fdb_resolution_duration_seconds")
+            .record(fdb_started.elapsed().as_secs_f64());
+
+        match fdb_outcome {
+            // `resolve_fdb_links` returns a bare resolved count and already logs it itself
+            // (`tracing::debug!` in `topology/mod.rs`) — nothing further to fold into `update`.
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => tracing::warn!(
+                session_id = %update.session_id,
+                network_id = %update.network_id,
+                error = %e,
+                "FDB link resolution failed; finalizing the session without its findings"
+            ),
+            Err(_) => {
+                let interfaces = host_service
+                    .unresolved_fdb_interface_count(update.network_id)
+                    .await;
+                tracing::warn!(
+                    session_id = %update.session_id,
+                    network_id = %update.network_id,
+                    budget_seconds = RESOLUTION_BUDGET.as_secs(),
+                    interfaces,
+                    "FDB link resolution exceeded its budget; finalizing the session without it"
+                );
+                update
+                    .warnings
+                    .push(DiscoveryWarning::FdbResolutionIncomplete {
+                        budget_seconds: RESOLUTION_BUDGET.as_secs() as u32,
+                        interfaces,
+                    });
+            }
+        }
     }
 
     /// Process discovered entities from a daemon.
