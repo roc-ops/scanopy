@@ -298,6 +298,17 @@ net-route = "0.4.6"
 [target.'cfg(any(target_os = "freebsd", target_os = "openbsd"))'.dependencies]
 netdev = "0.45.0"
 
+# Vendored pnet_datalink 0.35.0 (see vendor/pnet_datalink/README.md): macOS/BSD's raw-socket
+# backend calls libc::FD_SET on a fixed 1024-slot bitmap during channel construction, which
+# panics-and-aborts the whole process for any fd >= 1024 — reachable under this daemon's own
+# raised fd limit during real scan load. Patched to poll(), the identical fix libpnet already
+# shipped upstream for the Linux backend (PR #681) but never ported to this one. `pnet_datalink`
+# is transitive (pulled in by the `pnet` facade every caller already imports as
+# `pnet::datalink::...`), so this needs `[patch.crates-io]` rather than a plain `path =`
+# dependency the way vendor/snmp2 uses — no existing `pnet::` import anywhere changes.
+[patch.crates-io]
+pnet_datalink = { path = "vendor/pnet_datalink" }
+
 [dev-dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 walkdir = "2.5"
