@@ -23,7 +23,14 @@ Local patches (all marked in-source with `SCANOPY LOCAL PATCH`):
     array-of-one is a direct, behavior-preserving replacement for `select`'s fixed bitmap — the
     existing `pselect` calls already pass a null sigmask, so nothing here depends on `pselect`'s
     signal-atomicity property over `poll`. Timeout conversion mirrors `linux.rs`'s own
-    `tv_sec * 1000 + tv_nsec / 1_000_000` (`-1` for block-forever).
+    `tv_sec * 1000 + tv_nsec / 1_000_000` (`-1` for block-forever). One deliberate departure from
+    `linux.rs`'s pattern: `linux.rs` narrows on `revents & POLLOUT/POLLIN != 0` after a positive
+    `poll()` return, because that's meaningful for its AF_PACKET socket. This `/dev/bpf` character
+    device does not reliably set that bit even when the read/write below succeeds — confirmed
+    live, an early version of this patch that added the same narrowing check produced
+    "Unexpected poll event" on essentially every send. The `select`/`FD_SET` code this replaces
+    never checked `FD_ISSET` either; it trusted a positive return alone and always proceeded. All
+    three call sites match that: `ret > 0` proceeds, regardless of which bits `revents` carries.
   * src/bpf.rs — a debug-level log of the fd handed to each channel at construction, kept
     permanently (not a temporary diagnostic): the one place that actually sees the raw fd, so any
     future recurrence of this bug class is a logged fact instead of a silent abort.
