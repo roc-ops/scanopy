@@ -24,6 +24,14 @@ fn validate_host_name(name: &HostName) -> Result<(), validator::ValidationError>
 /// Serde default for [`HostBase::hostname_authoritative`]: a payload that says nothing about
 /// where its hostname came from is taken at its word, which is how every daemon predating the
 /// field behaved.
+///
+/// The hazard that buys, named so nobody has to rediscover it: a *future* producer of second-hand
+/// names that is not the controller integration — a DHCP lease table, a Proxmox guest-agent name,
+/// anything repeating a label the host itself never answered to — claims ownership of the field by
+/// saying nothing, and the flapping this flag exists to stop comes back silently. Anything
+/// reporting a name it did not read off the host must set this explicitly. `ControllerIdentity`
+/// deliberately has no `Default` impl for exactly this reason: there, the same omission is a
+/// compile error rather than a wrong value.
 pub(crate) fn hostname_is_authoritative() -> bool {
     true
 }
@@ -66,9 +74,16 @@ pub struct HostBase {
     /// (GH #89).
     ///
     /// It qualifies one observation rather than the host, so it rides along with the payload and
-    /// is never stored: a row read back reports `true`, because whatever is in the column has
-    /// already won the field. It defaults to `true`, so a daemon predating it — and every
-    /// hand-built `HostBase` — behaves exactly as it always has.
+    /// is never stored, and a row read back reports `true`. That is right for the destination
+    /// side of a merge — whatever is in that column has already won the field — and it is *not* a
+    /// statement about a stored row used as a merge *source*, which records nothing about where
+    /// its hostname came from. `consolidate_hosts` therefore clears the flag on the host it is
+    /// merging away: neither side is observing anything, so a hostname only ever heard
+    /// second-hand must not be able to overwrite a resolved one just by having been persisted.
+    ///
+    /// It defaults to `true`, so a daemon predating it — and every hand-built `HostBase` —
+    /// behaves exactly as it always has; see [`hostname_is_authoritative`] for what that default
+    /// costs.
     #[serde(
         default = "hostname_is_authoritative",
         skip_serializing_if = "is_authoritative"

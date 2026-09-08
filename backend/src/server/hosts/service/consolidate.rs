@@ -108,10 +108,21 @@ impl HostService {
         // against a short name, the ordinary shape of DHCP-to-DNS registration — they overwrite
         // each other twice a cycle for ever, taking the display name and a topology rebuild with
         // them. So a hostname the sender read off the host itself owns the field, and one it
-        // heard second-hand fills it only while it is empty. The residual: a host only a
-        // controller ever witnesses keeps the first hostname the controller reported, because
-        // nothing here can tell that from the flapping case without provenance on the stored
-        // value. Its *name* still refreshes — a controller's alias enters a rung higher.
+        // heard second-hand fills it only while it is empty.
+        //
+        // Two residuals, both known and neither fixed here. First: a host only a controller ever
+        // witnesses keeps the first hostname the controller reported, because nothing here can
+        // tell that from the flapping case without provenance on the stored value. Its *name*
+        // still refreshes — a controller's alias enters a rung higher. Second, and the reason
+        // this rule settles the controller case but not every case: the flag separates a direct
+        // observation from a second-hand one, and it cannot separate two *direct* observations of
+        // one host that disagree. `network/scan.rs` does the reverse lookup per address and
+        // submits one payload per address, so a host with two scanned addresses on one MAC —
+        // `sw1.lan` and `sw1-mgmt.lan` — sends two authoritative hostnames per cycle and they
+        // take turns, exactly as the two paths used to; two daemons with different resolvers are
+        // the same shape. Every flip is a `trigger_stale` update, so the cost is a topology
+        // rebuild per cycle. Choosing between two equally-authoritative PTRs needs a tiebreak
+        // nobody has designed yet, and it is tracked separately.
         //
         // An absent or blank incoming hostname is not evidence of absence — a scan that could
         // not resolve one says nothing about the name, and must never clear what an earlier scan
@@ -413,11 +424,22 @@ impl HostService {
             }
         }
 
-        // Upsert host data (metadata merge)
+        // Upsert host data (metadata merge).
+        //
+        // Neither side is making a fresh observation here: both hostnames came back out of the
+        // database, and a stored row cannot say where its own came from. `Host::from_row` reports
+        // every row as directly observed, which is true of the row being merged *into* — whatever
+        // is in that column has already won the field — and says nothing at all about a row used
+        // as the merge *source*. Passed through unqualified, a hostname the network only ever
+        // heard second-hand (a controller repeating a DHCP name) overwrites one a scan resolved
+        // off the destination host itself. A merge is not an observation, so the source may fill
+        // an empty hostname and nothing more (GH #89).
+        let mut merge_source = other_host.clone();
+        merge_source.base.hostname_authoritative = false;
         let updated_host = self
             .upsert_host(
                 destination_host.clone(),
-                other_host.clone(),
+                merge_source,
                 authentication.clone(),
             )
             .await?;

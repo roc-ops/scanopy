@@ -114,6 +114,48 @@ fn client_submission(network_id: Uuid, name: HostName, hostname: &str) -> Submis
     s
 }
 
+/// A *separate* host carrying a second-hand hostname: its own address and its own MAC, so
+/// discovery keeps it apart from the device at [`DEVICE_IP`] and the only way the two ever meet is
+/// a consolidation somebody asked for.
+fn second_hand_host(network_id: Uuid) -> Submission {
+    let mut s = submission_at(
+        network_id,
+        IpAddr::V4(Ipv4Addr::new(192, 168, 1, 21)),
+        HostName::Hostname(ADVERTISED_HOSTNAME.to_string()),
+        Some(ADVERTISED_HOSTNAME),
+    );
+    s.host.base.hostname_authoritative = false;
+    s.ip_address.base.mac_address = "aa:bb:cc:00:00:21".parse().ok();
+    s
+}
+
+/// Merge `source` into `destination`, the way the consolidate endpoint does: both hosts read back
+/// out of storage first, which is precisely where the provenance of a hostname is lost.
+async fn consolidate(
+    services: &ServiceFactory,
+    destination: &HostResponse,
+    source: &HostResponse,
+) -> HostResponse {
+    let destination_host = services
+        .host_service
+        .get_by_id(&destination.id)
+        .await
+        .unwrap()
+        .expect("the destination host must still exist");
+    let other_host = services
+        .host_service
+        .get_by_id(&source.id)
+        .await
+        .unwrap()
+        .expect("the host being merged away must still exist");
+
+    services
+        .host_service
+        .consolidate_hosts(destination_host, other_host, AuthenticatedEntity::System)
+        .await
+        .expect("the consolidation must succeed")
+}
+
 struct Submission {
     host: Host,
     ip_address: IPAddress,
@@ -126,18 +168,37 @@ struct Submission {
 /// `upsert_host` is the only publisher of a host `Updated` event on the discovery write path, and
 /// it publishes only when it decided something actually changed — so an empty list here *is* the
 /// assertion that the merge found nothing to do.
+///
+/// Which is exactly why a dropped event may not pass silently: these tests assert on the *absence*
+/// of updates, and a receiver that fell behind would report an empty list for a host that flipped
+/// on every cycle — the failure mode under test, reported as the fix. The channel holds 1000 and
+/// no test here publishes a handful, so `Lagged` is unreachable today; the arm is what keeps it
+/// that way if either of those changes.
 fn updates_for(
     events: &mut tokio::sync::broadcast::Receiver<Event<EntityOperation>>,
     host_id: Uuid,
 ) -> Vec<bool> {
+    use tokio::sync::broadcast::error::TryRecvError;
+
     let mut seen = Vec::new();
-    while let Ok(event) = events.try_recv() {
-        if event.scope.entity_id() == host_id && matches!(event.operation, EntityOperation::Updated)
-        {
-            seen.push(event.flags.trigger_stale);
+    loop {
+        match events.try_recv() {
+            Ok(event) => {
+                if event.scope.entity_id() == host_id
+                    && matches!(event.operation, EntityOperation::Updated)
+                {
+                    seen.push(event.flags.trigger_stale);
+                }
+            }
+            Err(TryRecvError::Empty | TryRecvError::Closed) => return seen,
+            Err(TryRecvError::Lagged(dropped)) => {
+                panic!(
+                    "the event receiver fell behind and dropped {dropped} events; this assertion \
+                     counts updates, so a silent drop would report a flapping host as a quiet one"
+                )
+            }
         }
     }
-    seen
 }
 
 async fn submit(services: &ServiceFactory, s: Submission) -> HostResponse {
@@ -825,4 +886,78 @@ async fn a_padded_hostname_is_stored_trimmed() {
         updates_for(&mut events, created.id).is_empty(),
         "re-reporting the same hostname with different whitespace is not a change"
     );
+}
+
+/// GH #89, third face of the same field: a merge is not an observation.
+///
+/// `consolidate_hosts` loads both hosts out of the database and hands the source to the very merge
+/// discovery uses. But the flag qualifies a payload and is not a column, so `Host::from_row`
+/// reports every stored hostname as directly observed — true of the row being merged *into*, and
+/// merely unknown for the row being merged *away*. Left unqualified, a hostname the network only
+/// ever heard second-hand overwrites one a scan resolved off the destination host itself, purely
+/// by being on the source side of a manual merge.
+#[tokio::test]
+async fn consolidating_a_host_cannot_overwrite_a_resolved_hostname_with_a_second_hand_one() {
+    harness!(services, network_id, _container);
+
+    let destination = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname(RESOLVED_HOSTNAME.to_string()),
+            Some(RESOLVED_HOSTNAME),
+        ),
+    )
+    .await;
+    assert_eq!(destination.hostname.as_deref(), Some(RESOLVED_HOSTNAME));
+
+    // A second host: its own address and its own MAC, so discovery does not fold the two together
+    // on its own and the merge under test is the one a person asks for.
+    let source = submit(&services, second_hand_host(network_id)).await;
+    assert_ne!(
+        source.id, destination.id,
+        "the two must start as separate hosts, or the merge under test never happens"
+    );
+    assert_eq!(source.hostname.as_deref(), Some(ADVERTISED_HOSTNAME));
+
+    let merged = consolidate(&services, &destination, &source).await;
+
+    assert_eq!(merged.id, destination.id);
+    assert_eq!(
+        merged.hostname.as_deref(),
+        Some(RESOLVED_HOSTNAME),
+        "the destination's hostname was resolved off the host; the source's was only ever \
+         reported, and persisting it does not turn it into an observation"
+    );
+    assert_eq!(
+        merged.name, RESOLVED_HOSTNAME,
+        "the display name is re-derived from that field, so it goes wherever the hostname goes"
+    );
+}
+
+/// The other half of the same rule, so the fix above stays a rule and does not become "the merge
+/// ignores the source". A destination with no hostname has nothing to defend, and the host being
+/// merged away is the only thing that knows what it answered to.
+#[tokio::test]
+async fn consolidating_a_host_still_fills_an_empty_hostname() {
+    harness!(services, network_id, _container);
+
+    let destination = submit(
+        &services,
+        submission(network_id, HostName::Ip(DEVICE_IP), None),
+    )
+    .await;
+    assert_eq!(destination.hostname, None);
+
+    let source = submit(&services, second_hand_host(network_id)).await;
+
+    let merged = consolidate(&services, &destination, &source).await;
+
+    assert_eq!(merged.id, destination.id);
+    assert_eq!(
+        merged.hostname.as_deref(),
+        Some(ADVERTISED_HOSTNAME),
+        "an empty field has nothing to defend, and a reported hostname beats none at all"
+    );
+    assert_eq!(merged.name, ADVERTISED_HOSTNAME);
 }
