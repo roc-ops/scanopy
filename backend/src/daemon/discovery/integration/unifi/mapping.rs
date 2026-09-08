@@ -20,7 +20,7 @@ use crate::server::interfaces::r#impl::base::{
     IfAdminStatus, IfOperStatus, Interface, InterfaceBase,
 };
 use crate::server::ip_addresses::r#impl::base::{IPAddress, IPAddressBase};
-use crate::server::lldp::{LldpChassisId, LldpPortId, canonical_mac};
+use crate::server::lldp::{LldpChassisId, LldpPortId, accept_port_identifier, canonical_mac};
 use crate::server::subnets::r#impl::base::Subnet;
 
 use super::types::{UnifiDevice, UnifiPort, UnifiStation};
@@ -302,12 +302,19 @@ fn apply_lldp_table(interfaces: &mut [Interface], device: &UnifiDevice) {
             interface.base.lldp_sys_name = Some(chassis_raw.to_string());
         }
         interface.base.lldp_chassis_id = Some(chassis);
+        // The controller's `port_id` is a free, vendor-formatted string — the neighbour need not
+        // be a UniFi device at all — so it gets the same guard as the SNMP, gNMI and lldpd port
+        // ids (GH #88). The uplink/downlink synthesis above does not, and does not need it: those
+        // ids are rendered from the controller's own integers. `chassis_id` above is left alone
+        // deliberately; refusing one is a larger change than #88, see `decode_tlv_name`.
         interface.base.lldp_port_id = entry
             .port_id
             .as_deref()
-            .map(str::trim)
+            // No trim here: the gate normalises padding, and trimming first was what made this
+            // transport accept "swp2\n" while SNMP, gNMI and lldpd refused it.
+            .and_then(|p| accept_port_identifier("unifi", p))
             .filter(|p| !p.is_empty())
-            .map(LldpPortId::from_identifier_str);
+            .map(|p| LldpPortId::from_identifier_str(&p));
     }
 }
 
@@ -568,6 +575,61 @@ mod tests {
         assert_eq!(
             port.base.lldp_port_id,
             Some(LldpPortId::LocallyAssigned("1/1/8".to_string()))
+        );
+    }
+
+    /// GH #88 on the fourth boundary. The controller's `port_id` is documented as "the
+    /// neighbour's port identifier, vendor-formatted" — a free string from a device that need not
+    /// be UniFi at all — so it is the same class of value as the SNMP payload that started #88,
+    /// and it reached `from_identifier_str` unguarded.
+    ///
+    /// The same case also pins the two things that must *not* change: `chassis_id` is still
+    /// recorded whatever it holds (refusing one drops the row out of L2 resolution entirely,
+    /// which is a separate change), and GH #668's NUL-terminated port id still yields its name.
+    #[test]
+    fn a_controller_port_id_that_is_not_a_name_is_refused() {
+        use crate::daemon::discovery::integration::unifi::types::{FlexInt, UnifiLldpEntry};
+
+        let apply = |port_id: &str| {
+            let mut interfaces = vec![Interface {
+                base: InterfaceBase {
+                    if_index: 8,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }];
+            let device = UnifiDevice {
+                lldp_table: vec![UnifiLldpEntry {
+                    chassis_id: Some("legacy-switch.lan".to_string()),
+                    port_id: Some(port_id.to_string()),
+                    local_port_idx: Some(FlexInt(8)),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            apply_lldp_table(&mut interfaces, &device);
+            interfaces.remove(0).base
+        };
+
+        let refused = apply("1/1/\u{1}8");
+        assert_eq!(refused.lldp_port_id, None);
+        assert_eq!(
+            refused.lldp_chassis_id,
+            Some(LldpChassisId::LocallyAssigned("legacy-switch.lan".into())),
+            "the chassis id is deliberately still recorded; only the port id is guarded"
+        );
+
+        let padded = apply("1\0");
+        assert_eq!(
+            padded.lldp_port_id,
+            Some(LldpPortId::LocallyAssigned("1".into())),
+            "GH #668's NUL padding is stripped here as on every other boundary"
+        );
+
+        let good = apply("1/1/8");
+        assert_eq!(
+            good.lldp_port_id,
+            Some(LldpPortId::LocallyAssigned("1/1/8".into()))
         );
     }
 

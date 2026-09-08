@@ -43,7 +43,7 @@ use tokio::io::AsyncReadExt;
 
 use crate::daemon::discovery::service::warnings::AttemptOutcome;
 use crate::server::interfaces::r#impl::base::Interface;
-use crate::server::lldp::{LldpChassisId, LldpPortId, canonical_mac};
+use crate::server::lldp::{LldpChassisId, LldpPortId, accept_port_identifier, canonical_mac};
 
 /// lldpd's compiled-in default control-socket path.
 const DEFAULT_SOCKET: &str = "/run/lldpd.socket";
@@ -137,6 +137,10 @@ pub(super) struct LldpdNeighbor {
 /// values arrive already decoded, so MAC-typed ids go through the same canonicalisation the
 /// SNMP path applies to raw octets. Unknown types fall back to
 /// [`LldpChassisId::from_identifier_str`], the constructor that assumes least.
+///
+/// Unguarded, deliberately: the GH #88 refusal is applied to port ids only, because dropping a
+/// chassis id takes the row out of L2 resolution altogether rather than demoting it a tier. See
+/// `decode_tlv_name` in `server::lldp`.
 fn map_chassis_id(id_type: &str, value: &str) -> Option<LldpChassisId> {
     match id_type {
         "mac" => canonical_mac(value).map(LldpChassisId::MacAddress),
@@ -151,8 +155,13 @@ fn map_chassis_id(id_type: &str, value: &str) -> Option<LldpChassisId> {
 }
 
 /// Map an lldpcli id `{type, value}` pair onto [`LldpPortId`]. Same rationale as
-/// [`map_chassis_id`].
+/// [`map_chassis_id`], plus the guard the chassis path does not get: lldpcli hands over an
+/// already-decoded JSON string, so the only thing its type field proves is what the neighbour
+/// claimed. [`accept_port_identifier`] strips NUL padding and refuses the rest, logging what it
+/// refused, so this transport and the SNMP one keep one rule between them (GH #88).
 fn map_port_id(id_type: &str, value: &str) -> Option<LldpPortId> {
+    let value = accept_port_identifier("lldpd", value)?;
+    let value = value.as_ref();
     match id_type {
         "mac" => canonical_mac(value).map(LldpPortId::MacAddress),
         "ifname" => Some(LldpPortId::InterfaceName(value.to_string())),
@@ -596,5 +605,42 @@ mod tests {
         let socket = dir.0.join("lldpd.socket");
         let _listener = tokio::net::UnixListener::bind(&socket).unwrap();
         probe_socket(&socket).await.unwrap();
+    }
+
+    /// GH #88, third transport: lldpcli hands over an already-decoded JSON string, so the only
+    /// thing its type field proves is what the neighbour claimed. A value holding a control
+    /// character is refused here rather than stored under `ifname`, on the same rule the SNMP
+    /// decode applies to raw octets.
+    #[test]
+    fn a_declared_port_id_that_is_not_a_name_is_refused() {
+        assert_eq!(map_port_id("ifname", "swp\n2"), None);
+        assert_eq!(map_port_id("unknown-type", "swp\u{fffd}2"), None);
+
+        assert_eq!(
+            map_port_id("ifname", "swp2"),
+            Some(LldpPortId::InterfaceName("swp2".into()))
+        );
+    }
+
+    /// And the chassis id keeps its old behaviour here, pinned rather than assumed. Refusing one
+    /// removes the row from the unresolved-neighbour filter entirely instead of demoting it a
+    /// tier, so it is a separate change from #88 and must not arrive as a side effect of it.
+    #[test]
+    fn a_chassis_id_is_still_mapped_whatever_it_holds() {
+        assert_eq!(
+            map_chassis_id("local", "switch\u{1}4"),
+            Some(LldpChassisId::LocallyAssigned("switch\u{1}4".into()))
+        );
+    }
+
+    /// GH #668's D-Link value through this door too: padding stripped, name kept. Before this the
+    /// same identifier was kept on SNMP and refused here, because NUL is a control character and
+    /// only the SNMP decode stripped it first.
+    #[test]
+    fn the_d_link_nul_terminated_port_id_survives_this_boundary() {
+        assert_eq!(
+            map_port_id("ifname", "1\0"),
+            Some(LldpPortId::InterfaceName("1".into()))
+        );
     }
 }

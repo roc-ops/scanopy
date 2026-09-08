@@ -261,18 +261,22 @@ impl HostService {
                         // already-resolved host like every other tier.
                         let port = match port {
                             IdentityResolution::Resolved(id) => IdentityResolution::Resolved(id),
-                            unresolved => match interface.base.lldp_port_desc.as_deref() {
-                                Some(desc) if !desc.trim().is_empty() => {
-                                    match resolver.find_if_entry_by_name(desc, host_id).await {
-                                        Some(id) => IdentityResolution::Resolved(id),
-                                        // Keep the port id's own verdict rather than overwriting
-                                        // it: `NoStrategy` and `NotFound` are counted separately
-                                        // and mean different things to whoever reads the stats.
-                                        None => unresolved,
+                            unresolved => {
+                                match desc_worth_matching(interface.base.lldp_port_desc.as_deref())
+                                {
+                                    Some(desc) => {
+                                        match resolver.find_if_entry_by_name(desc, host_id).await {
+                                            Some(id) => IdentityResolution::Resolved(id),
+                                            // Keep the port id's own verdict rather than
+                                            // overwriting it: `NoStrategy` and `NotFound` are
+                                            // counted separately and mean different things to
+                                            // whoever reads the stats.
+                                            None => unresolved,
+                                        }
                                     }
+                                    None => unresolved,
                                 }
-                                _ => unresolved,
-                            },
+                            }
                         };
                         let port =
                             match Self::pair_reciprocally(port, interface.id, host_id, &reciprocal)
@@ -466,5 +470,45 @@ impl HostService {
         }
 
         Ok(resolved_count)
+    }
+}
+
+/// The port description, if it is worth trying as a name — the input to the last-resort tier
+/// above, named so it can be tested without a resolver behind it.
+///
+/// Empty is nothing to match on. The `usable_identifier` half is GH #88 arriving at the tier that
+/// accidentally rescued the SR Linux row: a description is worth *storing* whatever it holds, and
+/// it is shown to operators, but a control character in it makes it no more a port name than it
+/// made the port id one. `lldp_port_desc` cannot carry U+FFFD — it is strictly decoded and
+/// NUL-stripped on the SNMP path where it is collected (gNMI and lldpd are not, so a NUL-padded description simply fails the exact-match lookup) — so control characters are the whole of what this catches.
+///
+/// Filtered at the lookup rather than at the write on purpose. The stored value is untouched and
+/// the caller's verdict stays `unresolved`, so the row is still counted and still warned about; it
+/// only stops the last tier claiming a match on a value that is not a name.
+fn desc_worth_matching(desc: Option<&str>) -> Option<&str> {
+    desc.filter(|d| !d.trim().is_empty() && crate::server::lldp::usable_identifier(d))
+}
+
+#[cfg(test)]
+mod desc_tier_tests {
+    use super::desc_worth_matching;
+
+    #[test]
+    fn a_real_description_is_still_offered_to_the_last_tier() {
+        // GH #668's D-Link description, byte-identical to that switch's own ifDescr, which is the
+        // whole reason this tier exists.
+        assert_eq!(
+            desc_worth_matching(Some("D-Link DGS-1210-48 Rev.GX/7.20.003 Port 9")),
+            Some("D-Link DGS-1210-48 Rev.GX/7.20.003 Port 9")
+        );
+        assert_eq!(desc_worth_matching(Some("Anschluß 4")), Some("Anschluß 4"));
+    }
+
+    #[test]
+    fn a_description_that_is_not_a_name_is_not_offered() {
+        assert_eq!(desc_worth_matching(Some("swp\u{1}2")), None);
+        assert_eq!(desc_worth_matching(Some("swp\n2")), None);
+        assert_eq!(desc_worth_matching(Some("   ")), None);
+        assert_eq!(desc_worth_matching(None), None);
     }
 }

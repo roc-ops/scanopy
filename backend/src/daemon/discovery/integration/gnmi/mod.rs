@@ -50,7 +50,7 @@ use crate::server::credentials::r#impl::mapping::{
 use crate::server::interfaces::r#impl::base::{
     IfAdminStatus, IfOperStatus, Interface, InterfaceBase, InterfaceDataComplete, if_type,
 };
-use crate::server::lldp::{LldpChassisId, LldpPortId, canonical_mac};
+use crate::server::lldp::{LldpChassisId, LldpPortId, accept_port_identifier, canonical_mac};
 use crate::server::ports::r#impl::base::PortType;
 use crate::server::services::r#impl::patterns::ClientProbe;
 use crate::server::snmp::generated::get_if_type_number;
@@ -557,6 +557,10 @@ fn oper_status(v: Option<&str>) -> IfOperStatus {
 /// Map an `openconfig-lldp-types` identity (`openconfig-lldp-types:MAC_ADDRESS`) plus value
 /// onto the 802.1AB chassis subtype. Unknown or absent types fall back to
 /// [`LldpChassisId::from_identifier_str`].
+///
+/// Unguarded, deliberately: the GH #88 refusal applies to port ids only, because dropping a
+/// chassis id takes the row out of L2 resolution altogether rather than demoting it a tier. See
+/// `decode_tlv_name` in `server::lldp` for the argument.
 fn map_chassis(id: &str, id_type: Option<&str>) -> Option<LldpChassisId> {
     match id_type.map(unqualified) {
         Some("MAC_ADDRESS") => canonical_mac(id).map(LldpChassisId::MacAddress),
@@ -570,7 +574,14 @@ fn map_chassis(id: &str, id_type: Option<&str>) -> Option<LldpChassisId> {
     }
 }
 
+/// Map the port-id leaf the same way, with the guard the chassis path does not get: a leaf that
+/// arrived as a gNMI string is valid UTF-8 by construction, which is exactly why "it decoded" was
+/// mistaken for "it is a name". [`accept_port_identifier`] strips NUL padding and refuses the
+/// rest, logging what it refused, so this transport and the SNMP one keep one rule between them
+/// (GH #88).
 fn map_port(id: &str, id_type: Option<&str>) -> Option<LldpPortId> {
+    let id = accept_port_identifier("gnmi", id)?;
+    let id = id.as_ref();
     match id_type.map(unqualified) {
         Some("MAC_ADDRESS") => canonical_mac(id).map(LldpPortId::MacAddress),
         Some("INTERFACE_NAME") => Some(LldpPortId::InterfaceName(id.to_string())),
@@ -1611,5 +1622,54 @@ mod tests {
         assert_eq!(row(&rows, "irb100").if_type, if_type::OTHER);
         assert_eq!(row(&rows, "mgmt-ncc-0/0").if_type, if_type::OTHER);
         assert_eq!(row(&rows, "lo0").if_alias.as_deref(), Some("loopback"));
+    }
+
+    /// GH #88, on the other transport: a leaf that arrived as a gNMI string is valid UTF-8 by
+    /// construction, which is exactly why "it decoded" was mistaken for "it is a name". The type
+    /// the device declares does not make a control-character payload an interface name, so it is
+    /// refused rather than mapped onto `INTERFACE_NAME`.
+    #[test]
+    fn a_declared_port_id_that_is_not_a_name_is_refused() {
+        assert_eq!(map_port("swp\n2", Some("INTERFACE_NAME")), None);
+        assert_eq!(
+            map_port("swp\u{1}2", Some("openconfig-lldp-types:LOCAL")),
+            None
+        );
+        assert_eq!(map_port("swp\u{fffd}2", Some("LOCAL")), None);
+        // Absent type too: the fallback constructor is not a way around the guard.
+        assert_eq!(map_port("swp\n2", None), None);
+
+        // And the guard is narrow enough to leave real values alone.
+        assert_eq!(
+            map_port("swp2", Some("openconfig-lldp-types:INTERFACE_NAME")),
+            Some(LldpPortId::InterfaceName("swp2".into()))
+        );
+        assert_eq!(
+            map_chassis("aa:c1:ab:d9:96:6d", Some("MAC_ADDRESS")),
+            Some(LldpChassisId::MacAddress("aa:c1:ab:d9:96:6d".into()))
+        );
+    }
+
+    /// The chassis leaf keeps its old behaviour on this transport too, and this pins it. Refusing
+    /// a chassis id is a larger change than #88 — the row stops matching the unresolved-neighbour
+    /// filter entirely and `neighbor_seen_at` stops being stamped — so it is deliberately not part
+    /// of the port-id fix, and it should not arrive here by accident either.
+    #[test]
+    fn a_chassis_id_is_still_mapped_whatever_it_holds() {
+        assert_eq!(
+            map_chassis("edge\u{fffd}arcos", Some("LOCAL")),
+            Some(LldpChassisId::LocallyAssigned("edge\u{fffd}arcos".into()))
+        );
+    }
+
+    /// GH #668's D-Link value through this door. NUL is a control character, so before the padding
+    /// was stripped here the same value was kept on SNMP and refused on gNMI — one identifier with
+    /// two answers depending on how the device was polled.
+    #[test]
+    fn the_d_link_nul_terminated_port_id_survives_this_boundary() {
+        assert_eq!(
+            map_port("1\0", Some("INTERFACE_NAME")),
+            Some(LldpPortId::InterfaceName("1".into()))
+        );
     }
 }
