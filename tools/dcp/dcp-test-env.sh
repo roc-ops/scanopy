@@ -24,7 +24,11 @@ PID_FILE="/tmp/dcp-sim.pid"
 LOG_FILE="/tmp/dcp-sim.log"
 
 is_running() {
-    [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+    # dcp-sim.py runs as root (sudo, for /dev/bpf* access), so a plain kill -0 from this
+    # unprivileged script always fails with "Operation not permitted" even when it's alive —
+    # signal-0 delivery is permission-checked too. Needs sudo here for the same reason cmd_stop
+    # already used sudo kill.
+    [ -f "$PID_FILE" ] && sudo kill -0 "$(cat "$PID_FILE")" 2>/dev/null
 }
 
 cmd_start() {
