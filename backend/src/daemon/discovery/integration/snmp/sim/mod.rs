@@ -516,10 +516,11 @@ mod tests {
         for device in &lab {
             let octets = device.ip.octets();
             assert!(
-                // Floor lowered from 230 to 227 for GH #701's three devices: .230-.254 (25
-                // addresses) were already fully occupied by the other 25 devices, with .255
-                // unusable (broadcast on this /22) — there was no room left above .230.
-                octets[..3] == [192, 168, 7] && octets[3] >= 227,
+                // Floor lowered from 230 to 227 for GH #701's three devices, then to 225 for
+                // GH #668's last two (`switch-dlink-02`, `pc-windows-nic-filters`): .227-.254 (28
+                // addresses) were already fully occupied, with .255 unusable (broadcast on this
+                // /22) — there was no room left above .227.
+                octets[..3] == [192, 168, 7] && octets[3] >= 225,
                 "{} is at {}, outside the lab's range",
                 device.name,
                 device.ip

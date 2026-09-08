@@ -177,6 +177,8 @@ fn nic_to_interface(
         // never set, so every later scan retried self-report and the daemon-host interface phase
         // was never reached at all.
         ip_address_id: None,
+        // Not an SNMP walk — no ipAddrTable to read, so this signal is unavailable here.
+        ip_configured: false,
         neighbor_candidates: Vec::new(),
         fdb_macs: None,
         native_vlan_id: None,

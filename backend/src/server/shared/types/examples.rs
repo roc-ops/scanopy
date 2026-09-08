@@ -459,6 +459,7 @@ pub fn interface() -> Interface {
                 AttributeSource::ArpReply,
             )),
             ip_address_id: Some(ids::INTERFACE),
+            ip_configured: true,
             neighbor_candidates: Vec::new(),
             fdb_macs: None,
             native_vlan_id: None,

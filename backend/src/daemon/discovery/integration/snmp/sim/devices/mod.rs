@@ -12,6 +12,7 @@ use super::SimDevice;
 pub mod ap_wireless_01;
 pub mod firewall_01;
 pub mod legacy_switch_01;
+pub mod pc_windows_nic_filters;
 pub mod printer_lobby;
 pub mod router_gw_01;
 pub mod secure_switch_01;
@@ -21,6 +22,7 @@ pub mod switch_cisco_01;
 pub mod switch_core_01;
 pub mod switch_dell_01;
 pub mod switch_dlink_01;
+pub mod switch_dlink_02;
 pub mod switch_exos_01;
 pub mod switch_flaky_01;
 pub mod switch_macport_01;
@@ -64,6 +66,8 @@ pub fn all() -> Vec<SimDevice> {
         switch_omada_01::device(),
         switch_flaky_01::device(),
         switch_dlink_01::device(),
+        switch_dlink_02::device(),
+        pc_windows_nic_filters::device(),
         switch_tplink_01::device(),
         switch_unsorted_01::device(),
         switch_macport_01::device(),

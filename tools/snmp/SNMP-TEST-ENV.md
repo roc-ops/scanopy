@@ -6,7 +6,7 @@
 > the data files and agent configs from those definitions and ships what it generated, so there is
 > no committed artifact that can drift. To add or change a device, see **Adding a device** below.
 
-25 simulated network devices running on a Proxmox VM, each on port 161. Most speak SNMPv2c; `.236`/`.237` are version-locked to exercise the SNMPv1 and SNMPv3 paths (#557); `.238`/`.239` are Extreme switches that exercise the LLDP local-port remap (Issue 2, July 2026); `.240`–`.242` reproduce the L2-topology failures from #664, #649 and #614; `.243` serves a deliberately malformed neighbour record; `.244` serves the port-id shapes from #668 and repeats one MAC across every port; `.245` serves that report's last device, whose neighbour table is indexed one sub-id short; `.246`/`.247` cover #674 and the Westermo local-port report; `.248`/`.249` are the two failure shapes the partial-failure reporting exists for; `.250` is the Dell OS10 switch from #685, whose breakout-port names and 568+ local-port namespace decide which interface a neighbour lands on; `.251` is the Cisco from #686 and the only device here that serves different data per SNMPv3 context; `.227`–`.229` are the shared L2 segment from #701, where every uplink hears two neighbours on one port — `.230`–`.254` were already spoken for by `switch-slowbulk-01`/`switch-shortports-01`/`switch-offsite-01`, which the device table below hadn't caught up to.
+27 simulated network devices running on a Proxmox VM, each on port 161. Most speak SNMPv2c; `.236`/`.237` are version-locked to exercise the SNMPv1 and SNMPv3 paths (#557); `.238`/`.239` are Extreme switches that exercise the LLDP local-port remap (Issue 2, July 2026); `.240`–`.242` reproduce the L2-topology failures from #664, #649 and #614; `.243` serves a deliberately malformed neighbour record; `.244` serves the port-id shapes from #668 and repeats one MAC across every port; `.245` serves that report's last device, whose neighbour table is indexed one sub-id short; `.246`/`.247` cover #674 and the Westermo local-port report; `.248`/`.249` are the two failure shapes the partial-failure reporting exists for; `.250` is the Dell OS10 switch from #685, whose breakout-port names and 568+ local-port namespace decide which interface a neighbour lands on; `.251` is the Cisco from #686 and the only device here that serves different data per SNMPv3 context; `.227`–`.229` are the shared L2 segment from #701, where every uplink hears two neighbours on one port; `.225`/`.226` are #668's last symptom, a far end whose MAC is worn by several of its own physical interfaces rather than by several ports of the local switch — `.230`–`.254` were already spoken for by `switch-slowbulk-01`/`switch-shortports-01`/`switch-offsite-01`, which the device table below hadn't caught up to.
 
 | IP | Host | Version | Credential | Device |
 |---|---|---|---|---|
@@ -35,10 +35,13 @@
 | 192.168.7.227 | switch-mcast-rcv-01 | v2c | community `netdefault` | Shared L2 segment, host A (see below) |
 | 192.168.7.228 | switch-mcast-src-01 | v2c | community `netdefault` | Shared L2 segment, host B (see below) |
 | 192.168.7.229 | switch-segment-gw-01 | v2c | community `netdefault` | Shared L2 segment, router (see below) |
+| 192.168.7.225 | switch-dlink-02 | v2c | community `netdefault` | D-Link DGS-1210-48, one port hearing a shared-NIC MAC (see below) |
+| 192.168.7.226 | pc-windows-nic-filters | v2c | community `public` | Windows host, one MAC on a real NIC and its NDIS filter/LWF pseudo-interfaces (see below) |
 
 > `.252`–`.254` are already `switch-slowbulk-01`/`switch-shortports-01`/`switch-offsite-01` in
 > `sim/devices/` — present in `all()` but missing from this table before this edit. `.227`–`.229`
 > were the next genuinely free addresses below `.230`; every address from `.230` to `.254` is taken.
+> `.225`/`.226` are the next free pair below `.227`, added for GH #668's last reported symptom.
 
 **LLDP local-port remap (`.238`/`.239`).** ExtremeXOS reports its `lldpRemTable` local-port index as an `lldpLocPortNum` (1..N) that is a **separate namespace from `ifIndex`** (switch-exos-01 uses ifIndex 1001+, ifName `1:N`), so neighbours only resolve if the daemon walks `lldpLocPortTable` (`1.0.8802.1.1.2.1.3.7`) and suffix-matches `lldpLocPortId` against `ifName`. Before the Issue 2 fix, switch-exos-01 yields **zero** LLDP neighbours. Extreme VOSS (switch-voss-01) reports local-port == ifIndex with `lldpLocPortId` matching `ifName` exactly, so it stays correct on both old and new code — the regression guard for the fix.
 

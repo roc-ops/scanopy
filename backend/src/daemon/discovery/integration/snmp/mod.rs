@@ -308,7 +308,19 @@ impl DiscoveryIntegration for SnmpIntegration {
             snmp_if_entries
                 .iter()
                 .map(|entry| {
-                    convert_snmp_if_entry(entry, network_id, &[], &[], &[], &[], &no_vlan_uuids)
+                    // ipAddrTable hasn't been queried yet at this early checkpoint (see below) —
+                    // every row reports `ip_configured: false` here and gets the real value once the
+                    // authoritative interface set is written later in this same poll.
+                    convert_snmp_if_entry(
+                        entry,
+                        network_id,
+                        &[],
+                        &[],
+                        &[],
+                        &[],
+                        &no_vlan_uuids,
+                        &HashSet::new(),
+                    )
                 })
                 .collect(),
             if_table.set_complete,
@@ -499,6 +511,14 @@ impl DiscoveryIntegration for SnmpIntegration {
             claim: ip_addr_table.claim,
         };
         let ip_addr_table = ip_addr_table.records;
+        // ifIndexes the device's own ipAddrTable binds an IP address to. On a host that exposes
+        // one MAC across a real NIC and several NDIS filter/LWF pseudo-interfaces (GH #668), only
+        // the real NIC's ifIndex ever appears here — a filter driver is not a distinct entry the
+        // IP stack configures an address on. Kept independent of `ip_address_id`, which requires
+        // the MAC to be unique on the host before it links anything and is therefore blank for
+        // exactly the hosts this signal exists to help.
+        let ip_configured_if_indexes: HashSet<i32> =
+            ip_addr_table.values().map(|entry| entry.if_index).collect();
 
         // Query ARP table for remote host discovery
         let arp = query_or_default(ip, "arp", query_arp_table(&mut session, ip)).await;
@@ -779,6 +799,7 @@ impl DiscoveryIntegration for SnmpIntegration {
                         &bridge_fdb,
                         &port_vlan_membership,
                         &vlan_number_to_uuid,
+                        &ip_configured_if_indexes,
                     )
                 })
                 .collect(),
@@ -1467,6 +1488,7 @@ fn cdp_candidates_for_port(
 
 /// Convert SNMP ifTable entry to Interface entity with LLDP/CDP/FDB neighbor data.
 /// Uses Uuid::nil() for host_id as placeholder - server will set correct host_id.
+#[allow(clippy::too_many_arguments)]
 fn convert_snmp_if_entry(
     entry: &IfTableEntry,
     network_id: Uuid,
@@ -1475,6 +1497,7 @@ fn convert_snmp_if_entry(
     bridge_fdb: &[BridgeFdbEntry],
     port_vlan_membership: &[PortVlanMembership],
     vlan_number_to_uuid: &std::collections::HashMap<u16, Uuid>,
+    ip_configured_if_indexes: &HashSet<i32>,
 ) -> Interface {
     // Every LLDP record and every CDP record heard on this port becomes its own candidate — an
     // LLDP entry and a CDP entry for the same physical neighbour stay two rows (see
@@ -1519,6 +1542,7 @@ fn convert_snmp_if_entry(
             )
         }),
         ip_address_id: None, // Linked server-side via MAC matching
+        ip_configured: ip_configured_if_indexes.contains(&entry.if_index),
         neighbor_candidates,
         // Bridge FDB data
         fdb_macs: if fdb_macs.is_empty() {
@@ -1625,6 +1649,7 @@ mod tests {
             &[],
             &[],
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
 
         // ifTable data survives the enrichment-free conversion.
@@ -1695,6 +1720,7 @@ mod tests {
             &[],
             &membership,
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
 
         assert_eq!(result.base.native_vlan_id, None);
@@ -1721,6 +1747,7 @@ mod tests {
             &[],
             &[],
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
 
         assert_eq!(result.base.native_vlan_id, None);
@@ -1754,6 +1781,7 @@ mod tests {
             &[],
             &membership,
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
 
         assert_eq!(result.base.native_vlan_id, None);
@@ -1895,6 +1923,7 @@ mod tests {
             &[],
             &[],
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
 
         let sys_names: Vec<Option<String>> = result
@@ -1944,6 +1973,7 @@ mod tests {
             &[],
             &[],
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
         assert_eq!(
             result

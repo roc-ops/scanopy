@@ -595,6 +595,8 @@ impl InterfaceInput {
                     .mac_address
                     .map(|m| MacEvidence::new(MacEvidenceValue(m), AttributeSource::Manual)),
                 ip_address_id: self.ip_address_id,
+                // Not an SNMP walk — no ipAddrTable to read, so this signal is unavailable here.
+                ip_configured: false,
                 // Neighbor resolution — not set from API, resolved server-side.
                 neighbor_candidates: Vec::new(),
                 fdb_macs: None,

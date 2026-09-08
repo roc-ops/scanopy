@@ -317,6 +317,19 @@ pub struct InterfaceBase {
     /// Old daemons send this as "interface_id".
     #[serde(alias = "interface_id")]
     pub ip_address_id: Option<Uuid>,
+    /// Whether the device's own SNMP `ipAddrTable` lists this ifIndex as carrying one of its
+    /// configured IP addresses.
+    ///
+    /// Independent of `ip_address_id`: that FK is set server-side and requires the interface's MAC
+    /// to be unique on the host before it links anything (`plan_interface_ip_links`), so it stays
+    /// `NULL` on exactly the hosts this field exists to help — a Windows NIC and its NDIS
+    /// filter/LWF pseudo-interfaces sharing one MAC (GH #668). `ipAddrTable` only ever binds an
+    /// address to a real IP-stack adapter; a filter driver is never a separate one, so this
+    /// distinguishes the physical interface among MAC-sharing candidates. `#[serde(default)]` so a
+    /// daemon predating this field is read as `false` on every row — never worse than today's
+    /// behavior.
+    #[serde(default)]
+    pub ip_configured: bool,
 
     // Neighbor resolution (LLDP/CDP) moved off `interfaces` in GH #701: raw evidence lives in
     // `interface_neighbor_candidates`, resolved adjacencies in `interface_neighbor_interfaces` /
@@ -360,6 +373,7 @@ impl Default for InterfaceBase {
             oper_status: None,
             mac_address: None,
             ip_address_id: None,
+            ip_configured: false,
             neighbor_candidates: Vec::new(),
             fdb_macs: None,
             native_vlan_id: None,

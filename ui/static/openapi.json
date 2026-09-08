@@ -26463,6 +26463,10 @@
                 "format": "uuid",
                 "description": "FK to IPAddress entity - this port's IP assignment (must be on same host).\nOld daemons send this as \"interface_id\"."
               },
+              "ip_configured": {
+                "type": "boolean",
+                "description": "Whether the device's own SNMP `ipAddrTable` lists this ifIndex as carrying one of its\nconfigured IP addresses.\n\nIndependent of `ip_address_id`: that FK is set server-side and requires the interface's MAC\nto be unique on the host before it links anything (`plan_interface_ip_links`), so it stays\n`NULL` on exactly the hosts this field exists to help — a Windows NIC and its NDIS\nfilter/LWF pseudo-interfaces sharing one MAC (GH #668). `ipAddrTable` only ever binds an\naddress to a real IP-stack adapter; a filter driver is never a separate one, so this\ndistinguishes the physical interface among MAC-sharing candidates. `#[serde(default)]` so a\ndaemon predating this field is read as `false` on every row — never worse than today's\nbehavior."
+              },
               "native_vlan_id": {
                 "type": [
                   "string",

@@ -8444,6 +8444,20 @@ export interface components {
              */
             ip_address_id?: string | null;
             /**
+             * @description Whether the device's own SNMP `ipAddrTable` lists this ifIndex as carrying one of its
+             *     configured IP addresses.
+             *
+             *     Independent of `ip_address_id`: that FK is set server-side and requires the interface's MAC
+             *     to be unique on the host before it links anything (`plan_interface_ip_links`), so it stays
+             *     `NULL` on exactly the hosts this field exists to help — a Windows NIC and its NDIS
+             *     filter/LWF pseudo-interfaces sharing one MAC (GH #668). `ipAddrTable` only ever binds an
+             *     address to a real IP-stack adapter; a filter driver is never a separate one, so this
+             *     distinguishes the physical interface among MAC-sharing candidates. `#[serde(default)]` so a
+             *     daemon predating this field is read as `false` on every row — never worse than today's
+             *     behavior.
+             */
+            ip_configured?: boolean;
+            /**
              * Format: uuid
              * @description Native/untagged VLAN entity ID on this port (resolved from Q-BRIDGE dot1qPvid)
              */
