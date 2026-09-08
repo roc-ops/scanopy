@@ -35,6 +35,7 @@ fn parse_lldp_port_id(row: &PgRow, column: &str) -> Option<LldpPortId> {
 // ============================================================================
 
 impl Storable for InterfaceNeighborCandidate {
+    const HAS_SCD2: bool = false;
     type BaseData = InterfaceNeighborCandidateBase;
 
     fn table_name() -> &'static str {
