@@ -131,6 +131,7 @@ impl HostService {
             name: HostName::default(),
             network_id,
             hostname,
+            hostname_authoritative: true,
             description,
             source: source.clone(),
             virtualization_metadata,

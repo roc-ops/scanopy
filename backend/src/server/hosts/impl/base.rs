@@ -21,6 +21,19 @@ fn validate_host_name(name: &HostName) -> Result<(), validator::ValidationError>
     Ok(())
 }
 
+/// Serde default for [`HostBase::hostname_authoritative`]: a payload that says nothing about
+/// where its hostname came from is taken at its word, which is how every daemon predating the
+/// field behaved.
+pub(crate) fn hostname_is_authoritative() -> bool {
+    true
+}
+
+/// `skip_serializing_if` for the same field: only the second-hand case is worth putting on the
+/// wire, so an ordinary payload is byte-identical to what it was before.
+fn is_authoritative(authoritative: &bool) -> bool {
+    *authoritative
+}
+
 /// Base data for a Host entity (stored in database).
 /// Child entities (ip_addresses, ports, services) are stored in their own tables
 /// and queried by `host_id`. They are NOT stored on the host.
@@ -38,6 +51,29 @@ pub struct HostBase {
     /// Hostname as resolved or reported by the host.
     #[schema(required)]
     pub hostname: Option<String>,
+    /// Whether the sender read `hostname` off the host itself — a reverse lookup on its address,
+    /// its own mDNS answer, SNMP sysName straight from the device — rather than hearing it
+    /// second-hand from something else on the network. A controller repeating the name a client
+    /// advertised to DHCP is the second-hand case.
+    ///
+    /// Only a direct observation may *rewrite* a stored hostname; a second-hand one fills the
+    /// field while it is empty and otherwise leaves it alone. Two submissions land for one host
+    /// in a single discovery cycle — the sweep's and the controller's — so without an owner they
+    /// overwrite each other for ever wherever the two strings differ, and an FQDN against the
+    /// short name a DHCP client advertised is the ordinary case, not an edge one. The display
+    /// name is re-derived from this field and `hostname` is a topology-staleness trigger, so the
+    /// flip took the label and a topology rebuild with it, every cycle, for every affected host
+    /// (GH #89).
+    ///
+    /// It qualifies one observation rather than the host, so it rides along with the payload and
+    /// is never stored: a row read back reports `true`, because whatever is in the column has
+    /// already won the field. It defaults to `true`, so a daemon predating it — and every
+    /// hand-built `HostBase` — behaves exactly as it always has.
+    #[serde(
+        default = "hostname_is_authoritative",
+        skip_serializing_if = "is_authoritative"
+    )]
+    pub hostname_authoritative: bool,
     /// Free-text notes about the host.
     #[validate(length(min = 0, max = 500))]
     #[serde(deserialize_with = "deserialize_empty_string_as_none")]
@@ -107,6 +143,7 @@ impl Default for HostBase {
             name: HostName::default(),
             network_id: Uuid::nil(),
             hostname: None,
+            hostname_authoritative: true,
             description: None,
             source: EntitySource::Unknown,
             virtualization_metadata: None,

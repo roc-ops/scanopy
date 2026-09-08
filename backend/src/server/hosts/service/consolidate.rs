@@ -101,20 +101,36 @@ impl HostService {
         // (GH #89). A name written once and never corrected is worse than no name: it looks
         // like an answer.
         //
+        // But "the current observation" is only well defined once the field has an owner. Two
+        // submissions arrive for one host in every cycle: the sweep's, whose hostname is reverse
+        // DNS falling back to mDNS, and a controller's, whose hostname is the name a client
+        // advertised to DHCP. Let both rewrite and, wherever the two strings differ — an FQDN
+        // against a short name, the ordinary shape of DHCP-to-DNS registration — they overwrite
+        // each other twice a cycle for ever, taking the display name and a topology rebuild with
+        // them. So a hostname the sender read off the host itself owns the field, and one it
+        // heard second-hand fills it only while it is empty. The residual: a host only a
+        // controller ever witnesses keeps the first hostname the controller reported, because
+        // nothing here can tell that from the flapping case without provenance on the stored
+        // value. Its *name* still refreshes — a controller's alias enters a rung higher.
+        //
         // An absent or blank incoming hostname is not evidence of absence — a scan that could
         // not resolve one says nothing about the name, and must never clear what an earlier scan
-        // learned. Only a real, different value overwrites. The display name is still the
-        // ladder's decision, not this arm's: a fresh hostname is merely *offered* below, where a
-        // controller's name or a hand-typed one outranks it.
+        // learned. Stored trimmed, because it is compared, displayed, and re-derived into the
+        // display name, and `" nas.lan "` is the same observation as `nas.lan`.
         if let Some(hostname) = new_host_data
             .base
             .hostname
-            .as_ref()
-            .filter(|h| !h.trim().is_empty())
-            && existing_host.base.hostname.as_deref() != Some(hostname.as_str())
+            .as_deref()
+            .map(str::trim)
+            .filter(|h| !h.is_empty())
         {
-            has_updates = true;
-            existing_host.base.hostname = Some(hostname.clone());
+            let stored = existing_host.base.hostname.as_deref();
+            let owns_the_field = new_host_data.base.hostname_authoritative
+                || stored.is_none_or(|h| h.trim().is_empty());
+            if owns_the_field && stored != Some(hostname) {
+                has_updates = true;
+                existing_host.base.hostname = Some(hostname.to_string());
+            }
         }
 
         // The display name. Both candidates go through the same ladder, which is the whole
@@ -123,15 +139,21 @@ impl HostService {
         // reverse-DNS hostname fills in only over something weaker, and a name a person typed is
         // never touched by either. A daemon too old to send a rank enters as `Unspecified` and
         // changes nothing on its own — the hostname arm still reproduces its old IP-upgrade.
-        if existing_host
+        //
+        // The second arm runs last on purpose: at equal rank it restores the name from the
+        // hostname the arm above just settled, so whoever owns that field owns the label derived
+        // from it. That means the two arms can each report a change and still leave the name
+        // exactly as it was — a controller client offering its DHCP name at the `Hostname` rung,
+        // overruled by the stored reverse-DNS one. Only the net effect is an update: counting
+        // each arm separately published an `Updated` event every cycle for a name nobody changed.
+        let name_before = existing_host.base.name.clone();
+        existing_host
             .base
-            .apply_name(new_host_data.base.name.clone())
-        {
-            has_updates = true;
+            .apply_name(new_host_data.base.name.clone());
+        if let Some(hostname) = existing_host.base.hostname.clone() {
+            existing_host.base.apply_name(HostName::Hostname(hostname));
         }
-        if let Some(hostname) = existing_host.base.hostname.clone()
-            && existing_host.base.apply_name(HostName::Hostname(hostname))
-        {
+        if existing_host.base.name != name_before {
             has_updates = true;
         }
 

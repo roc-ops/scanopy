@@ -874,6 +874,7 @@ impl HostResponse {
                 name: HostName::from_parts(name.clone(), *name_source),
                 network_id: *network_id,
                 hostname: hostname.clone(),
+                hostname_authoritative: true,
                 description: description.clone(),
                 source: source.clone(),
                 virtualization_metadata: virtualization_metadata.clone(),
@@ -928,6 +929,10 @@ impl HostResponse {
             name,
             network_id,
             hostname,
+            // Deliberately not in the response: it qualifies an incoming observation of
+            // `hostname`, and by the time a host is read back the stored value has already won
+            // the field.
+            hostname_authoritative: _,
             description,
             source,
             virtualization_metadata,

@@ -406,6 +406,7 @@ mod tests {
             host: Host::new(HostBase {
                 name: HostName::Manual("test-host".to_string()),
                 hostname: None,
+                hostname_authoritative: true,
                 tags: vec![],
                 network_id: Uuid::new_v4(),
                 description: None,
@@ -461,6 +462,7 @@ mod tests {
                         host: Host::new(HostBase {
                             name: HostName::Manual(format!("host-{}", i)),
                             hostname: None,
+                            hostname_authoritative: true,
                             tags: vec![],
                             network_id: Uuid::new_v4(),
                             description: None,
@@ -815,6 +817,7 @@ mod tests {
             host: Host::new(HostBase {
                 name: HostName::Manual("daemon-host".to_string()),
                 hostname: None,
+                hostname_authoritative: true,
                 tags: vec![],
                 network_id,
                 description: None,
@@ -909,6 +912,7 @@ mod tests {
             host: Host::new(HostBase {
                 name: HostName::Manual("daemon-host".to_string()),
                 hostname: None,
+                hostname_authoritative: true,
                 tags: vec![],
                 network_id,
                 description: None,
@@ -1108,6 +1112,7 @@ mod tests {
             host: Host::new(HostBase {
                 name: HostName::Manual("test-host".to_string()),
                 hostname: None,
+                hostname_authoritative: true,
                 tags: vec![],
                 network_id,
                 description: None,

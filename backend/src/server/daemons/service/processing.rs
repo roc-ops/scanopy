@@ -376,6 +376,7 @@ impl DaemonService {
             // as a hostname, so a later scan of the machine can improve on it.
             name: HostName::default(),
             hostname: None,
+            hostname_authoritative: true,
             description: None,
             source: EntitySource::Discovery,
             virtualization_metadata: None,

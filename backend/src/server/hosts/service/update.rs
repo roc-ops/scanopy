@@ -73,6 +73,11 @@ impl HostService {
                 network_id,
                 source: existing.base.source,
                 hostname,
+                // A person editing the field is asserting it directly. It carries no weight
+                // here — this path writes the row rather than merging into it — and it is not a
+                // column, so the next scan that resolves a hostname replaces what was typed.
+                // `hostname` records what the host answers to; `name` is the protected label.
+                hostname_authoritative: true,
                 description,
                 virtualization_metadata,
                 virtualization_service_id,

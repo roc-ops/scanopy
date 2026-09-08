@@ -17,6 +17,8 @@ use crate::server::hosts::r#impl::name::{HostName, HostNameSource};
 use crate::server::interfaces::r#impl::base::InterfaceDataComplete;
 use crate::server::ip_addresses::r#impl::base::{IPAddress, IPAddressBase};
 use crate::server::networks::r#impl::{Network, NetworkBase};
+use crate::server::shared::events::traits::Event;
+use crate::server::shared::events::types::EntityOperation;
 use crate::server::shared::services::factory::ServiceFactory;
 use crate::server::shared::services::traits::CrudService;
 use crate::server::shared::storage::traits::{Storable, Storage};
@@ -32,6 +34,11 @@ const DEVICE_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 20));
 /// same host: the daemon mints a fresh pending subnet id every scan, so IP+subnet does not match
 /// across scans and the MAC is the stable anchor.
 const DEVICE_MAC: &str = "aa:bb:cc:00:00:20";
+/// What reverse DNS answers for the device: DHCP registered the lease, so the record is an FQDN.
+const RESOLVED_HOSTNAME: &str = "nas.lan.example.com";
+/// What the same device advertised to DHCP, and therefore what a controller reports for it: the
+/// bare label. Differing from the PTR is the ordinary case, not a contrived one.
+const ADVERTISED_HOSTNAME: &str = "nas";
 
 macro_rules! harness {
     ($services:ident, $network_id:ident, $container:ident) => {
@@ -99,10 +106,38 @@ fn submission_at(
     }
 }
 
+/// The same host as a controller reports one of its clients: the hostname is the name the client
+/// advertised to DHCP, which the controller heard rather than read off the host.
+fn client_submission(network_id: Uuid, name: HostName, hostname: &str) -> Submission {
+    let mut s = submission(network_id, name, Some(hostname));
+    s.host.base.hostname_authoritative = false;
+    s
+}
+
 struct Submission {
     host: Host,
     ip_address: IPAddress,
     subnet: Subnet,
+}
+
+/// Every `Updated` event published for `host_id` since the receiver was taken, as their
+/// `trigger_stale` flags.
+///
+/// `upsert_host` is the only publisher of a host `Updated` event on the discovery write path, and
+/// it publishes only when it decided something actually changed — so an empty list here *is* the
+/// assertion that the merge found nothing to do.
+fn updates_for(
+    events: &mut tokio::sync::broadcast::Receiver<Event<EntityOperation>>,
+    host_id: Uuid,
+) -> Vec<bool> {
+    let mut seen = Vec::new();
+    while let Ok(event) = events.try_recv() {
+        if event.scope.entity_id() == host_id && matches!(event.operation, EntityOperation::Updated)
+        {
+            seen.push(event.flags.trigger_stale);
+        }
+    }
+    seen
 }
 
 async fn submit(services: &ServiceFactory, s: Submission) -> HostResponse {
@@ -546,5 +581,248 @@ async fn a_refreshed_hostname_does_not_displace_a_hand_typed_name() {
         rebuilt.hostname.as_deref(),
         Some("leaf2.lab"),
         "the observation is still recorded — it just does not win the display name"
+    );
+}
+
+/// GH #89, the other half: once a hostname may be rewritten, two discovery paths that both report
+/// one have to be told apart, or they take turns.
+///
+/// A UniFi site submits the same host twice per cycle — the sweep, whose hostname is reverse DNS,
+/// and the client record, whose hostname is what the client advertised to DHCP. Wherever DHCP
+/// registered the lease in DNS the two strings differ by the domain, so an unqualified
+/// "last writer wins" has them overwriting each other for ever: the hostname flips, the display
+/// name flips with it (a client with no controller alias is named at the same `Hostname` rung),
+/// and every flip sets `trigger_stale`, forcing a topology rebuild every cycle for the largest
+/// host population on the network.
+///
+/// So this runs both submissions, in both orders, twice, and asserts the row is *quiet*: same
+/// hostname, same display name, and not one update event after the first cycle settles it.
+#[tokio::test]
+async fn a_sweep_and_a_controller_client_do_not_take_turns_renaming_one_host() {
+    harness!(services, network_id, _container);
+
+    let swept = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname(RESOLVED_HOSTNAME.to_string()),
+            Some(RESOLVED_HOSTNAME),
+        ),
+    )
+    .await;
+    assert_eq!(swept.hostname.as_deref(), Some(RESOLVED_HOSTNAME));
+    assert_eq!(swept.name, RESOLVED_HOSTNAME);
+
+    // Subscribe only now: the host's creation is not what is under test.
+    let mut events = services.event_bus.entity_channel.subscribe_channel();
+
+    let mut observed = Vec::new();
+    for _ in 0..2 {
+        let from_controller = submit(
+            &services,
+            client_submission(
+                network_id,
+                HostName::Hostname(ADVERTISED_HOSTNAME.to_string()),
+                ADVERTISED_HOSTNAME,
+            ),
+        )
+        .await;
+        observed.push(from_controller);
+
+        let from_sweep = submit(
+            &services,
+            submission(
+                network_id,
+                HostName::Hostname(RESOLVED_HOSTNAME.to_string()),
+                Some(RESOLVED_HOSTNAME),
+            ),
+        )
+        .await;
+        observed.push(from_sweep);
+    }
+
+    for (i, host) in observed.iter().enumerate() {
+        assert_eq!(host.id, swept.id, "every submission is the same host");
+        assert_eq!(
+            host.hostname.as_deref(),
+            Some(RESOLVED_HOSTNAME),
+            "submission {i}: the hostname a scan resolved from the host owns the field; a name a \
+             controller heard second-hand must not take it back"
+        );
+        assert_eq!(
+            host.name, RESOLVED_HOSTNAME,
+            "submission {i}: the display name is re-derived from that field, so it flips with it"
+        );
+        assert_eq!(host.name_source, HostNameSource::Hostname);
+    }
+
+    assert!(
+        updates_for(&mut events, swept.id).is_empty(),
+        "nothing about the host changed across two cycles, so the merge must publish no update \
+         at all — every one of them would carry trigger_stale and rebuild the topology"
+    );
+}
+
+/// The other order, and the reason the rule is "may not rewrite" rather than "is ignored": a
+/// client the sweep cannot reach is a host the controller is the only witness for, and the name
+/// it advertised to DHCP is all there is. It fills an empty field, and yields the moment a scan
+/// resolves one.
+#[tokio::test]
+async fn a_hostname_only_a_controller_heard_still_fills_an_empty_field() {
+    harness!(services, network_id, _container);
+
+    let from_controller = submit(
+        &services,
+        client_submission(
+            network_id,
+            HostName::Hostname(ADVERTISED_HOSTNAME.to_string()),
+            ADVERTISED_HOSTNAME,
+        ),
+    )
+    .await;
+    assert_eq!(
+        from_controller.hostname.as_deref(),
+        Some(ADVERTISED_HOSTNAME)
+    );
+    assert_eq!(from_controller.name, ADVERTISED_HOSTNAME);
+
+    let swept = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname(RESOLVED_HOSTNAME.to_string()),
+            Some(RESOLVED_HOSTNAME),
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        swept.id, from_controller.id,
+        "the same host, matched on its MAC"
+    );
+    assert_eq!(
+        swept.hostname.as_deref(),
+        Some(RESOLVED_HOSTNAME),
+        "a hostname read off the host replaces one that was only reported"
+    );
+    assert_eq!(swept.name, RESOLVED_HOSTNAME);
+}
+
+/// A hostname that changed is still below a name a *controller* supplied, not just below one a
+/// person typed — the two sit on different rungs and only the top one was covered.
+#[tokio::test]
+async fn a_refreshed_hostname_does_not_displace_a_controller_name() {
+    harness!(services, network_id, _container);
+
+    let named = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Integration("Meeting Room AP".to_string()),
+            Some("ap1.lab"),
+        ),
+    )
+    .await;
+    assert_eq!(named.name, "Meeting Room AP");
+
+    let rebuilt = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname("ap2.lab".to_string()),
+            Some("ap2.lab"),
+        ),
+    )
+    .await;
+
+    assert_eq!(rebuilt.id, named.id, "the same host, matched on its MAC");
+    assert_eq!(
+        rebuilt.name, "Meeting Room AP",
+        "reverse DNS sits below a controller's name, refreshed or not"
+    );
+    assert_eq!(rebuilt.name_source, HostNameSource::Integration);
+    assert_eq!(
+        rebuilt.hostname.as_deref(),
+        Some("ap2.lab"),
+        "the observation is still recorded — it just does not win the display name"
+    );
+}
+
+/// A rescan that reports exactly what is already stored must be silent. It matters more now that
+/// the hostname can change at all: `hostname` is a topology-staleness trigger, so a merge that
+/// reports a change it did not make rebuilds the topology on every cycle.
+#[tokio::test]
+async fn a_rescan_that_reports_the_same_hostname_publishes_no_update() {
+    harness!(services, network_id, _container);
+
+    let first = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname(RESOLVED_HOSTNAME.to_string()),
+            Some(RESOLVED_HOSTNAME),
+        ),
+    )
+    .await;
+
+    let mut events = services.event_bus.entity_channel.subscribe_channel();
+
+    let again = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname(RESOLVED_HOSTNAME.to_string()),
+            Some(RESOLVED_HOSTNAME),
+        ),
+    )
+    .await;
+    assert_eq!(again.id, first.id);
+
+    assert!(
+        updates_for(&mut events, first.id).is_empty(),
+        "an unchanged hostname is not an update, and an update here means a topology rebuild"
+    );
+}
+
+/// Blankness was already judged on the trimmed value; the value itself was stored as it arrived.
+/// Reverse DNS and SNMP sysName do not normalise, so a padded answer became a padded column and,
+/// re-derived a few lines later, a padded display name.
+#[tokio::test]
+async fn a_padded_hostname_is_stored_trimmed() {
+    harness!(services, network_id, _container);
+
+    let created = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname(RESOLVED_HOSTNAME.to_string()),
+            Some("  nas.lan.example.com  "),
+        ),
+    )
+    .await;
+    assert_eq!(
+        created.hostname.as_deref(),
+        Some(RESOLVED_HOSTNAME),
+        "padding is not part of the name the host answers to"
+    );
+    assert_eq!(created.name, RESOLVED_HOSTNAME);
+
+    let mut events = services.event_bus.entity_channel.subscribe_channel();
+
+    // And the same value with different padding is the same observation, not a change.
+    let again = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname(RESOLVED_HOSTNAME.to_string()),
+            Some(" nas.lan.example.com"),
+        ),
+    )
+    .await;
+    assert_eq!(again.id, created.id);
+    assert_eq!(again.hostname.as_deref(), Some(RESOLVED_HOSTNAME));
+    assert!(
+        updates_for(&mut events, created.id).is_empty(),
+        "re-reporting the same hostname with different whitespace is not a change"
     );
 }

@@ -137,6 +137,17 @@ impl HostService {
             );
         }
 
+        // Normalise the hostname once, here, rather than at each of the paths that produce one:
+        // the controller integration trims, SNMP sysName and reverse DNS do not, and a padded
+        // value is stored padded, compared padded, and re-derived into a padded display name.
+        // Whitespace-only is the same non-statement as absent.
+        host.base.hostname = host
+            .base
+            .hostname
+            .take()
+            .map(|h| h.trim().to_string())
+            .filter(|h| !h.is_empty());
+
         if let Some(ctx) = scan_ctx {
             use crate::server::shared::storage::snapshot::DiscoveryTracked;
             host.refresh_scan_timestamps(ctx.scan_time);

@@ -120,6 +120,7 @@ pub fn host() -> Host {
         base: HostBase {
             name: HostName::Manual("web-server-01".to_string()),
             hostname: Some("web-server-01.local".to_string()),
+            hostname_authoritative: true,
             network_id: ids::NETWORK,
             description: Some("Primary web server".to_string()),
             source: EntitySource::Manual,

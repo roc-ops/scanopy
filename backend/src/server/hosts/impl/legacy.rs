@@ -365,6 +365,9 @@ impl LegacyHostWithServicesRequest {
                 name: crate::server::hosts::r#impl::name::HostName::Unspecified(host.name),
                 network_id: host.network_id,
                 hostname: host.hostname,
+                // A legacy daemon has no controller integration to hear a name second-hand from:
+                // whatever hostname it sends, it resolved itself.
+                hostname_authoritative: true,
                 description: host.description,
                 source: crate::server::shared::types::entities::EntitySource::Discovery,
                 virtualization_metadata: None,
