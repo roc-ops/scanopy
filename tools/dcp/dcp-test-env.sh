@@ -5,14 +5,17 @@ set -euo pipefail
 # PROFINET DCP Test Environment — deploy/verify/status, mirroring
 # tools/snmp/snmp-test-env.sh's shape for a single simulated device.
 #
-# The fixture is one VM/LXC running dcp-sim.py (see setup.sh), on a segment the
-# daemon under test can also reach — raw Ethernet does not route, so this is not
-# optional the way it is for SNMP's IP-reachable agents.
+# Designed to share a host with the SNMP lab (tools/snmp/) rather than needing its own VM:
+# setup.sh creates two macvlan children of DCP_IFACE — one for the sim, one for a verification
+# client — the same pattern tools/snmp/lxc/setup.sh already uses for its 28 devices. No IP
+# addressing, no conflict with the SNMP devices' 192.168.7.x addresses (DCP has no IP at all),
+# and the sim only reacts to EtherType 0x8892.
 #
 # Usage: tools/dcp/dcp-test-env.sh deploy|verify|status
 #
 # Override via env: DCP_VM_HOST (required), DCP_SSH_KEY (default ~/.ssh/dcp-test-vm),
-# DCP_IFACE (interface name on the VM, default eth0), DCP_DEVICE_NAME (default scanopy-dcp-sim).
+# DCP_IFACE (the *parent* interface on the VM the macvlan children attach to, default eth0),
+# DCP_DEVICE_NAME (default scanopy-dcp-sim).
 # ══════════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -20,6 +23,8 @@ SSH_KEY="${DCP_SSH_KEY:-$HOME/.ssh/dcp-test-vm}"
 IFACE="${DCP_IFACE:-eth0}"
 DEVICE_NAME="${DCP_DEVICE_NAME:-scanopy-dcp-sim}"
 REMOTE_DIR="/root/dcp-test"
+SIM_IFACE="mv-dcp0"
+VERIFY_IFACE="mv-dcp-verify"
 
 require_vm_host() {
     if [ -z "${DCP_VM_HOST:-}" ]; then
@@ -45,12 +50,14 @@ cmd_deploy() {
     read -ra opts <<< "$(ssh_opts)"
     echo "→ copying tools/dcp to the VM"
     ssh "${opts[@]}" "root@${vm_host}" "mkdir -p ${REMOTE_DIR}"
-    scp "${opts[@]}" -q "$SCRIPT_DIR/dcp-sim.py" "$SCRIPT_DIR/setup.sh" "root@${vm_host}:${REMOTE_DIR}/"
-    echo "→ running setup.sh on the VM (interface=${IFACE}, name=${DEVICE_NAME})"
+    scp "${opts[@]}" -q "$SCRIPT_DIR/dcp-sim.py" "$SCRIPT_DIR/dcp-verify.py" "$SCRIPT_DIR/setup.sh" \
+        "root@${vm_host}:${REMOTE_DIR}/"
+    echo "→ running setup.sh on the VM (parent interface=${IFACE}, name=${DEVICE_NAME})"
     ssh "${opts[@]}" "root@${vm_host}" "bash ${REMOTE_DIR}/setup.sh ${IFACE} '${DEVICE_NAME}'"
     echo
-    echo "Deploy complete. Verify from a host on the same L2 segment as \$DCP_IFACE:"
-    echo "  sudo tools/dcp/dcp-verify.py <your-interface-on-that-segment>"
+    echo "Deploy complete. Verify from the VM itself (a sibling macvlan is required — the"
+    echo "parent interface cannot reach its own macvlan children):"
+    echo "  ssh root@${vm_host} /opt/dcp-sim/dcp-verify.py ${VERIFY_IFACE}"
 }
 
 cmd_verify() {
@@ -59,12 +66,8 @@ cmd_verify() {
     read -ra opts <<< "$(ssh_opts)"
     echo "→ checking dcp-sim.service is active on the VM"
     ssh "${opts[@]}" "root@${vm_host}" "systemctl is-active dcp-sim.service"
-    echo
-    echo "That confirms the service is running — it does not confirm DCP actually answers."
-    echo "Run dcp-verify.py from a host with a real interface on the same L2 segment as"
-    echo "the VM's \$DCP_IFACE (raw Ethernet does not route, so SSH reachability to the VM's"
-    echo "management address does not establish this):"
-    echo "  sudo tools/dcp/dcp-verify.py <that-interface>"
+    echo "→ running the real protocol-level check from ${VERIFY_IFACE} (the sim's sibling)"
+    ssh "${opts[@]}" "root@${vm_host}" "/opt/dcp-sim/dcp-verify.py ${VERIFY_IFACE}"
 }
 
 cmd_status() {
