@@ -50,7 +50,7 @@ use crate::server::credentials::r#impl::mapping::{
 use crate::server::interfaces::r#impl::base::{
     IfAdminStatus, IfOperStatus, Interface, InterfaceBase, InterfaceDataComplete, if_type,
 };
-use crate::server::lldp::{LldpChassisId, LldpPortId, canonical_mac};
+use crate::server::lldp::{LldpChassisId, LldpPortId, canonical_mac, usable_identifier};
 use crate::server::ports::r#impl::base::PortType;
 use crate::server::services::r#impl::patterns::ClientProbe;
 use crate::server::snmp::generated::get_if_type_number;
@@ -557,7 +557,14 @@ fn oper_status(v: Option<&str>) -> IfOperStatus {
 /// Map an `openconfig-lldp-types` identity (`openconfig-lldp-types:MAC_ADDRESS`) plus value
 /// onto the 802.1AB chassis subtype. Unknown or absent types fall back to
 /// [`LldpChassisId::from_identifier_str`].
+///
+/// A value that is not usable as an identifier is refused outright rather than mapped onto the
+/// subtype the device declared for it — the same rule the SNMP decode applies, so a device that
+/// serves rubbish on one transport is not believed on the other.
 fn map_chassis(id: &str, id_type: Option<&str>) -> Option<LldpChassisId> {
+    if !usable_identifier(id) {
+        return None;
+    }
     match id_type.map(unqualified) {
         Some("MAC_ADDRESS") => canonical_mac(id).map(LldpChassisId::MacAddress),
         Some("INTERFACE_NAME") => Some(LldpChassisId::InterfaceName(id.to_string())),
@@ -570,7 +577,13 @@ fn map_chassis(id: &str, id_type: Option<&str>) -> Option<LldpChassisId> {
     }
 }
 
+/// Map the port-id leaf the same way, with the same guard: a leaf that arrived as a string is
+/// valid UTF-8 by construction, but "it decoded" is not "it is a name". See
+/// [`usable_identifier`] and GH #88.
 fn map_port(id: &str, id_type: Option<&str>) -> Option<LldpPortId> {
+    if !usable_identifier(id) {
+        return None;
+    }
     match id_type.map(unqualified) {
         Some("MAC_ADDRESS") => canonical_mac(id).map(LldpPortId::MacAddress),
         Some("INTERFACE_NAME") => Some(LldpPortId::InterfaceName(id.to_string())),
@@ -1611,5 +1624,31 @@ mod tests {
         assert_eq!(row(&rows, "irb100").if_type, if_type::OTHER);
         assert_eq!(row(&rows, "mgmt-ncc-0/0").if_type, if_type::OTHER);
         assert_eq!(row(&rows, "lo0").if_alias.as_deref(), Some("loopback"));
+    }
+
+    /// GH #88, on the other transport: a leaf that arrived as a gNMI string is valid UTF-8 by
+    /// construction, which is exactly why "it decoded" was mistaken for "it is a name". The type
+    /// the device declares does not make a control-character payload an interface name, so it is
+    /// refused rather than mapped onto `INTERFACE_NAME`.
+    #[test]
+    fn a_declared_identifier_that_is_not_a_name_is_refused() {
+        assert_eq!(map_port("swp\n2", Some("INTERFACE_NAME")), None);
+        assert_eq!(
+            map_port("swp\u{1}2", Some("openconfig-lldp-types:LOCAL")),
+            None
+        );
+        assert_eq!(map_chassis("edge\u{fffd}arcos", Some("LOCAL")), None);
+        // Absent type too: the fallback constructor is not a way around the guard.
+        assert_eq!(map_port("swp\n2", None), None);
+
+        // And the guard is narrow enough to leave real values alone.
+        assert_eq!(
+            map_port("swp2", Some("openconfig-lldp-types:INTERFACE_NAME")),
+            Some(LldpPortId::InterfaceName("swp2".into()))
+        );
+        assert_eq!(
+            map_chassis("aa:c1:ab:d9:96:6d", Some("MAC_ADDRESS")),
+            Some(LldpChassisId::MacAddress("aa:c1:ab:d9:96:6d".into()))
+        );
     }
 }

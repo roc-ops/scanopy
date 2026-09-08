@@ -156,31 +156,107 @@ mod ip_addr_serde {
     }
 }
 
-/// Decode a textual LLDP TLV payload.
+/// Whether a decoded LLDP identifier string is usable as an identifier at all.
 ///
-/// Lossy, so a single bad byte degrades one character rather than discarding the whole neighbour,
-/// and NUL-stripped, because these strings land in the `lldp_chassis_id` / `lldp_port_id` JSONB
-/// columns and PostgreSQL rejects the escape outright (SQLSTATE 22P05). D-Link's DGS series
-/// NUL-terminates its port identifiers — `31 00` for port `"1"` — which used to fail the write of
-/// the whole host (GH #668). Stripping here also makes the value comparable: `"1\0"` matches no
-/// interface named `"1"`.
-fn decode_tlv_text(value: &[u8]) -> String {
-    strip_nuls(&String::from_utf8_lossy(value)).into_owned()
+/// The line is drawn at two things and no further:
+///
+/// - **Control characters** (Unicode `Cc`: C0, DEL, C1). No device names a port with one; a
+///   payload carrying them is structure, not text.
+/// - **U+FFFD**, the replacement character. Its only meaning is "a decode already lost bytes
+///   here", so a value containing one is by definition not what the device advertised.
+///
+/// Deliberately *not* rejected: the empty string (its resolution already declines, and rejecting
+/// it here would discard a neighbour whose `sysName` tier can still identify it), non-ASCII text
+/// (a UTF-8 port description in any language is a legitimate identifier), and surrounding
+/// whitespace (trimmed at lookup, not at storage, so what is stored stays what the device said).
+pub fn usable_identifier(value: &str) -> bool {
+    !value
+        .chars()
+        .any(|c| c.is_control() || c == char::REPLACEMENT_CHARACTER)
+}
+
+/// Decode a textual LLDP TLV payload, or reject it as no identifier at all.
+///
+/// The subtype byte *declares* the payload is text; this verifies that rather than assuming it. A
+/// device that declares `interfaceName` and then sends bytes decides nothing about how those bytes
+/// are read — an SR Linux 7220 IXR-D2 answers `lldpRemPortId` with `B3 0A 76` under subtype 5,
+/// while its own CLI and gNMI report the neighbour's port as `swp2` (GH #88). Read as text that is
+/// one lost byte followed by `\n v`; read honestly it is a fragment of the agent's internal
+/// encoding that never was a port name.
+///
+/// The former lossy decode turned exactly that into a stored `InterfaceName` identifier. On a
+/// fabric where port names repeat across devices, a garbage identifier that happens to collide
+/// with a real port name yields a *wrong* edge — and a wrong edge looks like an answer, so nobody
+/// investigates it, where a missing one gets chased. So this returns `None`, `from_snmp` passes
+/// that on, and the identifier column is left empty. That is the deliberate outcome: for a port
+/// id it sends the neighbour to the `lldp_port_desc` tier in topology resolution — the tier that
+/// rescued this row by accident — instead of leaving a value that should never have been stored
+/// for a later tier to work around. Everything else the neighbour advertised (chassis id,
+/// `sysName`, port description) is untouched.
+///
+/// NULs are stripped *first*, and are not what this rejects. They are padding, not content:
+/// D-Link's DGS series NUL-terminates its port identifiers — `31 00` for port `"1"` — which used
+/// to fail the write of the whole host, because these strings land in the `lldp_chassis_id` /
+/// `lldp_port_id` JSONB columns and PostgreSQL rejects the escape outright (SQLSTATE 22P05, GH
+/// #668). Stripping also makes the value comparable: `"1\0"` matches no interface named `"1"`.
+/// That is one encoding quirk on an otherwise-real name; a payload that is mostly invalid bytes
+/// is not the same thing, and the two are told apart here rather than conflated.
+fn decode_tlv_name(value: &[u8]) -> Option<String> {
+    // Strict, not lossy: the decode failing *is* the finding. `from_utf8_lossy` answered "here is
+    // a string" for a payload that is not one, and that answer is what reached the database.
+    let text = match std::str::from_utf8(value) {
+        Ok(text) => text,
+        Err(error) => {
+            tracing::warn!(
+                payload = %hex_payload(value),
+                %error,
+                "LLDP TLV declares a textual subtype but its payload is not valid UTF-8; \
+                 recording the neighbour without this identifier"
+            );
+            return None;
+        }
+    };
+    // Padding is dropped before the value is judged, so a NUL-terminated real name is not
+    // mistaken for a payload full of control bytes.
+    let text = strip_nuls(text);
+    if !usable_identifier(&text) {
+        tracing::warn!(
+            payload = %hex_payload(value),
+            "LLDP TLV declares a textual subtype but its payload holds control characters; \
+             recording the neighbour without this identifier"
+        );
+        return None;
+    }
+    Some(text.into_owned())
+}
+
+/// A rejected payload as hex, so the warning names the bytes an operator would otherwise have to
+/// read out of a packet capture.
+fn hex_payload(value: &[u8]) -> String {
+    value
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 impl LldpChassisId {
     /// Parse from SNMP raw values (subtype byte + value bytes).
     ///
     /// LLDP chassis ID TLV format: subtype (1 byte) + value (variable)
+    ///
+    /// `None` for a textual subtype whose payload is not text — see [`decode_tlv_name`]. A chassis
+    /// id resolves to a *host*, so a garbage one is the more dangerous half of GH #88, not the
+    /// lesser: it would name the wrong device entirely.
     pub fn from_snmp(subtype: u8, value: &[u8]) -> Option<Self> {
         match subtype {
-            1 => Some(Self::ChassisComponent(decode_tlv_text(value))),
-            2 => Some(Self::InterfaceAlias(decode_tlv_text(value))),
-            3 => Some(Self::PortComponent(decode_tlv_text(value))),
+            1 => decode_tlv_name(value).map(Self::ChassisComponent),
+            2 => decode_tlv_name(value).map(Self::InterfaceAlias),
+            3 => decode_tlv_name(value).map(Self::PortComponent),
             4 => parse_mac_id(value).map(Self::MacAddress),
             5 => parse_network_address(value).map(Self::NetworkAddress),
-            6 => Some(Self::InterfaceName(decode_tlv_text(value))),
-            7 => Some(Self::LocallyAssigned(decode_tlv_text(value))),
+            6 => decode_tlv_name(value).map(Self::InterfaceName),
+            7 => decode_tlv_name(value).map(Self::LocallyAssigned),
             _ => None,
         }
     }
@@ -301,15 +377,18 @@ impl LldpPortId {
     /// Parse from SNMP raw values (subtype byte + value bytes).
     ///
     /// LLDP port ID TLV format: subtype (1 byte) + value (variable)
+    ///
+    /// `None` for a textual subtype whose payload is not text — see [`decode_tlv_name`] for why
+    /// that is preferred to storing the bytes under the subtype the device claimed.
     pub fn from_snmp(subtype: u8, value: &[u8]) -> Option<Self> {
         match subtype {
-            1 => Some(Self::InterfaceAlias(decode_tlv_text(value))),
-            2 => Some(Self::PortComponent(decode_tlv_text(value))),
+            1 => decode_tlv_name(value).map(Self::InterfaceAlias),
+            2 => decode_tlv_name(value).map(Self::PortComponent),
             3 => parse_mac_id(value).map(Self::MacAddress),
             4 => parse_network_address(value).map(Self::NetworkAddress),
-            5 => Some(Self::InterfaceName(decode_tlv_text(value))),
-            6 => Some(Self::AgentCircuitId(decode_tlv_text(value))),
-            7 => Some(Self::LocallyAssigned(decode_tlv_text(value))),
+            5 => decode_tlv_name(value).map(Self::InterfaceName),
+            6 => decode_tlv_name(value).map(Self::AgentCircuitId),
+            7 => decode_tlv_name(value).map(Self::LocallyAssigned),
             _ => None,
         }
     }
@@ -1246,6 +1325,80 @@ mod resolution_tests {
         );
     }
 
+    /// GH #88, from the field: an SR Linux 7220 IXR-D2 answers `lldpRemPortId` with the three
+    /// bytes `B3 0A 76` under subtype 5 (`interfaceName`), while its own CLI and gNMI report the
+    /// neighbour's port as `swp2`. `B3` is not a valid UTF-8 lead byte, so the old lossy decode
+    /// stored `"\u{fffd}\nv"` *as an `InterfaceName` identifier* — a name-shaped column holding
+    /// something that is not a name. On a fabric where port names repeat across devices, such a
+    /// value colliding with a real port name draws a wrong edge, and a wrong edge looks like an
+    /// answer.
+    ///
+    /// The two other bytes are the tell: `0a 76` is a protobuf length-delimited field header, so
+    /// the payload is a fragment of the agent's own encoding rather than truncated text.
+    #[test]
+    fn a_declared_port_name_that_is_not_text_is_no_identifier() {
+        const FROM_THE_FIELD: &[u8] = &[0xb3, 0x0a, 0x76];
+
+        assert_eq!(LldpPortId::from_snmp(5, FROM_THE_FIELD), None);
+        // Every textual subtype, on both identifiers: the defect is the decode, not subtype 5.
+        for subtype in [1, 2, 5, 6, 7] {
+            assert_eq!(
+                LldpPortId::from_snmp(subtype, FROM_THE_FIELD),
+                None,
+                "port subtype {subtype} kept a payload that is not text"
+            );
+        }
+        for subtype in [1, 2, 3, 6, 7] {
+            assert_eq!(
+                LldpChassisId::from_snmp(subtype, FROM_THE_FIELD),
+                None,
+                "chassis subtype {subtype} kept a payload that is not text"
+            );
+        }
+    }
+
+    /// The other half of the line: bytes that *are* valid UTF-8 but hold a control character. A
+    /// port is not named with a newline, and this is the case a UTF-8 check alone would pass —
+    /// the field payload above happens to fail both tests, so without this one the control-char
+    /// rule is untested.
+    #[test]
+    fn a_declared_port_name_holding_control_characters_is_no_identifier() {
+        assert_eq!(LldpPortId::from_snmp(5, b"swp\n2"), None);
+        assert_eq!(LldpPortId::from_snmp(5, b"swp\x012"), None);
+        assert_eq!(LldpChassisId::from_snmp(7, b"switch\x7f4"), None);
+        // U+FFFD is valid UTF-8 and is not a control character. It is rejected on its own
+        // grounds: it only ever means a decode upstream already lost the real bytes.
+        assert_eq!(LldpPortId::from_snmp(5, "swp\u{fffd}2".as_bytes()), None);
+    }
+
+    /// The guard has to be narrow, or it throws away the neighbours it exists to protect. A real
+    /// port name decodes byte-for-byte as before, non-ASCII included, and the empty payload keeps
+    /// its old outcome deliberately: it identifies nothing, but it also collides with nothing, and
+    /// rejecting it would drop a neighbour the `sysName` tier can still place.
+    #[test]
+    fn a_real_port_name_still_decodes_unchanged() {
+        assert_eq!(
+            LldpPortId::from_snmp(5, b"swp2"),
+            Some(LldpPortId::InterfaceName("swp2".to_string()))
+        );
+        assert_eq!(
+            LldpPortId::from_snmp(5, b"ethernet1/1/14:1"),
+            Some(LldpPortId::InterfaceName("ethernet1/1/14:1".to_string()))
+        );
+        assert_eq!(
+            LldpPortId::from_snmp(1, "Ring port to peer".as_bytes()),
+            Some(LldpPortId::InterfaceAlias("Ring port to peer".to_string()))
+        );
+        assert_eq!(
+            LldpChassisId::from_snmp(7, "Anschluß-4".as_bytes()),
+            Some(LldpChassisId::LocallyAssigned("Anschluß-4".to_string()))
+        );
+        assert_eq!(
+            LldpPortId::from_snmp(5, b""),
+            Some(LldpPortId::InterfaceName(String::new()))
+        );
+    }
+
     /// The other shape of a locally-assigned port id: the remote device's ifIndex, on a switch
     /// whose port labels are something else entirely (HP A-series reports "A1".."A24" as ifDescr
     /// while advertising the index).
@@ -1411,7 +1564,7 @@ mod resolution_tests {
     }
 
     /// The trailing-NUL form, because a device that pads its chassis id must still match the same
-    /// device recorded from an unpadded one. `decode_tlv_text` strips them on both paths, and if
+    /// device recorded from an unpadded one. `decode_tlv_name` strips them on both paths, and if
     /// it ever stopped doing so on one, this is the neighbour that would silently stop resolving.
     #[tokio::test]
     async fn a_nul_padded_subtype_7_chassis_id_reaches_the_same_device() {

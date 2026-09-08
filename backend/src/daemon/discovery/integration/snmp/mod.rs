@@ -1734,6 +1734,58 @@ mod tests {
         }
     }
 
+    /// GH #88: what the row looks like once a device advertises a port id that is not a port id.
+    ///
+    /// The neighbour is real and its chassis id is sound — only `lldpRemPortId` is rubbish, three
+    /// bytes of the agent's internal encoding served under subtype 5 (`interfaceName`) by an
+    /// SR Linux 7220 IXR-D2. This pins the deliberate outcome: the identifier column is left
+    /// empty rather than filled with a value that would resolve, and every other thing the
+    /// neighbour said survives — including `lldpRemPortDesc`, which is the tier topology
+    /// resolution then falls through to on purpose. Storing the bytes instead left a name-shaped
+    /// value that only failed to draw a wrong edge because it collided with no real port name.
+    #[test]
+    fn a_port_id_that_is_not_text_leaves_the_column_empty_and_the_rest_intact() {
+        use super::*;
+
+        let neighbour = LldpNeighbor {
+            local_port_index: 32768,
+            remote_chassis_id_subtype: Some(4),
+            remote_chassis_id_bytes: Some(vec![0xaa, 0xc1, 0xab, 0xd9, 0x96, 0x6d]),
+            remote_port_id_subtype: Some(5),
+            remote_port_id_bytes: Some(vec![0xb3, 0x0a, 0x76]),
+            remote_port_desc: Some("swp2".to_string()),
+            remote_sys_name: Some("edge-arcos".to_string()),
+            remote_sys_desc: None,
+            remote_mgmt_addr: None,
+        };
+        let entry = IfTableEntry {
+            if_index: 32768,
+            if_descr: Some("ethernet-1/1".to_string()),
+            if_name: Some("ethernet-1/1".to_string()),
+            ..Default::default()
+        };
+
+        let row = convert_snmp_if_entry(
+            &entry,
+            Uuid::nil(),
+            std::slice::from_ref(&neighbour),
+            &[],
+            &[],
+            &[],
+            &std::collections::HashMap::new(),
+        );
+
+        assert_eq!(row.base.lldp_port_id, None);
+        assert_eq!(
+            row.base.lldp_chassis_id,
+            Some(crate::server::lldp::LldpChassisId::MacAddress(
+                "aa:c1:ab:d9:96:6d".to_string()
+            ))
+        );
+        assert_eq!(row.base.lldp_port_desc.as_deref(), Some("swp2"));
+        assert_eq!(row.base.lldp_sys_name.as_deref(), Some("edge-arcos"));
+    }
+
     fn loc_port(subtype: u8, id: &str) -> LldpLocalPort {
         LldpLocalPort {
             port_id_subtype: Some(subtype),

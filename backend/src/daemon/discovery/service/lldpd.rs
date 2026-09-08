@@ -43,7 +43,7 @@ use tokio::io::AsyncReadExt;
 
 use crate::daemon::discovery::service::warnings::AttemptOutcome;
 use crate::server::interfaces::r#impl::base::Interface;
-use crate::server::lldp::{LldpChassisId, LldpPortId, canonical_mac};
+use crate::server::lldp::{LldpChassisId, LldpPortId, canonical_mac, usable_identifier};
 
 /// lldpd's compiled-in default control-socket path.
 const DEFAULT_SOCKET: &str = "/run/lldpd.socket";
@@ -136,8 +136,13 @@ pub(super) struct LldpdNeighbor {
 /// lldpcli renders the IEEE subtype as a short string (lldpd's `map_chassis_id` names);
 /// values arrive already decoded, so MAC-typed ids go through the same canonicalisation the
 /// SNMP path applies to raw octets. Unknown types fall back to
-/// [`LldpChassisId::from_identifier_str`], the constructor that assumes least.
+/// [`LldpChassisId::from_identifier_str`], the constructor that assumes least. A value that is
+/// not usable as an identifier at all is refused before the type is consulted — lldpcli's JSON
+/// guarantees the value decoded, not that it is a name (GH #88).
 fn map_chassis_id(id_type: &str, value: &str) -> Option<LldpChassisId> {
+    if !usable_identifier(value) {
+        return None;
+    }
     match id_type {
         "mac" => canonical_mac(value).map(LldpChassisId::MacAddress),
         "ifname" => Some(LldpChassisId::InterfaceName(value.to_string())),
@@ -153,6 +158,9 @@ fn map_chassis_id(id_type: &str, value: &str) -> Option<LldpChassisId> {
 /// Map an lldpcli id `{type, value}` pair onto [`LldpPortId`]. Same rationale as
 /// [`map_chassis_id`].
 fn map_port_id(id_type: &str, value: &str) -> Option<LldpPortId> {
+    if !usable_identifier(value) {
+        return None;
+    }
     match id_type {
         "mac" => canonical_mac(value).map(LldpPortId::MacAddress),
         "ifname" => Some(LldpPortId::InterfaceName(value.to_string())),
@@ -596,5 +604,21 @@ mod tests {
         let socket = dir.0.join("lldpd.socket");
         let _listener = tokio::net::UnixListener::bind(&socket).unwrap();
         probe_socket(&socket).await.unwrap();
+    }
+
+    /// GH #88, third transport: lldpcli hands over an already-decoded JSON string, so the only
+    /// thing its type field proves is what the neighbour claimed. A value holding a control
+    /// character is refused here rather than stored under `ifname`, on the same rule the SNMP
+    /// decode applies to raw octets.
+    #[test]
+    fn a_declared_identifier_that_is_not_a_name_is_refused() {
+        assert_eq!(map_port_id("ifname", "swp\n2"), None);
+        assert_eq!(map_chassis_id("local", "switch\u{1}4"), None);
+        assert_eq!(map_port_id("unknown-type", "swp\u{fffd}2"), None);
+
+        assert_eq!(
+            map_port_id("ifname", "swp2"),
+            Some(LldpPortId::InterfaceName("swp2".into()))
+        );
     }
 }
