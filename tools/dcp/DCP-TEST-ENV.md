@@ -1,103 +1,115 @@
 # PROFINET DCP Test Environment
 
-Mirrors `tools/snmp/`'s shape: a real fixture on a real host, and a real daemon scan against it —
-not an in-process mock standing in for both sides. §12 of the OT-discovery scoping report says
-plainly that no such environment exists yet; this is it.
+A real fixture and a real daemon scan against it — not an in-process mock standing in for both
+sides. §12 of the OT-discovery scoping report says plainly that no such environment exists yet;
+this is it.
 
-**Status: deployed and verified working**, on the same host as the SNMP lab
-(`root@192.168.7.230`, key `~/.ssh/snmp-test-vm` — see "Sharing a host with the SNMP lab" below).
-A real multicast Identify Request sent from one macvlan interface was answered by `dcp-sim.py` on
-a sibling macvlan interface, over real raw sockets on real Linux network devices — not simulated,
-not mocked. Confirmed 2026-09-08:
-```
-$ ssh root@192.168.7.230 /opt/dcp-sim/dcp-verify.py mv-dcp-verify
-sent Identify Request from 22:1b:b7:fe:82:36 (xid=0xfbcf946), waiting 3.0s...
-  ANSWERED by 8a:2e:53:fe:33:50  name_of_station='scanopy-dcp-sim'
-```
+**Runs locally, on this Mac** — the same machine the installed daemon-under-test runs on, on the
+same interface it actually scans. DCP is raw Ethernet and does not route, so that's what makes a
+real scan able to reach the sim at all.
+
+## History: why this isn't on the SNMP lab VM
+
+The first version of this shared the SNMP lab's remote Proxmox VM (`tools/snmp/`'s host), the
+same way the SNMP fixtures do — two `macvlan` children of the VM's `eth0`, one for the sim, one
+for a verification client, confirmed answering real DCP Identify traffic between them
+(2026-09-08). That precedent doesn't carry over to DCP the way it does to SNMP: SNMP is routable
+UDP, so a lab host anywhere with IP connectivity works. **DCP is raw Ethernet, addressed to a
+multicast MAC, and does not cross an L3 boundary.** A daemon running on this Mac, on its own LAN,
+can never see a sim on a remote VM's segment no matter how the two are IP-numbered — confirmed
+the hard way: a real scan run here found nothing, because the daemon's own subnet (`en0`,
+`192.168.4.0/22`) and the VM's (`192.168.7.0/24` on a physically separate network reached over a
+routed link) are not the same L2 segment, whatever the address ranges suggest on paper. Moved
+local rather than adding a second host on that segment, since the daemon-under-test already runs
+here.
 
 ## What this is
 
 `dcp-sim.py` is a standalone PROFINET DCP Identify responder — a fake device. It does **not**
 import or share code with `backend/src/daemon/discovery/service/network/dcp/`, on purpose: a sim
-built from the client's own encoder/decoder can only confirm the client agrees with itself. Written
-independently from the same wire-format reference (Wireshark's `packet-pn-dcp.c` dissector — see
-`dcp/packet.rs`'s own module doc), so a daemon scan against it is a real test of whether the two
-independent implementations agree on the wire format, the way a real `snmpd` agent is for SNMP.
+built from the client's own encoder/decoder can only confirm the client agrees with itself.
+Written independently from the same wire-format reference (Wireshark's `packet-pn-dcp.c`
+dissector — see `dcp/packet.rs`'s own module doc), so a daemon scan against it is a real test of
+whether the two independent implementations agree on the wire format, the way a real `snmpd`
+agent is for SNMP.
 
-Stdlib-only Python (`socket` with `AF_PACKET`), matching `tools/snmp/lxc/snmp-bulk-refuser.py`'s
-own precedent — no scapy dependency to install. Linux-only (`AF_PACKET` is Linux-specific), so it
-runs on the VM, not on a developer's Mac.
+`dcp-verify.py` sends one Identify request and prints whatever answers — the same role
+`snmpget`/`snmpwalk` play for the SNMP lab: a protocol-level check independent of both the daemon
+and the sim's own responder logic, to confirm the fixture actually answers before trusting a full
+daemon scan against it.
 
-## Sharing a host with the SNMP lab
+Both talk raw Ethernet through `bpf_raw.py` — macOS's `/dev/bpf*` character device, driven
+directly via `ioctl`/`read`/`write` (stdlib + `fcntl` only, no scapy). macOS has no Linux
+`AF_PACKET`, so this is the real equivalent: the same mechanism
+`backend/vendor/pnet_datalink/src/bpf.rs` uses for the daemon itself. `bpf_raw.py`'s ioctl
+request codes and the `bpf_hdr`/`ifreq` struct layouts it hand-packs are cross-checked against a
+small compiled C program against this machine's actual SDK headers
+(`net/bpf.h`), not just against the vendored Rust source — both agree exactly.
 
-Rather than a dedicated VM, the DCP sim shares the SNMP lab's existing host (`snmp-test`,
-`root@192.168.7.230`, key `~/.ssh/snmp-test-vm` — already trusted, set up for `make snmp-deploy`).
-`setup.sh` creates two `macvlan` children of `eth0` — `mv-dcp0` (the sim) and `mv-dcp-verify` (a
-verification client) — the identical pattern `tools/snmp/lxc/setup.sh` already uses for its 28
-`mv-snmp0`..`mv-snmp27` devices, via the same oneshot-systemd-unit approach
-(`dcp-lab-network.service`, mirroring `snmp-lab-network.service`) so a reboot recreates them. No
-conflict with the SNMP devices: DCP has no IP at all (nothing to collide with `mv-snmp*`'s
-192.168.7.x addresses), and the sim only reacts to EtherType `0x8892`, which SNMP never sends.
+## Running it
 
-**Two macvlan children, not one, because of a real Linux limitation**: the parent interface
-(`eth0`, the VM's own IP stack) cannot reach its own macvlan children — sibling-to-sibling works in
-`bridge` mode, parent-to-child does not. So the sim and anything talking to it (the verify client,
-or eventually a daemon) each need their own child interface.
-
-**The gotcha that actually broke the first deploy**: a NIC only accepts frames addressed to its
-own MAC (or broadcast) by default. DCP's multicast destination (`01:0e:cf:00:00:00`) is neither, so
-without either promiscuous mode or explicitly joining that multicast group, the kernel drops the
-Identify Request before any raw socket sees it — the sim's own log showed *nothing* received at
-all on the first attempt, which is what gave it away. `setup.sh` now sets both macvlan interfaces
-promiscuous. This is specific to the Python sim/verify scripts (plain `AF_PACKET` sockets); the
-actual Rust daemon code doesn't need this fix — `pnet::datalink::Config::default()` already sets
-`promiscuous: true`, confirmed by reading `pnet_datalink`'s own source, and both `dcp/channel.rs`
-and `arp/broadcast.rs` build their config via `..Default::default()`.
-
-Redeploy or update the sim:
 ```
-export DCP_VM_HOST=192.168.7.230
-export DCP_SSH_KEY=~/.ssh/snmp-test-vm
-tools/dcp/dcp-test-env.sh deploy
+tools/dcp/dcp-test-env.sh start    # launches dcp-sim.py in the background on $DCP_IFACE (default en0)
+tools/dcp/dcp-test-env.sh verify   # sends one real Identify request, prints whatever answers
+tools/dcp/dcp-test-env.sh status
+tools/dcp/dcp-test-env.sh stop
 ```
-`dcp-lab-network.service` is `Type=oneshot, RemainAfterExit=yes` — if it's already active, a plain
-`deploy` (which calls `enable --now`) won't necessarily re-run it to pick up a script change; force
-that with `ssh root@192.168.7.230 systemctl restart dcp-lab-network.service`.
 
-## The part that's genuinely different from SNMP: reachability
+Set `DCP_IFACE` if the installed daemon scans on something other than `en0`. Both `start` and
+`verify` need `sudo` — `/dev/bpf*` is root-owned (`crw-------`). `start` runs `dcp-sim.py` under
+`sudo` in the background, has it write its own pid to `/tmp/dcp-sim.pid` once it's actually bound
+and listening (not derived from shell-level `$!` after `sudo cmd &`, which isn't reliable across
+sudo configurations), and logs to `/tmp/dcp-sim.log`.
 
-SNMP is IP/UDP — the lab host just needs to be routable, and `verify`/a real daemon scan can run
-from anywhere with IP reachability. **DCP is raw Ethernet and does not route.** Whatever runs
-`dcp-verify.py` or the actual daemon-under-test needs a real NIC on the *same L2 segment* — in
-practice, its own macvlan child of `eth0` on this same host (a real daemon binary would need one
-too, the same way `mv-dcp-verify` stands in for it here), or another host bridged to that segment.
+## What's confirmed and what isn't
+
+**Confirmed:** the protocol logic itself — `dcp-sim.py` answered a real `dcp-verify.py` Identify
+request correctly when both ran on the VM's two macvlan siblings (2026-09-08, before the move
+described above). That logic is untouched by the move; only the raw-socket layer under it
+changed from `AF_PACKET` to `bpf_raw.py`.
+
+**Not yet confirmed:** whether macOS's BPF actually delivers a frame written by one process's
+`/dev/bpf*` fd to a *different* process's `/dev/bpf*` fd bound to the same physical interface —
+the mechanism `dcp-sim.py` (answering) and a real daemon scan (asking) depend on when both run on
+this Mac's same `en0`. The port to `bpf_raw.py` was built on BSD's documented BPF architecture
+(the tap point sits in the driver's transmit path itself, shared by every listener regardless of
+which fd wrote the frame — the same reason `tcpdump` on a machine sees its own outgoing traffic),
+not on a live test: this session could not get a working `sudo` session to run one. Confirm with:
+
+```
+tools/dcp/dcp-test-env.sh start
+tools/dcp/dcp-test-env.sh verify
+```
+
+If `verify` sees an answer, the mechanism is confirmed and a real daemon scan (with the sim
+running) should find `scanopy-dcp-sim` as a no-IP, MAC-only host the same way. If `verify` times
+out with the sim confirmed running (`status`), that assumption was wrong and this needs a
+different approach — say so rather than trusting the reasoning over the result.
 
 ## Running a real daemon scan against it
 
-The sim is confirmed answering (see the transcript above). What's left is pointing an actual
-Scanopy daemon at it:
-
-1. Run a Scanopy daemon (this branch's build) on a host with a NIC on the sim's segment — the
-   natural choice is a third macvlan child of `eth0` on this same VM, mirroring `mv-dcp-verify`.
-2. Point it at a real (or dev) Scanopy server and run discovery.
-3. Confirm: a host appears with no IP addresses, one interface carrying the sim's MAC
-   (`8a:2e:53:fe:33:50`), sourced `AttributeSource::ProfinetDcp`, named `scanopy-dcp-sim` (from the
-   Identify Response's Name of Station block).
+1. `tools/dcp/dcp-test-env.sh start` (confirm with `verify` first).
+2. Run discovery from the installed daemon on this Mac, same as any other scan.
+3. Confirm in the DB: a host with no IP addresses, one interface carrying the sim's MAC,
+   sourced `AttributeSource::ProfinetDcp`, named `scanopy-dcp-sim` (from the Identify Response's
+   Name of Station block).
 
 This is the last piece of end-to-end proof the unit tests (`dcp/packet.rs`, `dcp/identify.rs`)
 can't provide on their own — they're honest about testing this daemon's understanding of the wire
-format against itself; `dcp-verify.py` proved it against an independent implementation; only a real
-daemon run proves the *whole* path (submission, minting, provenance, L2 visibility) end to end.
+format against itself; `dcp-verify.py` proves it against an independent implementation; only a
+real daemon run proves the *whole* path (submission, minting, provenance, L2 visibility) end to
+end.
 
 ## What this still doesn't prove
 
 `dcp-sim.py` is a reference implementation written for this purpose, not a real PROFINET device —
 it settles whether the daemon's parser/builder agree with an independent reading of the same spec
-material, not whether a real Siemens/Rockwell/Beckhoff device behaves identically. In particular it
-does not resolve the unicast-vs-multicast question `dcp/packet.rs`'s module doc flags as unverified
-— `dcp-sim.py` replies unicast because that's what the daemon's current receive filter assumes, not
-because it's confirmed as the real-world answer. For that, the options are the same as before:
-IEC 61158-6-10 itself, or a genuine third-party stack. RT-Labs' [p-net](https://github.com/rtlabs-com/p-net)
-(BSD-3, used for real vendor pre-certification) remains the candidate if that level of confidence is
-ever needed — its `pn_dev` sample app already answers DCP Identify — but building and deploying it
-is a larger lift than this simple responder and hasn't been done here.
+material, not whether a real Siemens/Rockwell/Beckhoff device behaves identically. In particular
+it does not resolve the unicast-vs-multicast question `dcp/packet.rs`'s module doc flags as
+unverified — `dcp-sim.py` replies unicast because that's what the daemon's current receive filter
+assumes, not because it's confirmed as the real-world answer. For that, the options are the same
+as before: IEC 61158-6-10 itself, or a genuine third-party stack. RT-Labs'
+[p-net](https://github.com/rtlabs-com/p-net) (BSD-3, used for real vendor pre-certification)
+remains the candidate if that level of confidence is ever needed — its `pn_dev` sample app
+already answers DCP Identify — but building and deploying it is a larger lift than this simple
+responder and hasn't been done here.

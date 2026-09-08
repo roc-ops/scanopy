@@ -10,12 +10,16 @@ have over an in-process mock. Written from the wire format Wireshark's `packet-p
 dissector documents (see `dcp/packet.rs`'s own module doc for the same reference) — same source
 material as the Rust side, independently implemented, no shared code.
 
-Stdlib only (`socket` with `AF_PACKET`), matching `snmp-bulk-refuser.py`'s own precedent — no
-scapy dependency to install on the VM. Linux only (`AF_PACKET` is Linux-specific).
+Runs locally on this Mac, on the same interface (and so the same L2 segment) the daemon under
+test itself scans on — DCP is raw Ethernet and does not route, so "same host as the daemon" is
+what makes a real scan able to reach this at all (see DCP-TEST-ENV.md). Raw frame I/O goes
+through `bpf_raw.py` (macOS `/dev/bpf*`, stdlib + ioctl only, no scapy) instead of Linux's
+`AF_PACKET` the original VM-hosted version used — protocol logic below (frame building/parsing)
+is unchanged from that version.
 
-    sudo ./dcp-sim.py eth0 --name press-line-3
+    sudo ./dcp-sim.py en0 --name press-line-3
 
-Answers every Identify Request it sees on `eth0` with an Identify Response echoing the request's
+Answers every Identify Request it sees on `en0` with an Identify Response echoing the request's
 Xid, carrying the given name in a Device Properties / Name of Station block, sent unicast back to
 the requester's own MAC. (Unicast is this script's own choice for the reply, matching what the
 daemon's receive-side filter currently assumes — it does not settle whether a *real* PROFINET
@@ -23,9 +27,11 @@ device replies unicast or multicast, which is still an open question noted in `d
 """
 
 import argparse
-import socket
+import os
 import struct
 import sys
+
+import bpf_raw
 
 ETHERTYPE_PROFINET = 0x8892
 DCP_IDENTIFY_MULTICAST = bytes.fromhex("010ecf000000")
@@ -83,26 +89,35 @@ def parse_identify_request(frame: bytes):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("interface", help="interface to listen/answer on, e.g. eth0")
+    parser.add_argument("interface", help="interface to listen/answer on, e.g. en0")
     parser.add_argument("--name", default="scanopy-dcp-sim", help="Name of Station to answer with")
+    parser.add_argument(
+        "--pidfile",
+        help="write our own pid here once bound and listening, for a wrapper script to track "
+        "us reliably when backgrounded under sudo (shell-level $! after 'sudo ... &' isn't "
+        "trustworthy across sudo configurations)",
+    )
     args = parser.parse_args()
 
-    sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETHERTYPE_PROFINET))
-    sock.bind((args.interface, 0))
-    own_mac = sock.getsockname()[4]
+    own_mac = bpf_raw.get_mac(args.interface)
+    fd = bpf_raw.open_bpf(args.interface)
+
+    if args.pidfile:
+        with open(args.pidfile, "w") as f:
+            f.write(str(os.getpid()))
 
     print(f"listening on {args.interface} ({own_mac.hex(':')}), answering as '{args.name}'", file=sys.stderr)
 
     while True:
-        frame, _ = sock.recvfrom(2048)
-        if frame[6:12] == own_mac:
-            continue  # our own outgoing frame, looped back
+        frame = bpf_raw.read_frame(fd, timeout_s=None)
+        if frame is None or frame[6:12] == own_mac:
+            continue  # timeout (shouldn't happen — blocking wait) or our own outgoing frame, looped back
         parsed = parse_identify_request(frame)
         if parsed is None:
             continue
         requester_mac, xid = parsed
         response = build_identify_response(requester_mac, own_mac, xid, args.name)
-        sock.send(response)
+        bpf_raw.write_frame(fd, response)
         print(f"answered identify request from {requester_mac.hex(':')} (xid={xid:#x})", file=sys.stderr)
 
 

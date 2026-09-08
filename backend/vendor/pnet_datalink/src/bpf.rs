@@ -294,6 +294,13 @@ impl DataLinkSender for DataLinkSenderImpl {
                 // SCANOPY LOCAL PATCH: poll(), not select()/FD_SET — see README.md. One pollfd
                 // built fresh per call, exactly like linux.rs's DataLinkSenderImpl already does;
                 // no per-channel fd_set state to keep in sync with a single monitored fd.
+                //
+                // Unlike linux.rs's AF_PACKET socket, this /dev/bpf character device does not
+                // reliably set POLLOUT in `revents` even when the write below succeeds — bpf(4)
+                // documents writes as unbuffered/synchronous and says nothing about poll/select
+                // write-readiness. The original select()/FD_SET code this replaces never checked
+                // FD_ISSET either; it trusted a positive return alone. Match that: any ret > 0
+                // means proceed, regardless of which bits `revents` carries.
                 let mut pollfd = libc::pollfd {
                     fd: self.fd.fd,
                     events: libc::POLLOUT,
@@ -305,7 +312,7 @@ impl DataLinkSender for DataLinkSenderImpl {
                     return Some(Err(io::Error::last_os_error()));
                 } else if ret == 0 {
                     return Some(Err(io::Error::new(io::ErrorKind::TimedOut, "Timed out")));
-                } else if pollfd.revents & libc::POLLOUT != 0 {
+                } else {
                     match unsafe {
                         libc::write(
                             self.fd.fd,
@@ -316,8 +323,6 @@ impl DataLinkSender for DataLinkSenderImpl {
                         len if len == -1 => return Some(Err(io::Error::last_os_error())),
                         _ => (),
                     }
-                } else {
-                    return Some(Err(io::Error::new(io::ErrorKind::Other, "Unexpected poll event")));
                 }
             }
             Some(Ok(()))
@@ -333,7 +338,8 @@ impl DataLinkSender for DataLinkSenderImpl {
         } else {
             0
         };
-        // SCANOPY LOCAL PATCH: poll(), not select()/FD_SET — see build_and_send above.
+        // SCANOPY LOCAL PATCH: poll(), not select()/FD_SET — see build_and_send above (same
+        // caveat: this BPF device's POLLOUT bit isn't trustworthy, so any ret > 0 is enough).
         let mut pollfd = libc::pollfd {
             fd: self.fd.fd,
             events: libc::POLLOUT,
@@ -345,8 +351,6 @@ impl DataLinkSender for DataLinkSenderImpl {
             return Some(Err(io::Error::last_os_error()));
         } else if ret == 0 {
             return Some(Err(io::Error::new(io::ErrorKind::TimedOut, "Timed out")));
-        } else if pollfd.revents & libc::POLLOUT == 0 {
-            return Some(Err(io::Error::new(io::ErrorKind::Other, "Unexpected poll event")));
         }
         match unsafe {
             libc::write(
@@ -377,7 +381,9 @@ impl DataLinkReceiver for DataLinkReceiverImpl {
         if self.packets.is_empty() {
             let buffer = &mut self.read_buffer[self.buffer_offset..];
             // SCANOPY LOCAL PATCH: poll(), not select()/FD_SET — see README.md and
-            // DataLinkSenderImpl::build_and_send above.
+            // DataLinkSenderImpl::build_and_send above (same caveat: don't gate on which bits
+            // `revents` carries, only on ret > 0, matching the original select()/FD_ISSET-free
+            // code this replaces).
             let mut pollfd = libc::pollfd {
                 fd: self.fd.fd,
                 events: libc::POLLIN,
@@ -388,8 +394,6 @@ impl DataLinkReceiver for DataLinkReceiverImpl {
                 return Err(io::Error::last_os_error());
             } else if ret == 0 {
                 return Err(io::Error::new(io::ErrorKind::TimedOut, "Timed out"));
-            } else if pollfd.revents & libc::POLLIN == 0 {
-                return Err(io::Error::new(io::ErrorKind::Other, "Unexpected poll event"));
             } else {
                 let buflen = match unsafe {
                     libc::read(

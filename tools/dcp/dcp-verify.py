@@ -3,19 +3,20 @@
 
 A protocol-level check independent of the daemon and of dcp-sim.py's own responder logic — the
 same role `snmpget`/`snmpwalk` play in `tools/snmp/snmp-test-env.sh`'s `verify`: confirm the
-fixture actually answers before trusting a full daemon scan against it. Must run on a host with a
-real interface on the same L2 segment as the sim (raw Ethernet does not route) — typically the
-Proxmox host itself, or another VM/LXC on the same bridge.
+fixture actually answers before trusting a full daemon scan against it. Run on the same host as
+dcp-sim.py (raw Ethernet does not route, so this only proves anything on the sim's own L2
+segment — see DCP-TEST-ENV.md).
 
-    sudo ./dcp-verify.py eth0
+    sudo ./dcp-verify.py en0
 """
 
 import argparse
 import secrets
-import socket
 import struct
 import sys
 import time
+
+import bpf_raw
 
 ETHERTYPE_PROFINET = 0x8892
 DCP_IDENTIFY_MULTICAST = bytes.fromhex("010ecf000000")
@@ -51,21 +52,18 @@ def main():
     parser.add_argument("--timeout", type=float, default=3.0)
     args = parser.parse_args()
 
-    sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETHERTYPE_PROFINET))
-    sock.bind((args.interface, 0))
-    sock.settimeout(args.timeout)
-    own_mac = sock.getsockname()[4]
+    own_mac = bpf_raw.get_mac(args.interface)
+    fd = bpf_raw.open_bpf(args.interface)
 
     xid = secrets.randbits(24) | 0x0F000000
-    sock.send(build_identify_request(own_mac, xid))
+    bpf_raw.write_frame(fd, build_identify_request(own_mac, xid))
     print(f"sent Identify Request from {own_mac.hex(':')} (xid={xid:#x}), waiting {args.timeout}s...")
 
     deadline = time.monotonic() + args.timeout
     found = 0
     while time.monotonic() < deadline:
-        try:
-            frame, _ = sock.recvfrom(2048)
-        except socket.timeout:
+        frame = bpf_raw.read_frame(fd, timeout_s=max(0.0, deadline - time.monotonic()))
+        if frame is None:
             break
         if frame[6:12] == own_mac:
             continue
