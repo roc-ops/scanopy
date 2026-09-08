@@ -93,16 +93,28 @@ impl HostService {
             existing_host
         );
 
-        // Update hostname if not set
-        if existing_host.base.hostname.is_none()
-            && new_host_data
-                .base
-                .hostname
-                .as_ref()
-                .is_some_and(|h| !h.is_empty())
+        // The hostname is a current observation, not a first write. A device answering to a
+        // different name than it did last scan — a rebuilt machine on a re-used address, a
+        // renamed DNS record — has to record the name it answers to *now*. The display name is
+        // re-derived from this field a few lines below, so a hostname frozen at creation froze
+        // the name with it, and the host went on wearing a label belonging to another device
+        // (GH #89). A name written once and never corrected is worse than no name: it looks
+        // like an answer.
+        //
+        // An absent or blank incoming hostname is not evidence of absence — a scan that could
+        // not resolve one says nothing about the name, and must never clear what an earlier scan
+        // learned. Only a real, different value overwrites. The display name is still the
+        // ladder's decision, not this arm's: a fresh hostname is merely *offered* below, where a
+        // controller's name or a hand-typed one outranks it.
+        if let Some(hostname) = new_host_data
+            .base
+            .hostname
+            .as_ref()
+            .filter(|h| !h.trim().is_empty())
+            && existing_host.base.hostname.as_deref() != Some(hostname.as_str())
         {
             has_updates = true;
-            existing_host.base.hostname = new_host_data.base.hostname.clone();
+            existing_host.base.hostname = Some(hostname.clone());
         }
 
         // The display name. Both candidates go through the same ladder, which is the whole

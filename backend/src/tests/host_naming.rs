@@ -397,3 +397,154 @@ async fn an_address_derived_name_follows_the_host_to_a_new_address() {
     );
     assert_eq!(moved.name_source, HostNameSource::Ip);
 }
+
+/// GH #89: the hostname a host answers to is an observation, and observations are allowed to
+/// change. A lab rebuild handed two devices each other's address; Scanopy re-matched onto the
+/// existing rows and they went on displaying the previous devices' names, because `hostname` was
+/// written once at creation and the display name is re-derived from that same field.
+///
+/// Both halves have to move together, which is why this asserts both: the display name is
+/// re-applied from the *stored* hostname after the incoming name, so a stale hostname does not
+/// merely fail to update the name — it overwrites the fresh candidate with the old one.
+#[tokio::test]
+async fn a_host_that_reports_a_new_hostname_stops_wearing_the_old_one() {
+    harness!(services, network_id, _container);
+
+    let first = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname("leaf1.lab".to_string()),
+            Some("leaf1.lab"),
+        ),
+    )
+    .await;
+    assert_eq!(first.hostname.as_deref(), Some("leaf1.lab"));
+    assert_eq!(first.name, "leaf1.lab");
+
+    let rebuilt = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname("leaf2.lab".to_string()),
+            Some("leaf2.lab"),
+        ),
+    )
+    .await;
+
+    assert_eq!(rebuilt.id, first.id, "the same host, matched on its MAC");
+    assert_eq!(
+        rebuilt.name, "leaf2.lab",
+        "a name re-derived from a frozen hostname freezes with it, and the host goes on wearing \
+         another device's label"
+    );
+    assert_eq!(rebuilt.name_source, HostNameSource::Hostname);
+    assert_eq!(
+        rebuilt.hostname.as_deref(),
+        Some("leaf2.lab"),
+        "the hostname is what the host answers to now, not what it answered to first"
+    );
+}
+
+/// Absence of evidence is not evidence of absence. A scan that could not resolve a hostname —
+/// no reverse lookup, no SNMP sysName — says nothing about the name, so it must leave both the
+/// recorded hostname and the name derived from it exactly where they were.
+#[tokio::test]
+async fn a_scan_that_resolved_no_hostname_leaves_the_recorded_one_alone() {
+    harness!(services, network_id, _container);
+
+    let named = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname("nas.lan".to_string()),
+            Some("nas.lan"),
+        ),
+    )
+    .await;
+    assert_eq!(named.hostname.as_deref(), Some("nas.lan"));
+    assert_eq!(named.name, "nas.lan");
+
+    let rescanned = submit(
+        &services,
+        submission(network_id, HostName::Ip(DEVICE_IP), None),
+    )
+    .await;
+
+    assert_eq!(rescanned.id, named.id, "the same host, matched on its MAC");
+    assert_eq!(
+        rescanned.hostname.as_deref(),
+        Some("nas.lan"),
+        "a scan with nothing to say about the hostname must not erase it"
+    );
+    assert_eq!(rescanned.name, "nas.lan");
+    assert_eq!(rescanned.name_source, HostNameSource::Hostname);
+}
+
+/// A blank hostname on the wire is the same non-statement as an absent one — an empty column, a
+/// reverse lookup that returned nothing but whitespace — and must not overwrite a real value.
+#[tokio::test]
+async fn a_blank_hostname_is_not_an_observation() {
+    harness!(services, network_id, _container);
+
+    let named = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname("nas.lan".to_string()),
+            Some("nas.lan"),
+        ),
+    )
+    .await;
+
+    let rescanned = submit(
+        &services,
+        submission(network_id, HostName::Ip(DEVICE_IP), Some("   ")),
+    )
+    .await;
+
+    assert_eq!(rescanned.id, named.id, "the same host, matched on its MAC");
+    assert_eq!(rescanned.hostname.as_deref(), Some("nas.lan"));
+    assert_eq!(rescanned.name, "nas.lan");
+}
+
+/// Refreshing the hostname must not lower the bar for the display name: the fresh hostname is
+/// *offered* to the ladder, and a name a person typed still outranks it.
+#[tokio::test]
+async fn a_refreshed_hostname_does_not_displace_a_hand_typed_name() {
+    harness!(services, network_id, _container);
+
+    let discovered = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname("leaf1.lab".to_string()),
+            Some("leaf1.lab"),
+        ),
+    )
+    .await;
+
+    let typed = save_from_ui(&services, &discovered, "Rack 3 Leaf", false).await;
+    assert_eq!(typed.name_source, HostNameSource::Manual);
+
+    let rebuilt = submit(
+        &services,
+        submission(
+            network_id,
+            HostName::Hostname("leaf2.lab".to_string()),
+            Some("leaf2.lab"),
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        rebuilt.name, "Rack 3 Leaf",
+        "a hostname that changed is still below a name a person typed"
+    );
+    assert_eq!(rebuilt.name_source, HostNameSource::Manual);
+    assert_eq!(
+        rebuilt.hostname.as_deref(),
+        Some("leaf2.lab"),
+        "the observation is still recorded — it just does not win the display name"
+    );
+}
