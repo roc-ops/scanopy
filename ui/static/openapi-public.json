@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Scanopy API",
-    "description": "\nNetwork topology discovery and visualization API.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n| Method | Header | Use Case |\n|--------|--------|----------|\n| User API key | `Authorization: Bearer scp_u_...` | Programmatic access, integrations |\n| Session cookie | `Cookie: session_id=...` | Web UI (via `/api/auth/login`) |\n\nUser API keys require your organization to have API access enabled. Create keys at **Platform > API Keys**.\n\n## Rate Limiting\n\nLimit: 300 requests/minute\n\nBurst: 150\n\nResponse headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`\n\nWhen rate limited, you'll receive HTTP `429 Too Many Requests` with a `Retry-After` header.\n\n## Pagination\n\nList endpoints support pagination via query parameters:\n\n| Parameter | Type | Default | Description |\n|-----------|------|---------|-------------|\n| `limit` | integer | 50 | Maximum results to return (1-1000). Use 0 for no limit. |\n| `offset` | integer | 0 | Number of results to skip |\n\nExample: `GET /api/v1/hosts?limit=10&offset=20`\n\n## Response Format\n\nAll responses use a standard envelope:\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"meta\": {\n    \"api_version\": 1,\n    \"server_version\": \"0.17.14\"\n  }\n}\n```\n\n**Paginated list responses** include pagination metadata:\n\n```json\n{\n  \"success\": true,\n  \"data\": [ ... ],\n  \"meta\": {\n    \"api_version\": 1,\n    \"server_version\": \"0.17.14\",\n    \"pagination\": {\n      \"total_count\": 142,\n      \"limit\": 50,\n      \"offset\": 0,\n      \"has_more\": true\n    }\n  }\n}\n```\n\n| Field | Description |\n|-------|-------------|\n| `total_count` | Total items matching your query (ignoring pagination) |\n| `limit` | Applied limit (your request or default) |\n| `offset` | Applied offset |\n| `has_more` | `true` if more results exist beyond this page |\n\n**Error responses** include an `error` field instead of `data`:\n\n```json\n{\n  \"success\": false,\n  \"error\": \"Resource not found\",\n  \"meta\": { ... }\n}\n```\n\n**Common status codes:** `400` validation error, `401` unauthorized, `403` forbidden, `404` not found, `409` conflict, `429` rate limited.\n\n## Versioning\n\nEndpoints are prefixed with `/api/v1/`. The API version is an integer (`api_version: 1`) returned in every response, versioned independently from the application. Check `GET /api/version` for current versions.\n\n**While Scanopy is pre-v1.0 (current: 0.17.14)**, the API should be considered unstable. Breaking changes may be introduced in any release without incrementing the API version. We recommend pinning to a specific Scanopy release if you depend on API stability, and reviewing the [changelog](/changelog) before upgrading. After Scanopy reaches v1.0, breaking API changes will only occur with an API version increment.\n\n## Multi-Tenancy\n\nResources are scoped to your **organization** and **network(s)**:\n\n- You can only access entities within your organization\n- Network-level entities (hosts, services, etc.) are filtered to networks you have access to\n- Use `?network_id=<UUID>` to filter list endpoints to a specific network\n- API keys can be scoped to a subset of your accessible networks\n",
+    "description": "\nNetwork topology discovery and visualization API.\n\n## Authentication\n\nTwo authentication methods are supported:\n\n| Method | Header | Use Case |\n|--------|--------|----------|\n| User API key | `Authorization: Bearer scp_u_...` | Programmatic access, integrations |\n| Session cookie | `Cookie: session_id=...` | Web UI (via `/api/auth/login`) |\n\nUser API keys require your organization to have API access enabled. Create keys at **Platform > API Keys**.\n\n## Rate Limiting\n\nLimit: 300 requests/minute\n\nBurst: 150\n\nResponse headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`\n\nWhen rate limited, you'll receive HTTP `429 Too Many Requests` with a `Retry-After` header.\n\n## Pagination\n\nList endpoints support pagination via query parameters:\n\n| Parameter | Type | Default | Description |\n|-----------|------|---------|-------------|\n| `limit` | integer | 50 | Maximum results to return (1-1000). Use 0 for no limit. |\n| `offset` | integer | 0 | Number of results to skip |\n\nExample: `GET /api/v1/hosts?limit=10&offset=20`\n\n## Response Format\n\nAll responses use a standard envelope:\n\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"meta\": {\n    \"api_version\": 1,\n    \"server_version\": \"0.17.13\"\n  }\n}\n```\n\n**Paginated list responses** include pagination metadata:\n\n```json\n{\n  \"success\": true,\n  \"data\": [ ... ],\n  \"meta\": {\n    \"api_version\": 1,\n    \"server_version\": \"0.17.13\",\n    \"pagination\": {\n      \"total_count\": 142,\n      \"limit\": 50,\n      \"offset\": 0,\n      \"has_more\": true\n    }\n  }\n}\n```\n\n| Field | Description |\n|-------|-------------|\n| `total_count` | Total items matching your query (ignoring pagination) |\n| `limit` | Applied limit (your request or default) |\n| `offset` | Applied offset |\n| `has_more` | `true` if more results exist beyond this page |\n\n**Error responses** include an `error` field instead of `data`:\n\n```json\n{\n  \"success\": false,\n  \"error\": \"Resource not found\",\n  \"meta\": { ... }\n}\n```\n\n**Common status codes:** `400` validation error, `401` unauthorized, `403` forbidden, `404` not found, `409` conflict, `429` rate limited.\n\n## Versioning\n\nEndpoints are prefixed with `/api/v1/`. The API version is an integer (`api_version: 1`) returned in every response, versioned independently from the application. Check `GET /api/version` for current versions.\n\n**While Scanopy is pre-v1.0 (current: 0.17.13)**, the API should be considered unstable. Breaking changes may be introduced in any release without incrementing the API version. We recommend pinning to a specific Scanopy release if you depend on API stability, and reviewing the [changelog](/changelog) before upgrading. After Scanopy reaches v1.0, breaking API changes will only occur with an API version increment.\n\n## Multi-Tenancy\n\nResources are scoped to your **organization** and **network(s)**:\n\n- You can only access entities within your organization\n- Network-level entities (hosts, services, etc.) are filtered to networks you have access to\n- Use `?network_id=<UUID>` to filter list endpoints to a specific network\n- API keys can be scoped to a subset of your accessible networks\n",
     "license": {
       "name": "Dual (AGPL3.0, Commercial License Available)"
     },
@@ -5385,7 +5385,7 @@
           "Hosts"
         ],
         "summary": "Update a host",
-        "description": "Updates host properties. Children (ip_addresses, ports, services)\nare managed via their own endpoints.\n\n### Tag Validation\n\n- Tags must exist and belong to your organization\n- Duplicate tag UUIDs are automatically deduplicated\n- Invalid or cross-organization tag UUIDs return a 400 error",
+        "description": "Updates host properties. Children (ip_addresses, ports, services, interfaces) are synced\nfrom the fields on this same request body when provided — omit a field to leave that child\nset untouched.\n\n### Tag Validation\n\n- Tags must exist and belong to your organization\n- Duplicate tag UUIDs are automatically deduplicated\n- Invalid or cross-organization tag UUIDs return a 400 error",
         "operationId": "update_host",
         "parameters": [
           {
@@ -12426,12 +12426,12 @@
           "server_version": {
             "type": "string",
             "description": "Server version (semver)",
-            "example": "0.17.14"
+            "example": "0.17.13"
           }
         },
         "example": {
           "api_version": 1,
-          "server_version": "0.17.14"
+          "server_version": "0.17.13"
         }
       },
       "ApiResponse": {
@@ -12561,19 +12561,19 @@
             ],
             "description": "Association between a service and a port / interface that the service is listening on",
             "example": {
-              "created_at": "2026-09-03T21:45:01.870845Z",
+              "created_at": "2026-09-04T22:35:46.329345Z",
               "first_discovery_id": null,
-              "id": "e01d99ea-9b75-4dc8-8944-772b3854e7c7",
+              "id": "b866b898-b754-4682-88b9-543fc7f2fdd7",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-09-03T21:45:01.870845Z",
+              "last_seen_at": "2026-09-04T22:35:46.329345Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-09-03T21:45:01.870845Z",
-              "valid_from": "2026-09-03T21:45:01.870845Z",
+              "updated_at": "2026-09-04T22:35:46.329345Z",
+              "valid_from": "2026-09-04T22:35:46.329345Z",
               "valid_to": null
             }
           },
@@ -13899,6 +13899,10 @@
               "interfaces": [
                 {
                   "admin_status": "Up",
+                  "cdp_address": null,
+                  "cdp_device_id": null,
+                  "cdp_platform": null,
+                  "cdp_port_id": null,
                   "created_at": "2026-01-15T10:30:00Z",
                   "first_discovery_id": null,
                   "host_id": "550e8400-e29b-41d4-a716-446655440003",
@@ -13912,8 +13916,16 @@
                   "last_discovery_id": null,
                   "last_seen_at": "2026-01-15T10:30:00Z",
                   "lineage_id": null,
+                  "lldp_chassis_id": null,
+                  "lldp_mgmt_addr": null,
+                  "lldp_port_desc": null,
+                  "lldp_port_id": null,
+                  "lldp_sys_desc": null,
+                  "lldp_sys_name": null,
                   "mac_address": "DE:AD:BE:EF:CA:FE",
                   "mac_address_source": "ArpReply",
+                  "neighbor": null,
+                  "neighbor_seen_at": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "oper_status": "Up",
                   "speed_bps": 1000000000,
@@ -13973,19 +13985,19 @@
                 {
                   "bindings": [
                     {
-                      "created_at": "2026-09-03T21:45:01.845767Z",
+                      "created_at": "2026-09-04T22:35:46.302574Z",
                       "first_discovery_id": null,
-                      "id": "df070581-db9e-4ae7-b7b8-d00f618c82fc",
+                      "id": "b5bf3d83-912a-499a-9650-8e87ede2ff4f",
                       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                       "last_discovery_id": null,
-                      "last_seen_at": "2026-09-03T21:45:01.845767Z",
+                      "last_seen_at": "2026-09-04T22:35:46.302574Z",
                       "lineage_id": null,
                       "network_id": "550e8400-e29b-41d4-a716-446655440002",
                       "port_id": "550e8400-e29b-41d4-a716-446655440006",
                       "service_id": "550e8400-e29b-41d4-a716-446655440007",
                       "type": "Port",
-                      "updated_at": "2026-09-03T21:45:01.845767Z",
-                      "valid_from": "2026-09-03T21:45:01.845767Z",
+                      "updated_at": "2026-09-04T22:35:46.302574Z",
+                      "valid_from": "2026-09-04T22:35:46.302574Z",
                       "valid_to": null
                     }
                   ],
@@ -13999,7 +14011,7 @@
                   "name": "nginx",
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "position": 0,
-                  "service_definition": "Zabbix Agent",
+                  "service_definition": "Proxmox Datacenter Manager",
                   "source": {
                     "type": "Manual"
                   },
@@ -14244,10 +14256,6 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/InterfaceBase"
-              },
-              {
-                "$ref": "#/components/schemas/InterfaceNeighborEvidence",
-                "description": "Wire-compat only: the old scalar LLDP/CDP shape a pre-migration daemon still submits.\n\nGH #701 replaced these twelve columns with `interface_neighbor_candidates`, but a daemon\npredating that has no way to know (see the `<0.17.5 deprecated at v1.0` convention — old\ndaemons are supported for a whole deprecation window). This codebase never sets\n`deny_unknown_fields`, so simply removing the fields from `InterfaceBase` would silently\nswallow an old daemon's submission rather than erroring or translating it — flattening this\nalongside `base` is what makes the old JSON shape still deserialize. Reuses\n`InterfaceNeighborEvidence`'s field names/shape exactly, since that *is* the old scalar\nshape.\n\nDrained into `base.neighbor_candidates` by `Interface::drain_legacy_neighbor_evidence`\non the discovery ingest path and never read anywhere else — keep it that way; nothing\noutside that one function should reference this field. Never serialized: a new server\nresponse or a current daemon's own submission never emits this shape."
               },
               {
                 "type": "object",
@@ -15214,19 +15222,19 @@
             "example": {
               "bindings": [
                 {
-                  "created_at": "2026-09-03T21:45:01.865222Z",
+                  "created_at": "2026-09-04T22:35:46.323673Z",
                   "first_discovery_id": null,
-                  "id": "4c571219-0610-44d3-b784-986b3083100b",
+                  "id": "676982d9-97c9-410a-acd5-4f1bb31becf4",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-09-03T21:45:01.865222Z",
+                  "last_seen_at": "2026-09-04T22:35:46.323673Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-09-03T21:45:01.865222Z",
-                  "valid_from": "2026-09-03T21:45:01.865222Z",
+                  "updated_at": "2026-09-04T22:35:46.323673Z",
+                  "valid_from": "2026-09-04T22:35:46.323673Z",
                   "valid_to": null
                 }
               ],
@@ -15240,7 +15248,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Zabbix Agent",
+              "service_definition": "Proxmox Datacenter Manager",
               "source": {
                 "type": "Manual"
               },
@@ -15910,13 +15918,6 @@
                 },
                 "description": "Service bindings included in this topology."
               },
-              "candidates": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/InterfaceNeighborCandidate"
-                },
-                "description": "Raw LLDP/CDP candidate evidence behind `neighbours` (GH #701) — for the admin/debug\nunresolved-evidence display and per-adjacency protocol derivation\n(`TopologyContext::interface_has_lldp_evidence`), neither of which the resolved rows alone\ncan answer (they carry no raw evidence, by design — see `interface_neighbors`)."
-              },
               "dependencies": {
                 "type": "array",
                 "items": {
@@ -15964,13 +15965,6 @@
                   "$ref": "#/components/schemas/IPAddress"
                 },
                 "description": "IP addresses included in this topology."
-              },
-              "neighbours": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/InterfaceNeighborRow"
-                },
-                "description": "Resolved LLDP/CDP neighbour adjacencies (GH #701): the merged read-model of\n`interface_neighbor_interfaces` + `interface_neighbor_hosts`, replacing the old\n`Interface.neighbor` scalar now that a port can anchor several links."
               },
               "nodes": {
                 "type": "object",
@@ -17058,8 +17052,14 @@
             ]
           },
           {
+            "type": "string",
+            "description": "A PROFINET DCP Identify exchange: we sent the request and the transport correlated the\nreply to the station that sent it. `Native`, not merely `Queried` — like [`Self::Probe`]\nover [`ClientProbe::ModbusTcp`]/`EtherNetIp`/`OpcUa`, the protocol is the device's own\nrather than a generic MIB approximating it. A bare variant rather than `Probe(ClientProbe)`\non purpose: [`ClientProbe`] is scoped to application probes reached over an already-open\nTCP/UDP port (`every_client_probe_variant_has_a_producer` enforces that every variant has an\n`AppProbe` producer), and DCP is raw Ethernet with no port at all.",
+            "enum": [
+              "ProfinetDcp"
+            ]
+          },
+          {
             "type": "object",
-            "title": "Probe",
             "description": "A value the thing emitted about itself, over whatever transport [`ClientProbe`] names.",
             "required": [
               "Probe"
@@ -17073,7 +17073,6 @@
           },
           {
             "type": "object",
-            "title": "Authored",
             "description": "A value a person entered into the thing we read it from, carried back over the same\ntransport: SNMP `sysLocation`, a name set in a controller.",
             "required": [
               "Authored"
@@ -17432,19 +17431,19 @@
         ],
         "description": "Association between a service and a port / interface that the service is listening on",
         "example": {
-          "created_at": "2026-09-03T21:45:01.846408Z",
+          "created_at": "2026-09-04T22:35:46.303323Z",
           "first_discovery_id": null,
-          "id": "3a4082c5-2460-4986-a4b7-7a8671cbf417",
+          "id": "b5d49a50-11f9-4d22-872e-a272104c7abe",
           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
           "last_discovery_id": null,
-          "last_seen_at": "2026-09-03T21:45:01.846408Z",
+          "last_seen_at": "2026-09-04T22:35:46.303323Z",
           "lineage_id": null,
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "port_id": "550e8400-e29b-41d4-a716-446655440006",
           "service_id": "550e8400-e29b-41d4-a716-446655440007",
           "type": "Port",
-          "updated_at": "2026-09-03T21:45:01.846408Z",
-          "valid_from": "2026-09-03T21:45:01.846408Z",
+          "updated_at": "2026-09-04T22:35:46.303323Z",
+          "valid_from": "2026-09-04T22:35:46.303323Z",
           "valid_to": null
         }
       },
@@ -18139,7 +18138,7 @@
               "id": "550e8400-e29b-41d4-a716-446655440007",
               "name": "nginx",
               "position": 0,
-              "service_definition": "Zabbix Agent",
+              "service_definition": "Proxmox Datacenter Manager",
               "tags": [],
               "virtualization_metadata": null,
               "virtualization_service_id": null
@@ -21469,36 +21468,6 @@
           },
           {
             "type": "object",
-            "title": "FdbResolutionIncomplete",
-            "description": "FDB link resolution ran out of its time budget, so this scan's FDB-derived links are\nincomplete.\n\nDistinct from `NeighbourResolutionIncomplete`: that pass runs first and this one is\nstrictly sequenced after it, so a reader needs to know which pass stopped to judge how\nmuch of Physical Topology is affected.",
-            "required": [
-              "budget_seconds",
-              "interfaces",
-              "code"
-            ],
-            "properties": {
-              "budget_seconds": {
-                "type": "integer",
-                "format": "int32",
-                "description": "Seconds the pass was allowed before it was stopped.",
-                "minimum": 0
-              },
-              "code": {
-                "type": "string",
-                "enum": [
-                  "FdbResolutionIncomplete"
-                ]
-              },
-              "interfaces": {
-                "type": "integer",
-                "format": "int32",
-                "description": "Interfaces with an unresolved single-MAC FDB entry it was working through.",
-                "minimum": 0
-              }
-            }
-          },
-          {
-            "type": "object",
             "title": "WarningsTruncated",
             "description": "The run produced more warnings than the scan record holds. Emitted rather than dropping\nthe tail silently — a list that simply stops reads as though that was all of them.",
             "required": [
@@ -23196,6 +23165,10 @@
           "interfaces": [
             {
               "admin_status": "Up",
+              "cdp_address": null,
+              "cdp_device_id": null,
+              "cdp_platform": null,
+              "cdp_port_id": null,
               "created_at": "2026-01-15T10:30:00Z",
               "first_discovery_id": null,
               "host_id": "550e8400-e29b-41d4-a716-446655440003",
@@ -23209,8 +23182,16 @@
               "last_discovery_id": null,
               "last_seen_at": "2026-01-15T10:30:00Z",
               "lineage_id": null,
+              "lldp_chassis_id": null,
+              "lldp_mgmt_addr": null,
+              "lldp_port_desc": null,
+              "lldp_port_id": null,
+              "lldp_sys_desc": null,
+              "lldp_sys_name": null,
               "mac_address": "DE:AD:BE:EF:CA:FE",
               "mac_address_source": "ArpReply",
+              "neighbor": null,
+              "neighbor_seen_at": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "oper_status": "Up",
               "speed_bps": 1000000000,
@@ -23270,19 +23251,19 @@
             {
               "bindings": [
                 {
-                  "created_at": "2026-09-03T21:45:01.845094Z",
+                  "created_at": "2026-09-04T22:35:46.301771Z",
                   "first_discovery_id": null,
-                  "id": "46a9816d-fd85-4440-b4bc-20b6d301cb3c",
+                  "id": "1beadcd6-eb66-48e3-841c-2e977c04752f",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-09-03T21:45:01.845094Z",
+                  "last_seen_at": "2026-09-04T22:35:46.301771Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-09-03T21:45:01.845094Z",
-                  "valid_from": "2026-09-03T21:45:01.845094Z",
+                  "updated_at": "2026-09-04T22:35:46.301771Z",
+                  "valid_from": "2026-09-04T22:35:46.301771Z",
                   "valid_to": null
                 }
               ],
@@ -23296,7 +23277,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Zabbix Agent",
+              "service_definition": "Proxmox Datacenter Manager",
               "source": {
                 "type": "Manual"
               },
@@ -24078,10 +24059,6 @@
             "$ref": "#/components/schemas/InterfaceBase"
           },
           {
-            "$ref": "#/components/schemas/InterfaceNeighborEvidence",
-            "description": "Wire-compat only: the old scalar LLDP/CDP shape a pre-migration daemon still submits.\n\nGH #701 replaced these twelve columns with `interface_neighbor_candidates`, but a daemon\npredating that has no way to know (see the `<0.17.5 deprecated at v1.0` convention — old\ndaemons are supported for a whole deprecation window). This codebase never sets\n`deny_unknown_fields`, so simply removing the fields from `InterfaceBase` would silently\nswallow an old daemon's submission rather than erroring or translating it — flattening this\nalongside `base` is what makes the old JSON shape still deserialize. Reuses\n`InterfaceNeighborEvidence`'s field names/shape exactly, since that *is* the old scalar\nshape.\n\nDrained into `base.neighbor_candidates` by `Interface::drain_legacy_neighbor_evidence`\non the discovery ingest path and never read anywhere else — keep it that way; nothing\noutside that one function should reference this field. Never serialized: a new server\nresponse or a current daemon's own submission never emits this shape."
-          },
-          {
             "type": "object",
             "required": [
               "id",
@@ -24169,8 +24146,7 @@
             "type": "object",
             "required": [
               "host_id",
-              "network_id",
-              "if_descr"
+              "network_id"
             ],
             "properties": {
               "admin_status": {
@@ -24183,6 +24159,35 @@
                     "description": "SNMP ifAdminStatus: 1=up, 2=down, 3=testing, or `None` where nothing read it.\n\nOptional rather than defaulting to `Up`: an advertisement carries no status, and recording\none as up would be a claim nothing made."
                   }
                 ]
+              },
+              "cdp_address": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Remote management IP from CDP (cdpCacheAddress). IPv4 or IPv6.",
+                "example": "192.168.1.1"
+              },
+              "cdp_device_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Remote device ID from CDP (typically hostname, locally unique)"
+              },
+              "cdp_platform": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Remote platform from CDP (e.g., \"Cisco IOS\")"
+              },
+              "cdp_port_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Remote port ID from CDP"
               },
               "fdb_macs": {
                 "type": [
@@ -24207,8 +24212,11 @@
                 "description": "SNMP ifAlias - user-configured description"
               },
               "if_descr": {
-                "type": "string",
-                "description": "SNMP ifDescr - interface description (e.g., GigabitEthernet0/1)"
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SNMP ifDescr - interface description (e.g., GigabitEthernet0/1), where one was read.\n\n`None` for a source with nothing to put here — PROFINET DCP Identify carries no per-port\ndescription at all. Same principle as `if_index`/`if_type`: an absent value is `None`, never\na fabricated string standing in for it."
               },
               "if_index": {
                 "type": [
@@ -24241,6 +24249,57 @@
                 "format": "uuid",
                 "description": "FK to IPAddress entity - this port's IP assignment (must be on same host).\nOld daemons send this as \"interface_id\"."
               },
+              "lldp_chassis_id": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LldpChassisId",
+                    "description": "Remote chassis identifier from LLDP neighbor (globally/locally unique)"
+                  }
+                ]
+              },
+              "lldp_mgmt_addr": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Remote management IP from LLDP neighbor (lldpRemManAddr). IPv4 or IPv6.",
+                "example": "192.168.1.1"
+              },
+              "lldp_port_desc": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Remote port description from LLDP neighbor (lldpRemPortDesc)"
+              },
+              "lldp_port_id": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LldpPortId",
+                    "description": "Remote port identifier from LLDP neighbor"
+                  }
+                ]
+              },
+              "lldp_sys_desc": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Remote system description from LLDP neighbor (lldpRemSysDesc) - platform info"
+              },
+              "lldp_sys_name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Remote system name from LLDP neighbor (lldpRemSysName)"
+              },
               "native_vlan_id": {
                 "type": [
                   "string",
@@ -24248,6 +24307,26 @@
                 ],
                 "format": "uuid",
                 "description": "Native/untagged VLAN entity ID on this port (resolved from Q-BRIDGE dot1qPvid)"
+              },
+              "neighbor": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Neighbor",
+                    "description": "Resolved neighbor connection (mutually exclusive: either Interface or Host)"
+                  }
+                ]
+              },
+              "neighbor_seen_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "When a scan last carried evidence that something is adjacent to this port.\n\nThe freshness subject for the *link*, as `last_seen_at` is for the port. A port keeps\nappearing in the ifTable long after its neighbour record stops arriving, so `last_seen_at`\ncannot tell a live adjacency from one whose evidence has vanished. Judged against the same\n`Network::stale_cutoff` as every other freshness verdict.\n\n`None` means no scan has ever carried evidence for this row, and reads as *unknown* —\nnever as stale. Server-owned: stamped on the discovery ingest path, never sent by a daemon.",
+                "readOnly": true
               },
               "network_id": {
                 "type": "string",
@@ -24312,8 +24391,9 @@
       },
       "InterfaceInput": {
         "type": "object",
-        "description": "Input for creating an SNMP interface entry (ifTable data).\nUsed in CreateHostRequest. Server assigns UUIDs since nothing references\nInterface IDs at creation time (neighbor resolution is done server-side).",
+        "description": "Input for manually creating or updating an interface entry.\nUsed in `UpdateHostRequest`, synced the same way as `ip_addresses`/`ports`/`services`:\na client-provided `id` that already exists on this host is updated, one that doesn't is\ncreated, and an existing row missing from the list is deleted.",
         "required": [
+          "id",
           "if_index",
           "if_descr"
         ],
@@ -24328,6 +24408,11 @@
                 "description": "SNMP ifAdminStatus"
               }
             ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client-provided UUID for this interface."
           },
           "if_alias": {
             "type": [
@@ -24388,164 +24473,6 @@
             ],
             "format": "int64",
             "description": "Interface speed in bits per second"
-          }
-        }
-      },
-      "InterfaceNeighborCandidate": {
-        "type": "object",
-        "required": [
-          "id",
-          "created_at",
-          "base"
-        ],
-        "properties": {
-          "base": {
-            "$ref": "#/components/schemas/InterfaceNeighborCandidateBase"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
-      "InterfaceNeighborCandidateBase": {
-        "type": "object",
-        "required": [
-          "network_id",
-          "interface_id",
-          "evidence"
-        ],
-        "properties": {
-          "evidence": {
-            "$ref": "#/components/schemas/InterfaceNeighborEvidence"
-          },
-          "interface_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "network_id": {
-            "type": "string",
-            "format": "uuid"
-          }
-        }
-      },
-      "InterfaceNeighborEvidence": {
-        "type": "object",
-        "description": "The raw identity one LLDP or CDP record advertised about a neighbour on one port.\n\nOne candidate is one record — an LLDP entry and a CDP entry for the same physical neighbour are\nnever merged into a single row, even when they name the same device. That is what lets the\nreciprocal resolution tier dedup by remote host rather than by candidate count (see\n`hosts/service/topology/reciprocal.rs`), and what lets `edge_builder.rs` read each adjacency's\nown evidence-derived protocol instead of an interface-level predicate.\n\nThis is both the wire shape a daemon submits (nested under\n`InterfaceBase::neighbor_candidates`) and `InterfaceNeighborCandidate`'s stored field set — see\n`InterfaceNeighborCandidateBase`, which pairs this with the `(network_id, interface_id)` the\nwire submission does not need to repeat per candidate.",
-        "properties": {
-          "cdp_address": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Remote management IP from CDP (cdpCacheAddress). IPv4 or IPv6.",
-            "example": "192.168.1.1"
-          },
-          "cdp_device_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Remote device ID from CDP (typically hostname, locally unique)"
-          },
-          "cdp_platform": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Remote platform from CDP (e.g., \"Cisco IOS\")"
-          },
-          "cdp_port_id": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Remote port ID from CDP"
-          },
-          "lldp_chassis_id": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/LldpChassisId",
-                "description": "Remote chassis identifier from LLDP neighbor (globally/locally unique)"
-              }
-            ]
-          },
-          "lldp_mgmt_addr": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Remote management IP from LLDP neighbor (lldpRemManAddr). IPv4 or IPv6.",
-            "example": "192.168.1.1"
-          },
-          "lldp_port_desc": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Remote port description from LLDP neighbor (lldpRemPortDesc)"
-          },
-          "lldp_port_id": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/LldpPortId",
-                "description": "Remote port identifier from LLDP neighbor"
-              }
-            ]
-          },
-          "lldp_sys_desc": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Remote system description from LLDP neighbor (lldpRemSysDesc) - platform info"
-          },
-          "lldp_sys_name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Remote system name from LLDP neighbor (lldpRemSysName)"
-          }
-        }
-      },
-      "InterfaceNeighborRow": {
-        "type": "object",
-        "description": "One row of the merged read model: an interface's adjacency to one neighbour, whichever of the\ntwo resolved tables it lives in. `TopologyContext` loads a `Vec` of these per network\n(`live_or_as_of`-pinned the same way `interfaces` is) instead of reading a scalar field —\n`InterfaceNeighborRow` is what every topology file downstream of resolution actually iterates.",
-        "required": [
-          "id",
-          "interface_id",
-          "neighbor"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "The resolved row's own id (from whichever of the two tables it came from) — carried so a\nrow can be told apart from another row naming the same pair (not possible today, since the\nnatural key is unique per table, but keeps the type honest about which row backs it)."
-          },
-          "interface_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "neighbor": {
-            "$ref": "#/components/schemas/Neighbor"
-          },
-          "neighbor_seen_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
           }
         }
       },
@@ -25218,7 +25145,7 @@
             }
           }
         ],
-        "description": "One resolved adjacency, tagged by which of the two tables it came from — the same shape\n`Neighbor` gave a single interface before GH #701, now one per row rather than at most one per\ninterface."
+        "description": "Resolved LLDP/CDP neighbor connection.\n\nRepresents the remote endpoint this port connects to, discovered via LLDP or CDP.\nThe two variants are mutually exclusive and represent different resolution states."
       },
       "Network": {
         "allOf": [
@@ -25880,7 +25807,7 @@
           "server_version": {
             "type": "string",
             "description": "Server version (semver)",
-            "example": "0.17.14"
+            "example": "0.17.13"
           }
         },
         "example": {
@@ -25891,7 +25818,7 @@
             "offset": 0,
             "total_count": 142
           },
-          "server_version": "0.17.14"
+          "server_version": "0.17.13"
         }
       },
       "PaginatedApiResponse_Credential": {
@@ -26541,6 +26468,10 @@
                 "interfaces": [
                   {
                     "admin_status": "Up",
+                    "cdp_address": null,
+                    "cdp_device_id": null,
+                    "cdp_platform": null,
+                    "cdp_port_id": null,
                     "created_at": "2026-01-15T10:30:00Z",
                     "first_discovery_id": null,
                     "host_id": "550e8400-e29b-41d4-a716-446655440003",
@@ -26554,8 +26485,16 @@
                     "last_discovery_id": null,
                     "last_seen_at": "2026-01-15T10:30:00Z",
                     "lineage_id": null,
+                    "lldp_chassis_id": null,
+                    "lldp_mgmt_addr": null,
+                    "lldp_port_desc": null,
+                    "lldp_port_id": null,
+                    "lldp_sys_desc": null,
+                    "lldp_sys_name": null,
                     "mac_address": "DE:AD:BE:EF:CA:FE",
                     "mac_address_source": "ArpReply",
+                    "neighbor": null,
+                    "neighbor_seen_at": null,
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "oper_status": "Up",
                     "speed_bps": 1000000000,
@@ -26615,19 +26554,19 @@
                   {
                     "bindings": [
                       {
-                        "created_at": "2026-09-03T21:45:01.831643Z",
+                        "created_at": "2026-09-04T22:35:46.285946Z",
                         "first_discovery_id": null,
-                        "id": "db32067e-f6a5-4d7b-9c45-57e22dc8ed00",
+                        "id": "a08138cc-f592-4a3e-a77e-55e689e491a6",
                         "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                         "last_discovery_id": null,
-                        "last_seen_at": "2026-09-03T21:45:01.831643Z",
+                        "last_seen_at": "2026-09-04T22:35:46.285946Z",
                         "lineage_id": null,
                         "network_id": "550e8400-e29b-41d4-a716-446655440002",
                         "port_id": "550e8400-e29b-41d4-a716-446655440006",
                         "service_id": "550e8400-e29b-41d4-a716-446655440007",
                         "type": "Port",
-                        "updated_at": "2026-09-03T21:45:01.831643Z",
-                        "valid_from": "2026-09-03T21:45:01.831643Z",
+                        "updated_at": "2026-09-04T22:35:46.285946Z",
+                        "valid_from": "2026-09-04T22:35:46.285946Z",
                         "valid_to": null
                       }
                     ],
@@ -26641,7 +26580,7 @@
                     "name": "nginx",
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "position": 0,
-                    "service_definition": "Zabbix Agent",
+                    "service_definition": "Proxmox Datacenter Manager",
                     "source": {
                       "type": "Manual"
                     },
@@ -26784,19 +26723,19 @@
               "example": {
                 "bindings": [
                   {
-                    "created_at": "2026-09-03T21:45:01.864135Z",
+                    "created_at": "2026-09-04T22:35:46.322623Z",
                     "first_discovery_id": null,
-                    "id": "917eed29-1926-48fb-944c-e46289b63c0b",
+                    "id": "1a21ef53-b8fa-4b36-a955-cb0cca052fb5",
                     "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                     "last_discovery_id": null,
-                    "last_seen_at": "2026-09-03T21:45:01.864135Z",
+                    "last_seen_at": "2026-09-04T22:35:46.322623Z",
                     "lineage_id": null,
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "port_id": "550e8400-e29b-41d4-a716-446655440006",
                     "service_id": "550e8400-e29b-41d4-a716-446655440007",
                     "type": "Port",
-                    "updated_at": "2026-09-03T21:45:01.864135Z",
-                    "valid_from": "2026-09-03T21:45:01.864135Z",
+                    "updated_at": "2026-09-04T22:35:46.322623Z",
+                    "valid_from": "2026-09-04T22:35:46.322623Z",
                     "valid_to": null
                   }
                 ],
@@ -26810,7 +26749,7 @@
                 "name": "nginx",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
                 "position": 0,
-                "service_definition": "Zabbix Agent",
+                "service_definition": "Proxmox Datacenter Manager",
                 "source": {
                   "type": "Manual"
                 },
@@ -28867,19 +28806,19 @@
         "example": {
           "bindings": [
             {
-              "created_at": "2026-09-03T21:45:01.846222Z",
+              "created_at": "2026-09-04T22:35:46.303110Z",
               "first_discovery_id": null,
-              "id": "ca803fb6-b429-4e9c-bf80-a9ae1cebed11",
+              "id": "01078c32-da46-4b10-83f4-ca8af443daa3",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-09-03T21:45:01.846222Z",
+              "last_seen_at": "2026-09-04T22:35:46.303110Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-09-03T21:45:01.846222Z",
-              "valid_from": "2026-09-03T21:45:01.846222Z",
+              "updated_at": "2026-09-04T22:35:46.303110Z",
+              "valid_from": "2026-09-04T22:35:46.303110Z",
               "valid_to": null
             }
           ],
@@ -28893,7 +28832,7 @@
           "name": "nginx",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "position": 0,
-          "service_definition": "Zabbix Agent",
+          "service_definition": "Proxmox Datacenter Manager",
           "source": {
             "type": "Manual"
           },
@@ -29956,13 +29895,6 @@
             },
             "description": "Service bindings included in this topology."
           },
-          "candidates": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InterfaceNeighborCandidate"
-            },
-            "description": "Raw LLDP/CDP candidate evidence behind `neighbours` (GH #701) — for the admin/debug\nunresolved-evidence display and per-adjacency protocol derivation\n(`TopologyContext::interface_has_lldp_evidence`), neither of which the resolved rows alone\ncan answer (they carry no raw evidence, by design — see `interface_neighbors`)."
-          },
           "dependencies": {
             "type": "array",
             "items": {
@@ -30010,13 +29942,6 @@
               "$ref": "#/components/schemas/IPAddress"
             },
             "description": "IP addresses included in this topology."
-          },
-          "neighbours": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/InterfaceNeighborRow"
-            },
-            "description": "Resolved LLDP/CDP neighbour adjacencies (GH #701): the merged read-model of\n`interface_neighbor_interfaces` + `interface_neighbor_hosts`, replacing the old\n`Interface.neighbor` scalar now that a port can anchor several links."
           },
           "nodes": {
             "type": "object",
@@ -30165,7 +30090,7 @@
             "default": {
               "Application": [
                 {
-                  "id": "9cab33ef-726b-497d-b646-6565fdc9b5e0",
+                  "id": "010b88e1-ab62-4385-a2b4-d54dc1adcba5",
                   "rule": {
                     "ByApplication": {
                       "tag_ids": []
@@ -30175,23 +30100,23 @@
               ],
               "L2Physical": [
                 {
-                  "id": "36554908-eda8-47be-b701-42d1224c2715",
+                  "id": "0f1bbd87-678a-421f-af29-664122f40d55",
                   "rule": "ByHost"
                 }
               ],
               "L3Logical": [
                 {
-                  "id": "bac550b7-4a1b-49cb-8a72-22255e181e79",
+                  "id": "0eeafecb-61e8-4948-a143-d6b53d48253a",
                   "rule": "BySubnet"
                 },
                 {
-                  "id": "1cfd42ce-395f-404a-838b-cdb2fab4ce44",
+                  "id": "2e7d35be-3c86-43de-ad52-2be8dec8163f",
                   "rule": "MergeContainerBridges"
                 }
               ],
               "Workloads": [
                 {
-                  "id": "36554908-eda8-47be-b701-42d1224c2715",
+                  "id": "0f1bbd87-678a-421f-af29-664122f40d55",
                   "rule": "ByHost"
                 }
               ]
@@ -30221,19 +30146,19 @@
             "description": "Rules deciding how entities are placed and inlined within containers.",
             "default": [
               {
-                "id": "918b3310-a69a-463c-8358-4129a6060e62",
+                "id": "3cb86a12-d299-42fc-b914-f9803e9d130a",
                 "rule": "ByTrunkPort"
               },
               {
-                "id": "1cfa543b-a2e8-4914-b3c6-b68e5635636e",
+                "id": "0a884c53-545e-41e3-9d74-771db5425c62",
                 "rule": "ByVLAN"
               },
               {
-                "id": "639ca820-1369-4411-b519-6b716fe1879e",
+                "id": "4cc8c718-4148-42f8-a10c-c6d4ac058ea8",
                 "rule": "ByPortOpStatus"
               },
               {
-                "id": "52b9416c-9603-4c90-9840-b03aa7fba792",
+                "id": "a61a1031-d853-407d-8cfa-34a2336bd725",
                 "rule": {
                   "ByServiceCategory": {
                     "categories": [
@@ -30251,7 +30176,7 @@
                 }
               },
               {
-                "id": "a214845e-e2bc-47ec-8ad1-b05fe67a3a56",
+                "id": "27d98d3e-ac7c-4988-b124-599919d91056",
                 "rule": {
                   "ByTag": {
                     "tag_ids": [],
@@ -30260,15 +30185,15 @@
                 }
               },
               {
-                "id": "80efd154-31a4-4cda-8783-ca82fea67602",
+                "id": "9db47cc9-7d33-44dd-b20c-37aa4cc677f8",
                 "rule": "ByHypervisor"
               },
               {
-                "id": "3af1d919-bcd4-4cf6-86d1-421321dfdbeb",
+                "id": "6f4f6f4d-5626-40ba-8cc4-97dad2a66181",
                 "rule": "ByContainerRuntime"
               },
               {
-                "id": "f2275b35-79bf-4fba-b6bd-2cf250228604",
+                "id": "60015252-dc68-4cc0-9725-8c921773c049",
                 "rule": "ByStack"
               }
             ]
@@ -30577,6 +30502,16 @@
             "type": "string",
             "format": "uuid",
             "description": "Server-assigned unique identifier."
+          },
+          "interfaces": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/InterfaceInput"
+            },
+            "description": "Interfaces to sync with this host.\nIf Some, server will create/update/delete to match this list.\nIf None, existing interfaces are preserved."
           },
           "ip_addresses": {
             "type": [

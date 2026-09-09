@@ -194,6 +194,25 @@ impl Lab {
         self.storage.ip_addresses.create(&ip).await.unwrap();
         ip
     }
+
+    /// Exactly what `NetworkScan::submit_dcp_host` builds: no `if_index`/`if_descr`/`if_type`/
+    /// admin or oper status — a PROFINET DCP Identify carries none of that, only the MAC the
+    /// device answered with. Distinct from `port`/`interface` above, which always set those
+    /// fields, because a test using them here would not actually be exercising DCP's shape.
+    async fn profinet_dcp_port(&self, host_id: Uuid, mac: &str) -> Interface {
+        let entry = Interface::new(InterfaceBase {
+            host_id,
+            network_id: self.network_id,
+            if_descr: None,
+            mac_address: Some(MacEvidence::new(
+                MacEvidenceValue(mac.parse().unwrap()),
+                AttributeSource::ProfinetDcp,
+            )),
+            ..Default::default()
+        });
+        self.storage.interfaces.create(&entry).await.unwrap();
+        entry
+    }
 }
 
 // ============================================================================
@@ -216,6 +235,28 @@ async fn a_host_resolves_by_the_mac_on_one_of_its_addresses() {
             .find_host_by_mac("00:1a:2b:00:10:01", lab.network_id)
             .await,
         IdentityResolution::Resolved(switch.id)
+    );
+}
+
+/// A no-IP PROFINET device found only via DCP Identify (`AttributeSource::ProfinetDcp`) resolves
+/// through the same MAC tier as any other interface — `find_host_by_mac`'s fallback query has no
+/// `AttributeSource` filter at all, so a neighbouring switch's LLDP-reported chassis MAC matches
+/// it exactly as it would an SNMP- or ARP-discovered one. This is the fact the whole "does a
+/// managed switch's LLDP table already place a no-IP PROFINET device" story depends on — see
+/// tools/dcp/DCP-TEST-ENV.md and the switch-access-01 SNMP fixture, which advertises this same
+/// device's MAC as a neighbour for exactly this reason.
+#[tokio::test]
+async fn a_no_ip_dcp_discovered_device_resolves_through_the_mac_tier_like_any_other_source() {
+    let lab = Lab::new().await;
+    let device = lab.host("scanopy-dcp-sim").await;
+    lab.profinet_dcp_port(device.id, "00:1a:2b:dc:90:01").await;
+
+    assert_eq!(
+        lab.resolver
+            .find_host_by_mac("00:1a:2b:dc:90:01", lab.network_id)
+            .await,
+        IdentityResolution::Resolved(device.id),
+        "a DCP-attributed MAC must resolve exactly like an SNMP- or ARP-attributed one"
     );
 }
 
