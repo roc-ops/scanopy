@@ -339,9 +339,15 @@ pub struct InterfaceBase {
     /// Raw LLDP/CDP evidence this scan heard on the port — the wire shape a **current** daemon
     /// submits, one entry per distinct LLDP or CDP record. Drained into `interface_neighbor_
     /// candidates` by the discovery ingest path (`InterfaceService::create_or_update_from_
-    /// discovery`); never read anywhere else. `#[serde(skip_serializing)]` because the API never
-    /// echoes candidates back through `Interface` — they're read via `InterfaceNeighborService`.
-    #[serde(default, skip_serializing)]
+    /// discovery`); never read anywhere else. Not `skip_serializing`: this field is the daemon's
+    /// *outgoing* discovery payload as much as it is the server's read model, and that attribute
+    /// has no notion of direction — it silently dropped every daemon's submitted evidence before
+    /// the request ever left the process (found investigating the GH #701 candidate-persistence
+    /// regression; nothing downstream of the wire was ever at fault). Harmless for API responses:
+    /// `create_or_update_from_discovery` takes this field via `mem::take` before returning or
+    /// persisting `Interface`, and it is not a stored column, so nothing read back from the
+    /// database or echoed in a response ever has it populated.
+    #[serde(default)]
     pub neighbor_candidates: Vec<InterfaceNeighborEvidence>,
     /// Bridge FDB: learned MAC addresses on this switch port.
     /// Single-MAC ports can be resolved to neighbor links server-side.
@@ -626,4 +632,34 @@ pub mod if_type {
         L2_VLAN,
         BRIDGE,
     ];
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::server::lldp::LldpChassisId;
+
+    /// The regression this whole thing is about: `neighbor_candidates` is not just the server's
+    /// read model, it is also the shape a daemon serializes into its outgoing discovery request.
+    /// `skip_serializing` has no notion of direction — it silently dropped every submitted
+    /// candidate before the request left the daemon process, and nothing downstream (the
+    /// completeness veto, host-identity matching, `replace_candidates_from_discovery`) was ever
+    /// wrong, because none of it ever saw real evidence to begin with.
+    #[test]
+    fn neighbor_candidates_survives_a_json_round_trip() {
+        let mut interface = Interface::default();
+        interface.base.neighbor_candidates = vec![InterfaceNeighborEvidence {
+            lldp_chassis_id: Some(LldpChassisId::MacAddress("00:1a:2b:00:11:00".into())),
+            ..Default::default()
+        }];
+
+        let json = serde_json::to_value(&interface).unwrap();
+        let round_tripped: Interface = serde_json::from_value(json).unwrap();
+
+        assert_eq!(
+            round_tripped.base.neighbor_candidates, interface.base.neighbor_candidates,
+            "a daemon's submitted LLDP/CDP evidence must survive serialization, not just \
+             deserialization"
+        );
+    }
 }
