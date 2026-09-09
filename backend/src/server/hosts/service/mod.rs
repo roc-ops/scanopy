@@ -193,11 +193,12 @@ mod update;
 
 /// Statistics from LLDP link resolution.
 ///
-/// What survives here are the counters no warning covers: the successes, and the one failure mode
-/// that is not worth a warning. The five per-reason failure counters this used to carry are now
-/// exactly the count of their `DiscoveryWarning`s, and keeping both would leave two sources for
-/// one number that can silently disagree — with the warnings being the ones an operator can
-/// actually read, since they reach the scan record rather than only the container log.
+/// What survives here are the counters no warning covers: the successes, and one alarm that is
+/// not a statistic about the network at all. The five per-reason failure counters this used to
+/// carry are now exactly the count of their `DiscoveryWarning`s, and keeping both would leave two
+/// sources for one number that can silently disagree — with the warnings being the ones an
+/// operator can actually read, since they reach the scan record rather than only the container
+/// log.
 #[derive(Default, Debug)]
 pub struct LldpResolutionStats {
     /// Total number of interfaces with unresolved LLDP data
@@ -213,12 +214,30 @@ pub struct LldpResolutionStats {
     /// across every port: a figure of zero on a network full of such devices says the pairing is
     /// not firing, which no other counter distinguishes from "nothing needed it".
     pub ports_resolved_reciprocal: usize,
-    /// Neighbor advertised no identifier any strategy can look up.
+    /// Rows the resolvable-identity guard admitted that the ladder could then not judge.
     ///
-    /// The only failure counter left, because it is the only one with no warning behind it: it
-    /// counts the `cdp_address`-only rows there was never anything to resolve in, and a warning
-    /// per one of those would bury the ones that mean something.
-    pub host_no_strategy: usize,
+    /// **An alarm, not a statistic.** This was `host_no_strategy`, and it counted two populations
+    /// that no longer reach it: rows admitted on `cdp_address` alone, and rows whose only
+    /// identifier was blank — `InterfaceBase::has_resolvable_identity` stops selecting both. What
+    /// is left is not a kind of neighbour at all, it is a disagreement between two layers meant to
+    /// ask the same question, so it is named for that and is expected to read zero for ever.
+    /// Leaving the old name in place would have left a counter describing a population that cannot
+    /// occur, quietly reading zero — worse than no counter, because a reader trusts it.
+    ///
+    /// Two sites increment it, and both report the same finding:
+    ///
+    /// * [`Self::record_host`] seeing `NoStrategy`. `LldpChassisId::resolve_host_id` answers that
+    ///   only when no strategy ran at all: an `interfaceAlias`/`portComponent` subtype — the two
+    ///   with no subtype lookup — whose identifier is empty and whose `sysName` it also declines.
+    ///   The guard admits exactly that row when the `sysName` is non-empty, so arriving here means
+    ///   the two disagreed about whether it *was* empty. They can, narrowly and knowingly: this
+    ///   crate's emptiness rule is ASCII whitespace, because it has to be expressible in Postgres,
+    ///   while the `sysName` fallback trims with `str::trim`, which is Unicode. A `sysName` of a
+    ///   single U+00A0 is content to one and padding to the other. Rather than widen either rule
+    ///   for a case no device produces, the counter is where that shows up instead of nowhere.
+    /// * The `else` arm of `resolve_lldp_links`, structurally unreachable now the guard and the
+    ///   arms read the same accessors, which warns as well as counting.
+    pub ladder_divergences: usize,
 }
 
 /// What one LLDP/CDP resolution pass produced.
@@ -240,8 +259,16 @@ impl LldpResolutionStats {
                 self.hosts_resolved += 1;
                 Some(host_id)
             }
+            // Not a neighbour we failed to place — a row that should never have been admitted.
+            // See `ladder_divergences` for the one input that can still reach it. Loud, because
+            // a counter nobody reads is how the last three of these went unnoticed.
             IdentityResolution::NoStrategy => {
-                self.host_no_strategy += 1;
+                self.ladder_divergences += 1;
+                tracing::warn!(
+                    "the resolvable-identity guard admitted a neighbour the chassis ladder then \
+                     ran no strategy for; the guard and `resolve_host_id` disagree about which \
+                     identifiers are empty"
+                );
                 None
             }
             // Both reach the operator as a warning apiece rather than as a counter — see

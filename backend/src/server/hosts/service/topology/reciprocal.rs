@@ -88,8 +88,11 @@ impl HostService {
                     IdentityResolution::found(host_of_interface.get(&bound_id).copied())
                 }
                 Some(Neighbor::Host(host_id)) => IdentityResolution::Resolved(host_id),
+                // The same two arms, chosen by the same accessors, as the ladder in
+                // `resolve_lldp_links` — they must pick the same arm for a row or the verdict
+                // cached here is answered for one identifier and spent on another.
                 None => {
-                    if let Some(ref chassis_id) = interface.base.lldp_chassis_id {
+                    if let Some(chassis_id) = interface.base.resolvable_chassis_id() {
                         chassis_id
                             .resolve_host_id(
                                 resolver,
@@ -97,7 +100,7 @@ impl HostService {
                                 interface.base.lldp_sys_name.as_deref(),
                             )
                             .await
-                    } else if let Some(ref device_id) = interface.base.cdp_device_id {
+                    } else if let Some(device_id) = interface.base.resolvable_cdp_device_id() {
                         resolver.find_host_by_sys_name(device_id, network_id).await
                     } else {
                         IdentityResolution::NoStrategy

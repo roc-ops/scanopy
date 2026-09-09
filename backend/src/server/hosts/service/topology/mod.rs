@@ -32,9 +32,16 @@ impl UnresolvedReason {
 
 /// The warning for a far end no strategy could place, or `None` when it is not worth reporting.
 ///
-/// `NoStrategy` is deliberately silent on the host side: it counts the `cdp_address`-only rows the
-/// resolver itself calls "nothing here to resolve", and a warning per one of those would bury the
-/// two that mean something.
+/// `NoStrategy` reaches no warning on the host side, and no longer because it is a benign
+/// population worth suppressing — the `cdp_address`-only rows it used to name are not selected at
+/// all now. It is a *divergence* between the guard and the chassis ladder, which is not a far end
+/// anyone can go and scan, so describing it as an unmatched neighbour would misdirect the operator
+/// reading the scan record. It is reported where it belongs instead:
+/// [`LldpResolutionStats::ladder_divergences`], which warns.
+///
+/// The port side is unaffected: `UnresolvedReason::NoStrategy` there means the far end advertised
+/// a port id no tier can look up, which is a real and reportable outcome — see
+/// [`unresolved_port_warning`].
 ///
 /// What each warning carries is what it takes to decide whether an unresolved neighbour is a
 /// device that should have been scanned or one that never will be: which of our devices saw it, on
@@ -204,10 +211,11 @@ impl HostService {
             // Rows admitted only because they already carry a resolved neighbour — an FDB-matched
             // port, say — have no protocol identity to run the tiers against. Persist a downgrade
             // if one just happened and move on.
-            if interface.base.lldp_chassis_id.is_none()
-                && interface.base.cdp_device_id.is_none()
-                && interface.base.cdp_address.is_none()
-            {
+            //
+            // The one predicate, so this guard cannot throw back a row the filter above admitted
+            // *for* its identity, nor keep one the tiers below have no arm for. It used to test
+            // three columns by hand, one of them (`cdp_address`) that no tier reads.
+            if !interface.base.has_resolvable_identity() {
                 self.persist_neighbor(&mut interface, &original_neighbor)
                     .await?;
                 continue;
@@ -225,7 +233,8 @@ impl HostService {
             // Only chassis_id and port_id are used for neighbor resolution — they represent
             // actual physical connections. lldp_mgmt_addr / cdp_address are where you manage the
             // device, not necessarily the physical connection point.
-            let resolved_neighbor = if let Some(ref chassis_id) = interface.base.lldp_chassis_id {
+            let resolved_neighbor = if let Some(chassis_id) = interface.base.resolvable_chassis_id()
+            {
                 let host = match known_host_id {
                     Some(host_id) => IdentityResolution::Resolved(host_id),
                     // Already run once while building the adjacency — reusing the verdict is what
@@ -302,7 +311,7 @@ impl HostService {
                         Some(stats.record_port(port, host_id))
                     }
                 }
-            } else if let Some(ref device_id) = interface.base.cdp_device_id {
+            } else if let Some(device_id) = interface.base.resolvable_cdp_device_id() {
                 // CDP device_id is typically sysName, resolve against sys_name field
                 let host = match known_host_id {
                     Some(host_id) => IdentityResolution::Resolved(host_id),
@@ -314,7 +323,7 @@ impl HostService {
                 if let Some(reason) = UnresolvedReason::from_resolution(host) {
                     warnings.extend(unmatched_neighbour_warning(
                         &interface,
-                        device_id.clone(),
+                        device_id.to_string(),
                         None,
                         reason,
                     ));
@@ -354,9 +363,16 @@ impl HostService {
                     }
                 }
             } else {
-                // Admitted by the filter on cdp_address alone, which is a management address and
-                // never a physical connection — there is nothing here to resolve.
-                stats.host_no_strategy += 1;
+                // Unreachable: the guard above and the two arms here read the same predicate, so a
+                // row that got this far has an arm. Kept as the place a future divergence lands,
+                // and made loud rather than silent — a row that is counted but never judged is
+                // exactly how the last three of these went unnoticed.
+                stats.ladder_divergences += 1;
+                tracing::warn!(
+                    interface_id = %interface.id,
+                    "interface passed the resolvable-identity guard but matched no resolution \
+                     arm; the guard and the ladder have diverged"
+                );
                 None
             };
 
@@ -377,9 +393,10 @@ impl HostService {
             ports_resolved_reciprocal = stats.ports_resolved_reciprocal,
             // The five per-reason failure counters this line used to carry are now exactly the
             // count of their `DiscoveryWarning`s, and two sources for one number can only
-            // disagree. `host_no_strategy` stays because nothing warns on it: it counts the
-            // `cdp_address`-only rows there was never anything to resolve in.
-            host_no_strategy = stats.host_no_strategy,
+            // disagree. What is left is not a failure counter at all: it reads zero unless the
+            // guard and the ladder have come apart, and a non-zero here is a defect in this
+            // module rather than anything about the network. See its doc for the two sites.
+            ladder_divergences = stats.ladder_divergences,
             reopened,
             rebound,
             "LLDP/CDP link resolution complete"
