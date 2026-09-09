@@ -23,6 +23,7 @@ pub mod values;
 
 use std::net::IpAddr;
 
+use semver::Version;
 use serde::{Deserialize, Deserializer, Serialize};
 use strum::{EnumIter, IntoStaticStr, VariantNames};
 use utoipa::ToSchema;
@@ -372,6 +373,29 @@ pub enum DiscoveryWarning {
         interfaces: u32,
     },
 
+    // ---- Daemon ----------------------------------------------------------
+    /// The daemon submitted this scan in a wire format a current daemon no longer produces.
+    ///
+    /// Server-side finding, raised where the raw request body is read. The server translates the
+    /// old format, so nothing was lost — this says the translation happened, which is the only
+    /// evidence an operator ever gets that a daemon is behind. Which superseded format it was is
+    /// deliberately not carried: the answer is the same either way, upgrade the daemon.
+    ///
+    /// Ends with the compatibility window. When the enforced floor rises past the last release
+    /// that sends an old format, the translations go and this goes with them.
+    #[schema(title = "OutdatedDaemonFormat")]
+    OutdatedDaemonFormat {
+        /// The submitting daemon's version, so the reader knows which one to upgrade. `None` for
+        /// a daemon too old to report one at all.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schema(
+            value_type = Option<String>,
+            pattern = r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$",
+            example = "0.17.14"
+        )]
+        daemon_version: Option<Version>,
+    },
+
     // ---- Meta ------------------------------------------------------------
     /// The run produced more warnings than the scan record holds. Emitted rather than dropping
     /// the tail silently — a list that simply stops reads as though that was all of them.
@@ -581,6 +605,7 @@ pub enum DiscoveryWarningCode {
     ProvisionalSubnetInferred,
     NeighbourResolutionIncomplete,
     FdbResolutionIncomplete,
+    OutdatedDaemonFormat,
     WarningsTruncated,
     /// Absorbs a code from a newer binary. Fieldless, so `#[serde(other)]` applies — the text of
     /// an unrecognised warning rides on [`DiscoveryWarning::Unknown`] instead, where no metric
@@ -664,6 +689,7 @@ impl DiscoveryWarning {
                 DiscoveryWarningCode::NeighbourResolutionIncomplete
             }
             Self::FdbResolutionIncomplete { .. } => DiscoveryWarningCode::FdbResolutionIncomplete,
+            Self::OutdatedDaemonFormat { .. } => DiscoveryWarningCode::OutdatedDaemonFormat,
             Self::WarningsTruncated { .. } => DiscoveryWarningCode::WarningsTruncated,
             Self::Unknown { .. } => DiscoveryWarningCode::Unknown,
         }
@@ -725,6 +751,7 @@ impl DiscoveryWarning {
             | Self::ProvisionalSubnetInferred(_)
             | Self::NeighbourResolutionIncomplete { .. }
             | Self::FdbResolutionIncomplete { .. }
+            | Self::OutdatedDaemonFormat { .. }
             | Self::WarningsTruncated { .. }
             | Self::Unknown { .. } => None,
         }

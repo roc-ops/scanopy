@@ -580,8 +580,41 @@ impl DaemonService {
             self.resolve_neighbours_into_session(&mut update).await;
         }
 
+        if update.phase.is_terminal() {
+            self.report_superseded_wire_shape(&mut update).await;
+        }
+
         self.discovery_service.update_session(update).await?;
         Ok(())
+    }
+
+    /// Fold a latched "this daemon submitted an outdated format" observation into the terminal
+    /// payload, so it reaches the scan record and the operator rather than a server log.
+    ///
+    /// Into `update` before `update_session` writes it, for the same reason neighbour resolution
+    /// moved here: `update_session` replaces the live session wholesale, so anything appended
+    /// afterwards is overwritten.
+    async fn report_superseded_wire_shape(&self, update: &mut DiscoveryUpdatePayload) {
+        if !self
+            .discovery_service
+            .take_superseded_wire_shape(&update.daemon_id)
+            .await
+        {
+            return;
+        }
+
+        // The recorded version, not the request header: this is written once per scan, and the
+        // daemon record is the value the daemons page shows for the same daemon.
+        let daemon_version = self
+            .get_by_id(&update.daemon_id)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|daemon| daemon.base.version.clone());
+
+        update
+            .warnings
+            .push(DiscoveryWarning::OutdatedDaemonFormat { daemon_version });
     }
 
     /// Resolve this network's neighbours and fold what that produced into the terminal payload.
@@ -728,6 +761,17 @@ impl DaemonService {
             .host_service
             .get()
             .ok_or_else(|| ApiError::internal_error("HostService not initialized"))?;
+
+        // Latch a superseded submission shape against the daemon before anything else touches the
+        // batch. The raw body is only visible here; the session that reports it is a separate
+        // request, and this is the one place both daemon modes pass through.
+        if let Some(daemon_id) = auth.daemon_id()
+            && entities.hosts.iter().any(|h| h.superseded_wire_shape)
+        {
+            self.discovery_service
+                .note_superseded_wire_shape(daemon_id)
+                .await;
+        }
 
         // Compute host limit context from the first host's network → org → plan
         let limit_ctx = if let Some(first_host) = entities.hosts.first() {

@@ -468,7 +468,6 @@ pub fn interface() -> Interface {
             native_vlan_id: None,
             vlan_ids: None,
         },
-        legacy_neighbor_evidence: Default::default(),
     }
 }
 

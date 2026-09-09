@@ -80,7 +80,6 @@ impl Storable for Interface {
             first_discovery_id: None,
             display_name: None,
             base,
-            legacy_neighbor_evidence: Default::default(),
         }
     }
 
@@ -100,7 +99,6 @@ impl Storable for Interface {
             last_discovery_id,
             first_discovery_id,
             display_name: _,
-            legacy_neighbor_evidence: _,
             base:
                 Self::BaseData {
                     host_id,
@@ -215,8 +213,6 @@ impl Storable for Interface {
             // Never stored — computed at response-serialization time, see
             // `HostResponse::from_host_with_children`.
             display_name: None,
-            // Never stored — see `to_params`'s note on `neighbor_candidates`.
-            legacy_neighbor_evidence: Default::default(),
             base: InterfaceBase {
                 host_id: row.get("host_id"),
                 network_id: row.get("network_id"),
@@ -582,6 +578,8 @@ mod tests {
         assert_eq!(incoming.base.if_type, Some(117));
         assert_eq!(incoming.base.oper_status, Some(IfOperStatus::Down));
     }
+
+    #[test]
     fn preserve_immutable_fields_copies_created_at() {
         let existing = make_interface(5, Some("eth0"), None);
         let mut incoming = make_interface(5, Some("eth0"), None);

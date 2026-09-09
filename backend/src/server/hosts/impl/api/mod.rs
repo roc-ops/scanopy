@@ -33,6 +33,7 @@ use crate::server::{
     interfaces::r#impl::base::{
         IfAdminStatus, IfOperStatus, Interface, InterfaceBase, InterfaceDataComplete,
     },
+    interfaces::r#impl::wire::DiscoveryInterface,
     ip_addresses::r#impl::base::{IPAddress, IPAddressBase, MacEvidence, MacEvidenceValue},
     ports::r#impl::base::{Port, PortBase, PortConfig, PortType, TransportProtocol},
     services::r#impl::{
@@ -108,6 +109,16 @@ pub struct DiscoveryHostRequest {
     /// Daemons predating this field omit it; it defaults to all-complete so they behave as before.
     #[serde(default)]
     pub interface_data_complete: InterfaceDataComplete,
+    /// Whether any interface in this submission arrived in a wire shape a current daemon no
+    /// longer produces — today, the pre-#701 scalar LLDP/CDP fields (see
+    /// [`DiscoveryInterface`](crate::server::interfaces::r#impl::wire::DiscoveryInterface)).
+    ///
+    /// Set by the deserializer, never by a daemon: it is `skip`ped on the wire in both
+    /// directions and exists only to carry the observation from the boundary, where the raw
+    /// shape is visible, to the discovery session, where a warning can be attached. Read once,
+    /// in the discovery handlers, then discarded.
+    #[serde(skip)]
+    pub superseded_wire_shape: bool,
 }
 
 /// Serde default for `interfaces_complete`: absent (old daemon) ⇒ treat as a complete/authoritative
@@ -133,8 +144,13 @@ struct DiscoveryHostRequestWire {
     #[serde(default)]
     interfaces: Vec<serde_json::Value>,
     /// Old field name for SNMP Interface data (< v0.16.0). Absent in new payloads.
+    ///
+    /// Untyped for the same reason `interfaces` is: both are read as `DiscoveryInterface` in the
+    /// branch below, and that type is deserialize-only while this struct is also the outgoing
+    /// wire format. A daemon this old also predates #701, so its interfaces carry the scalar
+    /// LLDP/CDP shape and need the same translation the new-format branch applies.
     #[serde(default)]
-    if_entries: Vec<crate::server::interfaces::r#impl::base::Interface>,
+    if_entries: Vec<serde_json::Value>,
     #[serde(default)]
     subnets: Vec<crate::server::subnets::r#impl::base::Subnet>,
     #[serde(default = "default_interfaces_complete")]
@@ -170,13 +186,32 @@ impl<'de> serde::Deserialize<'de> for DiscoveryHostRequest {
     {
         let wire = DiscoveryHostRequestWire::deserialize(deserializer)?;
 
-        if let Some(ip_addresses) = wire.ip_addresses {
-            // New format (v0.16.0+): ip_addresses present, interfaces = SNMP data
-            let interfaces: Vec<crate::server::interfaces::r#impl::base::Interface> = wire
-                .interfaces
+        /// Read one submission's interfaces, translating any superseded per-interface wire shape
+        /// into the current one and reporting whether it had to.
+        fn read_interfaces<E: serde::de::Error>(
+            raw: Vec<serde_json::Value>,
+        ) -> Result<
+            (
+                Vec<crate::server::interfaces::r#impl::base::Interface>,
+                bool,
+            ),
+            E,
+        > {
+            let wire: Vec<DiscoveryInterface> = raw
                 .into_iter()
                 .map(|v| serde_json::from_value(v).map_err(serde::de::Error::custom))
-                .collect::<Result<_, _>>()?;
+                .collect::<Result<_, E>>()?;
+
+            let superseded = wire
+                .iter()
+                .any(DiscoveryInterface::submitted_legacy_neighbor_evidence);
+
+            Ok((wire.into_iter().map(Into::into).collect(), superseded))
+        }
+
+        if let Some(ip_addresses) = wire.ip_addresses {
+            // New format (v0.16.0+): ip_addresses present, interfaces = SNMP data
+            let (interfaces, superseded_wire_shape) = read_interfaces(wire.interfaces)?;
 
             Ok(DiscoveryHostRequest {
                 host: wire.host,
@@ -187,6 +222,7 @@ impl<'de> serde::Deserialize<'de> for DiscoveryHostRequest {
                 subnets: wire.subnets,
                 interfaces_complete: wire.interfaces_complete,
                 interface_data_complete: wire.interface_data_complete,
+                superseded_wire_shape,
             })
         } else {
             // Old format (< v0.16.0): interfaces = IPAddress data, if_entries = SNMP data
@@ -196,15 +232,20 @@ impl<'de> serde::Deserialize<'de> for DiscoveryHostRequest {
                 .map(|v| serde_json::from_value(v).map_err(serde::de::Error::custom))
                 .collect::<Result<_, _>>()?;
 
+            let (interfaces, _) = read_interfaces(wire.if_entries)?;
+
             Ok(DiscoveryHostRequest {
                 host: wire.host,
                 ip_addresses,
                 ports: wire.ports,
                 services: wire.services,
-                interfaces: wire.if_entries,
+                interfaces,
                 subnets: wire.subnets,
                 interfaces_complete: wire.interfaces_complete,
                 interface_data_complete: wire.interface_data_complete,
+                // Reaching this branch at all is the stronger signal: only a pre-0.16.0 daemon
+                // sends this layout, whatever its interfaces happened to carry.
+                superseded_wire_shape: true,
             })
         }
     }
@@ -224,6 +265,7 @@ mod discovery_request_interfaces_complete_tests {
             subnets: vec![],
             interfaces_complete,
             interface_data_complete: InterfaceDataComplete::default(),
+            superseded_wire_shape: false,
         }
     }
 
@@ -604,7 +646,6 @@ impl InterfaceInput {
                 native_vlan_id: None,
                 vlan_ids: None,
             },
-            legacy_neighbor_evidence: Default::default(),
         }
     }
 }

@@ -191,9 +191,8 @@ impl InterfaceService {
     ) -> Result<Interface> {
         let mut entry = entry;
         entry.normalize_blank_identity();
-        // Daemon-compat: fold an old-format scalar submission into `base.neighbor_candidates`
-        // before anything else reads it. See `Interface::drain_legacy_neighbor_evidence`.
-        entry.drain_legacy_neighbor_evidence();
+        // A pre-#701 daemon's scalar LLDP/CDP submission has already been folded in here by
+        // `DiscoveryInterface` at the API boundary, so this path sees one shape only.
         // Captured before `entry` moves into `create`/`update` below — the candidates this scan
         // submitted for this port, independent of which branch persists the interface itself.
         let submitted_candidates = std::mem::take(&mut entry.base.neighbor_candidates);

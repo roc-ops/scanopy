@@ -403,6 +403,9 @@ impl LegacyHostWithServicesRequest {
             // (and guarded server-side regardless), and they send no neighbour data at all.
             interfaces_complete: true,
             interface_data_complete: Default::default(),
+            // The whole point of this type: only a daemon old enough to predate the current
+            // `POST /hosts/discovery` body ever produces one.
+            superseded_wire_shape: true,
         }
     }
 }

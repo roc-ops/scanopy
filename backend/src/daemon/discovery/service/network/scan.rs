@@ -872,6 +872,9 @@ impl NetworkScan {
                                         // ...and no neighbour data either, so there is nothing
                                         // for it to overwrite.
                                         interface_data_complete: InterfaceDataComplete::default(),
+                                        // This daemon is this build; it submits the current
+                                        // shape by construction.
+                                        superseded_wire_shape: false,
                                     };
                                     early_entity_buffer.push_host(request.clone()).await;
                                     let mode = early_config_store.get_mode().await?;

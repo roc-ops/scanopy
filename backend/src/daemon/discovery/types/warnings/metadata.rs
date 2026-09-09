@@ -202,6 +202,8 @@ impl DiscoveryWarningCode {
             Self::NeighbourResolutionIncomplete => &["budget_seconds", "neighbours"],
             Self::FdbResolutionIncomplete => &["budget_seconds", "interfaces"],
 
+            Self::OutdatedDaemonFormat => &["daemon_version"],
+
             Self::WarningsTruncated => &["elided"],
             Self::Unknown => &["detail"],
         }
@@ -264,6 +266,9 @@ impl DiscoveryWarningCode {
             // A range Scanopy proposes, not a fault: the segment is probably real and the operator
             // is being asked to confirm it, which is a different thing from something going wrong.
             | Self::ProvisionalSubnetInferred
+            // The old format was translated, so this scan lost nothing. It reports a daemon
+            // that will lose something once the compatibility window closes.
+            | Self::OutdatedDaemonFormat
             | Self::Unknown => Severity::Informational,
             // Links are missing that the device did advertise, which is data loss for this scan
             // rather than something for the operator to confirm.
@@ -310,7 +315,9 @@ impl DiscoveryWarningCode {
             | Self::LldpNeighbourAmbiguous
             // Narrowing what one scan covers is the lever that brings the pass back inside budget.
             | Self::NeighbourResolutionIncomplete
-            | Self::FdbResolutionIncomplete => WarningRemedy::FixInScanopy,
+            | Self::FdbResolutionIncomplete
+            // Upgrading the daemon is the fix, and the daemon is Scanopy's own component.
+            | Self::OutdatedDaemonFormat => WarningRemedy::FixInScanopy,
 
             // The device says one thing and serves another. No Scanopy setting reaches these:
             // what has to change is the agent's view of its own tables.
@@ -424,6 +431,7 @@ impl TypeMetadataProvider for DiscoveryWarningCode {
             Self::ProvisionalSubnetInferred => "Address range assumed, please confirm",
             Self::NeighbourResolutionIncomplete => "Link resolution did not finish",
             Self::FdbResolutionIncomplete => "FDB link resolution did not finish",
+            Self::OutdatedDaemonFormat => "Daemon sent an outdated format",
             Self::WarningsTruncated => "Some warnings not recorded",
             Self::Unknown => "Warning from another version",
         }
@@ -567,6 +575,9 @@ impl TypeMetadataProvider for DiscoveryWarningCode {
             }
             Self::FdbResolutionIncomplete => {
                 "Matching single-MAC forwarding-table entries to the devices they name was stopped after {budget_seconds}s, with {interfaces} interface(s) still carrying one. Physical Topology is missing links this scan would otherwise have drawn; the next scan retries from scratch. Narrow what the scan covers, or split the network across daemons, if it keeps happening."
+            }
+            Self::OutdatedDaemonFormat => {
+                "The daemon that ran this scan (version {daemon_version}) sent it in a format newer daemons no longer use. Scanopy read it in full and nothing was lost, but that translation is removed once this version stops being supported. Upgrade the daemon."
             }
             Self::WarningsTruncated => {
                 "{elided} further warnings from this scan were not recorded, because it produced more than the scan record holds. Narrow what the scan covers to see the rest."
