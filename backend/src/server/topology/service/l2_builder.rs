@@ -682,6 +682,87 @@ mod tests {
         );
     }
 
+    /// The default hide-set in front of the graph builder — the pairing the two halves are each
+    /// tested for separately and neither covers.
+    ///
+    /// `retain_visible` runs over the bundle before any view is built, so `L2Builder` sees only
+    /// the ports that survived it. If the two disagree about which ports are linked, the view
+    /// draws host containers with nothing inside them: the hosts qualify off the neighbour rows,
+    /// which are never filtered, while every port they own has already been dropped.
+    #[test]
+    fn hiding_unlinked_ports_still_draws_the_linked_ones() {
+        let h1 = make_host("switch-1");
+        let h2 = make_host("switch-2");
+
+        let linked_out = make_if_entry(h1.id, 1, if_type::ETHERNET_CSMA_CD);
+        let unlinked = make_if_entry(h1.id, 2, if_type::ETHERNET_CSMA_CD);
+        // The far end: named by `linked_out`, reports no neighbour of its own.
+        let linked_in = make_if_entry(h2.id, 1, if_type::ETHERNET_CSMA_CD);
+
+        let neighbours = vec![neighbor_row(
+            linked_out.id,
+            Neighbor::Interface(linked_in.id),
+        )];
+
+        let mut interfaces = vec![linked_out.clone(), unlinked.clone(), linked_in.clone()];
+        let options = TopologyOptions::default();
+
+        // Exactly what `apply_server_metadata_filters` does to the bundle first.
+        let ctx_values = crate::server::topology::types::views::FilterValueContext {
+            interfaces_referenced_as_neighbours:
+                crate::server::topology::service::metadata_filter::referenced_neighbour_interfaces(
+                    neighbours.iter(),
+                ),
+            interfaces_with_neighbours:
+                crate::server::topology::service::metadata_filter::interfaces_with_neighbours(
+                    neighbours.iter(),
+                ),
+        };
+        let hide_sets =
+            crate::server::topology::service::metadata_filter::server_hide_sets(&options);
+        crate::server::topology::service::metadata_filter::retain_visible(
+            &mut interfaces,
+            hide_sets.get(&EntityDiscriminants::Interface),
+            &ctx_values,
+        );
+
+        assert_eq!(
+            interfaces.len(),
+            2,
+            "only the unlinked port should have been dropped"
+        );
+
+        let hosts = vec![h1.clone(), h2.clone()];
+        let ctx = TopologyContext::new(
+            &hosts,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &interfaces,
+            &[],
+            &[],
+            &options,
+            crate::server::topology::types::views::TopologyView::L3Logical,
+        )
+        .with_neighbours(&neighbours);
+
+        let (nodes, _edges) = L2Builder.build(&ctx, &l2_grouping());
+        let drawn: Vec<Uuid> = nodes.iter().map(|n| n.id).collect();
+
+        assert!(
+            drawn.contains(&linked_out.id),
+            "a linked port must survive both the filter and the builder"
+        );
+        assert!(
+            drawn.contains(&linked_in.id),
+            "so must the far end it names"
+        );
+        assert!(!drawn.contains(&unlinked.id));
+    }
+
     #[test]
     fn test_physical_link_creates_containers_and_edges() {
         let h1 = make_host("switch-1");
