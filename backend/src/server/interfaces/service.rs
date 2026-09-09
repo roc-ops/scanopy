@@ -220,6 +220,17 @@ impl InterfaceService {
         // Replace this port's candidate rows now that it has a real, persisted id. Per-group
         // completeness (a walk cut short by timeout) is honored inside the service the same way
         // `preserve_uncollected_data` above honors it for `fdb_macs`/VLAN membership.
+        //
+        // TEMPORARY: diagnosing why interface_neighbor_candidates stays empty for some hosts
+        // despite a clean submission. Remove once found.
+        tracing::info!(
+            interface_id = %persisted.id,
+            network_id = %persisted.base.network_id,
+            submitted_candidates = submitted_candidates.len(),
+            collected_lldp = collected.lldp,
+            collected_cdp = collected.cdp,
+            "TEMP: about to replace_candidates_from_discovery"
+        );
         self.interface_neighbor_service
             .replace_candidates_from_discovery(
                 persisted.base.network_id,
@@ -228,6 +239,18 @@ impl InterfaceService {
                 collected,
             )
             .await?;
+        // TEMPORARY: confirm what actually landed, immediately after the write.
+        let persisted_candidate_count = self
+            .interface_neighbor_service
+            .candidates_for_interface(&persisted.id)
+            .await
+            .map(|rows| rows.len())
+            .unwrap_or(usize::MAX);
+        tracing::info!(
+            interface_id = %persisted.id,
+            persisted_candidate_count,
+            "TEMP: replace_candidates_from_discovery returned"
+        );
 
         Ok(persisted)
     }
