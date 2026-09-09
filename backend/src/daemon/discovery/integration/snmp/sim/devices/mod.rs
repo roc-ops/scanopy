@@ -49,7 +49,12 @@ pub(super) fn inline(value: &str) -> SecretValue {
     }
 }
 
-/// Every device, in address order.
+/// Every device, in allocation order.
+///
+/// APPEND ONLY. `super::allocation::assign_addresses` gives each device its address purely from
+/// its position here — position 0 gets the lab's first reserved address, position 1 the next, and
+/// so on. Reordering or removing an entry silently renumbers every device after it; adding one is
+/// always safe, and is the only change this list should ever see.
 pub fn all() -> Vec<SimDevice> {
     vec![
         switch_core_01::device(),

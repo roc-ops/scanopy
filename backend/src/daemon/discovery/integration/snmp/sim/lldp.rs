@@ -218,6 +218,10 @@ pub struct RemoteNeighbour {
     /// absence is itself a case worth covering: it is the difference between a far end this
     /// network could place if it were scanned and one that cannot be placed at all.
     pub mgmt_addr: Option<IpAddr>,
+    /// A lab peer's address to publish as [`Self::mgmt_addr`], resolved once every device has its
+    /// own — set through [`Self::mgmt_addr_of`] rather than [`Self::mgmt_addr`] directly, because
+    /// the peer's address does not exist yet while this table is being built.
+    pub mgmt_addr_of: Option<&'static str>,
     /// Set only where the malformed shape is the point.
     pub defect: Option<ChassisDefect>,
 }
@@ -239,6 +243,7 @@ impl RemoteNeighbour {
             sys_name: None,
             sys_desc: None,
             mgmt_addr: None,
+            mgmt_addr_of: None,
             defect: None,
         }
     }
@@ -270,6 +275,14 @@ impl RemoteNeighbour {
 
     pub fn mgmt_addr(mut self, addr: IpAddr) -> Self {
         self.mgmt_addr = Some(addr);
+        self
+    }
+
+    /// Publish a lab peer's own address as this neighbour's management address, by name — never
+    /// by a literal the peer's renumbering would silently strand. Resolved once every device in
+    /// the lab has its final address (see `allocation::resolve_peer_addresses`).
+    pub fn mgmt_addr_of(mut self, name: &'static str) -> Self {
+        self.mgmt_addr_of = Some(name);
         self
     }
 

@@ -22,7 +22,7 @@ use super::inline;
 pub fn device() -> SimDevice {
     SimDevice {
         name: "switch-dlink-02",
-        ip: Ipv4Addr::new(192, 168, 7, 225),
+        ip: Ipv4Addr::UNSPECIFIED,
         purpose: Purpose::Regression {
             issue: "#668",
             defect: "a far end's MAC is carried by several of its own physical interfaces (a real NIC and its NDIS filter/LWF pseudo-interfaces), so the port cannot be told apart by if_type alone",

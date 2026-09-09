@@ -17,7 +17,7 @@ use super::inline;
 pub fn device() -> SimDevice {
     SimDevice {
         name: "switch-dell-01",
-        ip: Ipv4Addr::new(192, 168, 7, 250),
+        ip: Ipv4Addr::UNSPECIFIED,
         purpose: Purpose::Regression {
             issue: "#685",
             defect: "OS10 breakout port names carry both anchor characters, and lldpLocPortNum is a separate namespace numbering the management port 4 and the front panel from 555",

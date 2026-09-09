@@ -21,7 +21,7 @@ use super::inline;
 pub fn device() -> SimDevice {
     SimDevice {
         name: "switch-segment-gw-01",
-        ip: Ipv4Addr::new(192, 168, 7, 229),
+        ip: Ipv4Addr::UNSPECIFIED,
         purpose: Purpose::Regression {
             issue: "GH #701",
             defect: "a shared L2 segment's uplink hears two neighbours on one port; the old \
