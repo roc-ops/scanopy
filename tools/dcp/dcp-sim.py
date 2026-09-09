@@ -110,8 +110,16 @@ def main():
 
     while True:
         frame = bpf_raw.read_frame(fd, timeout_s=None)
-        if frame is None or frame[6:12] == own_mac:
-            continue  # timeout (shouldn't happen — blocking wait) or our own outgoing frame, looped back
+        if frame is None:
+            continue  # shouldn't happen — blocking wait
+        # No MAC-based self-loopback check here on purpose: this sim runs on the same physical
+        # interface as the daemon-under-test (and dcp-verify.py), so every local sender shares
+        # en0's one hardware MAC as its source address — a MAC comparison would silently
+        # discard a legitimate request from the daemon along with our own echoed frames. There
+        # is nothing to filter anyway: we only ever send Responses, never Requests, so the only
+        # thing that could loop back to us is one of our own Responses, and
+        # parse_identify_request already rejects anything that isn't a Request by content
+        # (frame_id/service_type), which correctly excludes it without needing a MAC check.
         parsed = parse_identify_request(frame)
         if parsed is None:
             continue

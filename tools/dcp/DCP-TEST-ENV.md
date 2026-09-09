@@ -61,30 +61,33 @@ Set `DCP_IFACE` if the installed daemon scans on something other than `en0`. Bot
 and listening (not derived from shell-level `$!` after `sudo cmd &`, which isn't reliable across
 sudo configurations), and logs to `/tmp/dcp-sim.log`.
 
-## What's confirmed and what isn't
+## What's confirmed
 
-**Confirmed:** the protocol logic itself — `dcp-sim.py` answered a real `dcp-verify.py` Identify
-request correctly when both ran on the VM's two macvlan siblings (2026-09-08, before the move
-described above). That logic is untouched by the move; only the raw-socket layer under it
-changed from `AF_PACKET` to `bpf_raw.py`.
+**BPF delivers cross-process on one shared interface.** This was the open question when the
+local port first landed: does macOS deliver a frame written by one process's `/dev/bpf*` fd to a
+*different* process's `/dev/bpf*` fd bound to the same interface, which `dcp-sim.py` (answering)
+and a real daemon scan (asking) both depend on when sharing `en0`. Confirmed live with
+`sudo tcpdump -i en0 -e 'ether proto 0x8892'` running as a third, independent process while
+`dcp-verify.py` sent a request: `tcpdump` captured both the outgoing Request and the (at the
+time, remote-VM) reply, so cross-process delivery on one interface is real, not just documented
+BSD architecture taken on faith.
 
-**Not yet confirmed:** whether macOS's BPF actually delivers a frame written by one process's
-`/dev/bpf*` fd to a *different* process's `/dev/bpf*` fd bound to the same physical interface —
-the mechanism `dcp-sim.py` (answering) and a real daemon scan (asking) depend on when both run on
-this Mac's same `en0`. The port to `bpf_raw.py` was built on BSD's documented BPF architecture
-(the tap point sits in the driver's transmit path itself, shared by every listener regardless of
-which fd wrote the frame — the same reason `tcpdump` on a machine sees its own outgoing traffic),
-not on a live test: this session could not get a working `sudo` session to run one. Confirm with:
-
-```
-tools/dcp/dcp-test-env.sh start
-tools/dcp/dcp-test-env.sh verify
-```
-
-If `verify` sees an answer, the mechanism is confirmed and a real daemon scan (with the sim
-running) should find `scanopy-dcp-sim` as a no-IP, MAC-only host the same way. If `verify` times
-out with the sim confirmed running (`status`), that assumption was wrong and this needs a
-different approach — say so rather than trusting the reasoning over the result.
+**Two bugs that made it look broken anyway, both fixed:**
+- `dcp-sim.py`/`dcp-verify.py` filtered "our own frame looped back" by comparing the frame's
+  source MAC to their own — correct on the old macvlan setup, where the sim and the verify
+  client each had a distinct MAC, but wrong once both share `en0`'s one hardware MAC: it silently
+  discarded a legitimate peer's frame too. Fixed by dropping the MAC check entirely — the
+  existing frame-type check (Request vs. Response) already excludes a self-echo without it,
+  matching how the real daemon's own `dcp/identify.rs::collect()` does this (content/xid-based,
+  no MAC comparison anywhere).
+- `bpf_raw.py` didn't set `BIOCPROMISC`, reasoning from the real daemon's bpf.rs having no
+  promiscuous ioctl at all — the wrong comparison. The daemon only *sends* DCP multicast
+  (promiscuous doesn't affect transmit) and only *receives* the sim's *unicast* reply (always
+  delivered regardless of promiscuous). The sim is different: it has to *receive* an arbitrary
+  multicast Request nobody addressed to it, which a non-promiscuous BPF listener never sees —
+  confirmed by the same `tcpdump` capture above showing the Request that a non-promiscuous sim
+  didn't. The identical bug class the original Linux/macvlan version hit, for the same reason
+  (see the history section above) — just missed again on the port to a different OS.
 
 ## Running a real daemon scan against it
 
