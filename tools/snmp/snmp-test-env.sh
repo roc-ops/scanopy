@@ -192,9 +192,53 @@ verify_no_leaked_addresses() {
                 ;;
         esac
 
-        local addr
+        # Keep only lines that are actually dotted quads. A device serving no ipAddrTable answers
+        # "No Such Instance currently exists at this OID" on *stdout*, which is not an error to
+        # snmpwalk and would otherwise be compared against `allowed` and reported as a leaked
+        # address — which is exactly what switch-mute-01 did.
+        local addr found=()
         while IFS= read -r addr; do
             [ -z "$addr" ] && continue
+            [[ "$addr" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || continue
+            found+=("$addr")
+        done <<< "$reported"
+
+        if [ "${SUPPRESSES_IPADDR[$i]:-0}" = "1" ]; then
+            # Mute by design. Silence is the pass condition, and anything at all is the failure —
+            # the built-in IP module answering means the suppressing registration was lost.
+            if [ ${#found[@]} -gt 0 ]; then
+                printf "  ${RED}✗${NC} %-18s  %-20s  serves %d address(es) but suppresses ipAddrTable\n" \
+                    "$host" "address-leak" "${#found[@]}"
+                all_ok=false
+                leaked_any=true
+            fi
+            continue
+        fi
+
+        # Every other device must serve its own address. A silent table here is the same lost
+        # registration, and reporting nothing must not read as "nothing leaked". Checked before
+        # any `"${found[@]}"` expansion: this runs under `set -u` on bash 3.2, where expanding an
+        # empty array is an unbound-variable error rather than an empty list.
+        if [ ${#found[@]} -eq 0 ]; then
+            printf "  ${RED}✗${NC} %-18s  %-20s  serves no ipAddrTable row for its own address\n" \
+                "$host" "address-leak"
+            all_ok=false
+            leaked_any=true
+            continue
+        fi
+
+        local has_own=false
+        for addr in "${found[@]}"; do
+            [ "$addr" = "$host" ] && has_own=true && break
+        done
+        if ! $has_own; then
+            printf "  ${RED}✗${NC} %-18s  %-20s  serves ipAddrTable rows but not its own address\n" \
+                "$host" "address-leak"
+            all_ok=false
+            leaked_any=true
+        fi
+
+        for addr in "${found[@]}"; do
             local ok=false a
             for a in "${allowed[@]}"; do
                 [ "$addr" = "$a" ] && ok=true && break
@@ -205,7 +249,7 @@ verify_no_leaked_addresses() {
                 all_ok=false
                 leaked_any=true
             fi
-        done <<< "$reported"
+        done
     done
 
     if ! $leaked_any; then
