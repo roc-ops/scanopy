@@ -58,6 +58,25 @@ vm_host() {
 SSH_KEY="${SNMP_SSH_KEY:-$HOME/.ssh/snmp-test-vm}"
 REMOTE_DIR="/root/snmp-test"
 
+# Look a device up by sysName and echo its index into the parallel HOSTS/COMMUNITIES/VERSIONS
+# arrays. The fixture checks below used to hard-code those indices, which held right up until
+# GH #709 and #668 inserted three devices in the middle of the lab: every index past `.244`
+# shifted by three, and the vlan-context check silently began walking `switch-stuck-01` instead
+# of `switch-cisco-01` and reporting the empty result as a lab failure. Index positions are not
+# stable across a growing lab; names are. Exits non-zero if the name is absent so a renamed
+# device fails loudly here rather than being verified against whatever moved into its slot.
+device_index() {
+    local want="$1" i
+    for i in "${!SYSNAMES[@]}"; do
+        if [ "${SYSNAMES[$i]}" = "$want" ]; then
+            echo "$i"
+            return 0
+        fi
+    done
+    printf "${RED}✗${NC} no device named %s in the generated lab — check sim/devices/\n" "$want" >&2
+    return 1
+}
+
 # ap-wireless-01 advertises 172.30.10.1/24 on a `br-` prefixed interface — the
 # #663 fixture, where an access point's NAT guest network was misclassified as a
 # Docker bridge. It's the only agent serving its own ipAddrTable, which means it
@@ -66,7 +85,9 @@ REMOTE_DIR="/root/snmp-test"
 # the agent quietly falls back to reporting only the scanned subnet. Check it
 # explicitly so a scan is never run against a fixture that isn't there.
 verify_guest_subnet_fixture() {
-    local host="${HOSTS[5]}" community="${COMMUNITIES[5]}"
+    local idx
+    idx=$(device_index "ap-wireless-01") || return 1
+    local host="${HOSTS[$idx]}" community="${COMMUNITIES[$idx]}"
     local if_index="4" guest_ip="172.30.10.1" if_name="br-guest"
 
     local got_index got_name
@@ -104,7 +125,9 @@ verify_guest_subnet_fixture() {
 # Both v3 (context name) and v2c (Cisco's `community@vlan` indexing) reach the same back end, so
 # one device covers both halves of the report.
 verify_vlan_context_fixture() {
-    local host="${HOSTS[21]}" fdb=".1.3.6.1.2.1.17.4.3.1.1"
+    local idx
+    idx=$(device_index "switch-cisco-01") || return 1
+    local host="${HOSTS[$idx]}" fdb=".1.3.6.1.2.1.17.4.3.1.1"
 
     local v3_default v3_context v2c_context
     v3_default=$("$SNMPWALK" -v3 -l authPriv -u "$V3_CTX_USER" -a SHA-256 -A "$V3_CTX_AUTH_PASS" \
@@ -190,7 +213,8 @@ cmd_verify() {
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     else
         printf "${YELLOW}Some hosts are unreachable. Is the LXC running?${NC}\n"
-        echo "  Check with: ssh root@${HOSTS[0]} 'systemctl list-units snmpd-*'"
+        echo "  Check with: ssh root@$(vm_host) 'systemctl list-units snmpd-*'"
+        echo "  If only newly added devices failed, the VM is behind the repo: make snmp-deploy"
     fi
 }
 
