@@ -65,8 +65,12 @@ def main():
         frame = bpf_raw.read_frame(fd, timeout_s=max(0.0, deadline - time.monotonic()))
         if frame is None:
             break
-        if frame[6:12] == own_mac:
-            continue
+        # No MAC-based self-loopback check here on purpose — see dcp-sim.py's own comment on
+        # the same line it used to have. This process and the sim share en0's one hardware MAC
+        # as their source address when both run on this Mac, so a MAC comparison would silently
+        # discard the sim's legitimate reply along with our own echoed request. Our own request
+        # loops back with frame_id == FRAME_ID_DCP_IDENT_REQ, which the frame_id check below
+        # already rejects (it only accepts FRAME_ID_DCP_IDENT_RES) — no MAC check needed.
         payload = frame[14:]
         if len(payload) < 12:
             continue
