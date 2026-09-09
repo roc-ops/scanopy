@@ -80,11 +80,11 @@ device_index() {
 
 # ap-wireless-01 advertises 172.30.10.1/24 on a `br-` prefixed interface — the
 # #663 fixture, where an access point's NAT guest network was misclassified as a
-# Docker bridge. It's the only agent serving its own ipAddrTable, which means it
-# is also the only one that breaks silently: if snmpd fails to displace its
-# built-in IP module, the `pass` directive loses the duplicate registration and
-# the agent quietly falls back to reporting only the scanned subnet. Check it
-# explicitly so a scan is never run against a fixture that isn't there.
+# Docker bridge. Every agent now serves its own ipAddrTable, but this is the only
+# one serving an address *beyond* its own, so it is the one where a lost `pass`
+# registration is invisible: it would quietly fall back to the built-in IP module
+# and drop the guest subnet while still answering. verify_no_leaked_addresses
+# catches the general case; this checks the extra address is actually there.
 verify_guest_subnet_fixture() {
     local idx
     idx=$(device_index "ap-wireless-01") || return 1

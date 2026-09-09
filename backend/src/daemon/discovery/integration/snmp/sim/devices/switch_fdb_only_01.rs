@@ -17,9 +17,6 @@ use super::inline;
 pub fn device() -> SimDevice {
     SimDevice {
         name: "switch-fdb-only-01",
-        // .226 at authoring time; moved down to .224 when GH #668's `pc-windows-nic-filters`
-        // landed on .226 in a branch developed in parallel. Two agents on one address bind the
-        // same socket and the lab fails in a way that reads like flaky device behaviour.
         ip: Ipv4Addr::UNSPECIFIED,
         purpose: Purpose::Regression {
             issue: "#709",
