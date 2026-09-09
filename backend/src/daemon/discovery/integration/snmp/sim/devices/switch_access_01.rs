@@ -115,6 +115,21 @@ pub fn lldp_table() -> LldpTable {
         .port_desc("eth0")
         .sys_name("ap-wireless-01")
         .sys_desc("Ubiquiti UniFi AP AC Pro, firmware 6.5.28"),
+        // A no-IP PROFINET device found only via DCP Identify (see daemon/discovery/service/
+        // network/dcp/), attached to the access port on Gi0/2. This is the fixture proving the
+        // MAC-tier of `LldpChassisId::resolve_host_id` doesn't care about attribution — the same
+        // MAC a DCP sweep discovers (AttributeSource::ProfinetDcp) is also what tools/dcp/
+        // dcp-sim.py's --device-mac defaults to, so a real scan against both the SNMP lab and the
+        // local DCP sim resolves this into one host with a real neighbor edge, not two.
+        RemoteNeighbour::new(
+            2,
+            Advertised::text(
+                LldpChassisId::MacAddress("00:1a:2b:dc:90:01".into()),
+                MacEncoding::AsciiLower,
+            ),
+            Advertised::octets(LldpPortId::LocallyAssigned("sim-port-1".into())),
+        )
+        .sys_name("scanopy-dcp-sim"),
     ])
 }
 
