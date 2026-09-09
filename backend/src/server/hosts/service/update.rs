@@ -56,6 +56,16 @@ impl HostService {
         self.validate_virtualization_service(virtualization_service_id)
             .await?;
 
+        // The same normalisation `discover_host` applies to every daemon payload, for the same
+        // reason — the value is compared, displayed, and re-derived into the display name, so
+        // `" nas "` is the same observation as `nas` and must not be stored as a different one.
+        // Trimming only on the discovery path left the two hand-typed paths, this one and create,
+        // writing padded columns. Whitespace-only is the same non-statement as empty, which is
+        // already how `""` is treated on the way in.
+        let hostname = hostname
+            .map(|h| h.trim().to_string())
+            .filter(|h| !h.is_empty());
+
         let mut updated_host = Host {
             id,
             created_at: existing.created_at,
@@ -73,6 +83,11 @@ impl HostService {
                 network_id,
                 source: existing.base.source,
                 hostname,
+                // A person editing the field is asserting it directly. It carries no weight
+                // here — this path writes the row rather than merging into it — and it is not a
+                // column, so the next scan that resolves a hostname replaces what was typed.
+                // `hostname` records what the host answers to; `name` is the protected label.
+                hostname_authoritative: true,
                 description,
                 virtualization_metadata,
                 virtualization_service_id,

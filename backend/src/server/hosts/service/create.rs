@@ -125,12 +125,20 @@ impl HostService {
         // Auto-set source to Manual for API-created entities
         let source = EntitySource::Manual;
 
+        // Normalised exactly as `discover_host` normalises a daemon payload: the value is
+        // compared, displayed, and re-derived into the display name, so `" nas "` is the same
+        // observation as `nas`. Whitespace-only is the same non-statement as empty.
+        let hostname = hostname
+            .map(|h| h.trim().to_string())
+            .filter(|h| !h.is_empty());
+
         // Create host base with SNMP fields. The name is applied below rather than assigned
         // here: a person typed it, and that is the top of the ladder.
         let mut host_base = HostBase {
             name: HostName::default(),
             network_id,
             hostname,
+            hostname_authoritative: true,
             description,
             source: source.clone(),
             virtualization_metadata,

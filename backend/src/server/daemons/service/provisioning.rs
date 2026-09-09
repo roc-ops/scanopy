@@ -212,6 +212,7 @@ impl DaemonService {
             name: HostName::default(),
             network_id,
             hostname: None,
+            hostname_authoritative: true,
             description: None,
             source: EntitySource::System,
             virtualization_metadata: None,

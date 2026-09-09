@@ -71,6 +71,12 @@ impl ControllerIdentity {
             // neighbour resolution matches `interfaces.lldp_sys_name` against this column.
             sys_name: name.clone(),
             hostname: hostname.clone(),
+            // The controller is repeating a name it heard — a client's DHCP-advertised hostname,
+            // typically — not one it read off the host. It may fill the field on a device nothing
+            // else witnessed, but it must not rewrite one the sweep resolved: both submissions
+            // land in the same cycle, and at equal standing they overwrite each other for ever
+            // (GH #89).
+            hostname_authoritative: false,
             chassis_id,
             manufacturer,
             model,
@@ -101,7 +107,7 @@ impl ControllerIdentity {
         } = self.clone().normalized();
 
         if let Some(hostname) = hostname {
-            host_data.with_hostname_fallback(hostname);
+            host_data.with_reported_hostname(hostname);
         }
         if let Some(name) = name {
             host_data.with_sys_name(name.clone());
@@ -286,6 +292,60 @@ mod tests {
         assert_eq!(host.base.name, "Reception iPad");
         assert_eq!(host.base.name.source(), HostNameSource::Integration);
         assert_eq!(host.base.hostname.as_deref(), Some("ipad-1a2b"));
+    }
+
+    /// A controller reports the DHCP name it *heard*; the sweep resolves the one the host
+    /// answers to. Both submissions land for the same host in one cycle, so the controller's
+    /// must be marked as the one that cannot rewrite the field (GH #89).
+    #[test]
+    fn a_controller_reported_hostname_is_not_authoritative_for_the_field() {
+        let host = identity(Some("Reception iPad"), Some("ipad-1a2b")).into_host(Uuid::new_v4());
+        assert!(!host.base.hostname_authoritative);
+    }
+
+    /// The same, on the enrichment path: a controller folding its identity into a host the sweep
+    /// is already scanning must not upgrade the payload's standing for the field either.
+    #[test]
+    fn enriching_a_scanned_host_marks_a_filled_in_hostname_as_reported() {
+        let mut host_data = HostData::new(
+            Host::new(HostBase::default()),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        identity(None, Some("marys-laptop")).enrich(&mut host_data);
+
+        assert_eq!(
+            host_data.host.base.hostname.as_deref(),
+            Some("marys-laptop")
+        );
+        assert!(!host_data.host.base.hostname_authoritative);
+    }
+
+    /// …but only when it actually filled the field. A hostname the scan resolved itself is left
+    /// alone, and so is the payload's standing for it.
+    #[test]
+    fn enriching_leaves_a_resolved_hostname_and_its_standing_alone() {
+        let mut host_data = HostData::new(
+            Host::new(HostBase {
+                hostname: Some("nas.lan.example.com".to_string()),
+                ..Default::default()
+            }),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        identity(None, Some("nas")).enrich(&mut host_data);
+
+        assert_eq!(
+            host_data.host.base.hostname.as_deref(),
+            Some("nas.lan.example.com")
+        );
+        assert!(host_data.host.base.hostname_authoritative);
     }
 
     #[test]

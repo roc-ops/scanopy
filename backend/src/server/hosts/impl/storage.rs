@@ -119,6 +119,9 @@ impl Storable for Host {
                     name,
                     description,
                     hostname,
+                    // Not a column: it qualifies an incoming observation of `hostname`, and the
+                    // merge has already used it to decide whether this value may be written.
+                    hostname_authoritative: _,
                     network_id,
                     hidden,
                     source,
@@ -241,6 +244,9 @@ impl Storable for Host {
                 network_id: row.get("network_id"),
                 source,
                 hostname: row.get("hostname"),
+                // Not a column: it qualifies an incoming observation, and a stored hostname has
+                // already won the field.
+                hostname_authoritative: true,
                 hidden: row.get("hidden"),
                 virtualization_metadata,
                 virtualization_service_id: row.get("virtualization_service_id"),

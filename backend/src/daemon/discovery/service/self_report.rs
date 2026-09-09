@@ -179,6 +179,7 @@ impl DiscoveryRunner {
         let mut host_base = HostBase {
             name: HostName::default(),
             hostname: hostname.clone(),
+            hostname_authoritative: true,
             network_id,
             description: Some("Scanopy daemon".to_string()),
             tags: Vec::new(),

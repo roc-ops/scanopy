@@ -452,12 +452,34 @@ impl HostData {
     ///
     /// The name follows the same ladder as everything else: a hostname outranks an IP or a
     /// detected service, and loses to a name a controller or a person supplied.
+    ///
+    /// sysName is read off the device, so this leaves the payload authoritative for the field:
+    /// the server lets it rewrite a stored hostname. Use [`Self::with_reported_hostname`] for a
+    /// name heard second-hand.
     pub fn with_hostname_fallback(&mut self, hostname: String) -> &mut Self {
         if self.host.base.hostname.is_none() {
             self.host
                 .base
                 .apply_name(HostName::Hostname(hostname.clone()));
             self.host.base.hostname = Some(hostname);
+        }
+        self
+    }
+
+    /// The same, for a hostname the scan did not read off the host itself — a controller
+    /// repeating the name one of its clients advertised to DHCP.
+    ///
+    /// It fills the field the same way, but marks the payload non-authoritative for it, so the
+    /// server will not let it rewrite a hostname a direct observation put there. Both run in one
+    /// cycle for any host a controller and the sweep both see, and at equal standing they
+    /// overwrite each other for ever (GH #89).
+    pub fn with_reported_hostname(&mut self, hostname: String) -> &mut Self {
+        if self.host.base.hostname.is_none() {
+            self.host
+                .base
+                .apply_name(HostName::Hostname(hostname.clone()));
+            self.host.base.hostname = Some(hostname);
+            self.host.base.hostname_authoritative = false;
         }
         self
     }
@@ -1342,6 +1364,7 @@ impl DiscoveryOps {
         let mut host = Host::new(HostBase {
             name: HostName::default(),
             hostname: hostname.clone(),
+            hostname_authoritative: true,
             tags: Vec::new(),
             network_id,
             description: None,
