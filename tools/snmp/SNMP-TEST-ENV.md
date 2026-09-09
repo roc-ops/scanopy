@@ -6,46 +6,63 @@
 > the data files and agent configs from those definitions and ships what it generated, so there is
 > no committed artifact that can drift. To add or change a device, see **Adding a device** below.
 
-31 simulated network devices running on a Proxmox VM, each on port 161. Most speak SNMPv2c; `.236`/`.237` are version-locked to exercise the SNMPv1 and SNMPv3 paths (#557); `.238`/`.239` are Extreme switches that exercise the LLDP local-port remap (Issue 2, July 2026); `.240`–`.242` reproduce the L2-topology failures from #664, #649 and #614; `.243` serves a deliberately malformed neighbour record; `.244` serves the port-id shapes from #668 and repeats one MAC across every port; `.245` serves that report's last device, whose neighbour table is indexed one sub-id short; `.246`/`.247` cover #674 and the Westermo local-port report; `.248`/`.249` are the two failure shapes the partial-failure reporting exists for; `.250` is the Dell OS10 switch from #685, whose breakout-port names and 568+ local-port namespace decide which interface a neighbour lands on; `.251` is the Cisco from #686 and the only device here that serves different data per SNMPv3 context; `.227`–`.229` are the shared L2 segment from #701, where every uplink hears two neighbours on one port; `.226` serves a bridge forwarding database and no LLDP remote table at all (#709) — `.230`–`.254` were already spoken for by `switch-slowbulk-01`/`switch-shortports-01`/`switch-offsite-01`, which the device table below hadn't caught up to.
+31 simulated network devices running on a Proxmox VM, each on port 161, addressed out of a
+reserved `192.168.7.192`–`.254` block (63 addresses — see **Addressing** below for why that range
+is the lab's to take). Most speak SNMPv2c; `legacy-switch-01`/`secure-switch-01` are version-locked
+to exercise the SNMPv1 and SNMPv3 paths (#557); `switch-exos-01`/`switch-voss-01` are Extreme
+switches that exercise the LLDP local-port remap (Issue 2, July 2026); `switch-netgear-01`/
+`switch-aruba-01`/`switch-omada-01` reproduce the L2-topology failures from #664, #649 and #614;
+`switch-flaky-01` serves a deliberately malformed neighbour record; `switch-dlink-01` serves the
+port-id shapes from #668 and repeats one MAC across every port; `switch-tplink-01` serves that
+report's last device, whose neighbour table is indexed one sub-id short; `switch-unsorted-01`/
+`switch-macport-01` cover #674 and the Westermo local-port report; `switch-mute-01`/
+`switch-stuck-01` are the two failure shapes the partial-failure reporting exists for;
+`switch-dell-01` is the Dell OS10 switch from #685, whose breakout-port names and 568+ local-port
+namespace decide which interface a neighbour lands on; `switch-cisco-01` is the Cisco from #686 and
+the only device here that serves different data per SNMPv3 context; `switch-mcast-rcv-01`/
+`switch-mcast-src-01`/`switch-segment-gw-01` are the shared L2 segment from #701, where every
+uplink hears two neighbours on one port; `switch-fdb-only-01` serves a bridge forwarding database
+and no LLDP remote table at all (#709).
 
-| IP | Host | Version | Credential | Device |
-|---|---|---|---|---|
-| 192.168.7.230 | switch-core-01 | v2c | community `netdefault` | Cisco C2960 |
-| 192.168.7.231 | switch-access-01 | v2c | community `netdefault` | Cisco C3750 |
-| 192.168.7.232 | router-gw-01 | v2c | community `secret42` | Juniper MX204 |
-| 192.168.7.233 | firewall-01 | v2c | community `secret42` | FortiGate 60F |
-| 192.168.7.234 | printer-lobby | v2c | community `public` | HP LaserJet M428 |
-| 192.168.7.235 | ap-wireless-01 | v2c | community `netdefault` | Ubiquiti UniFi AP |
-| 192.168.7.236 | legacy-switch-01 | **v1 only** | community `legacyv1` | Cisco C2950 |
-| 192.168.7.237 | secure-switch-01 | **v3 only** | user `scanopyv3` (see below) | Huawei S5000 |
-| 192.168.7.238 | switch-exos-01 | v2c | community `netdefault` | Extreme X435 (EXOS) |
-| 192.168.7.239 | switch-voss-01 | v2c | community `netdefault` | Extreme VSP-7400 (VOSS) |
-| 192.168.7.240 | switch-netgear-01 | v2c | community `netdefault` | Netgear GS724Tv3 |
-| 192.168.7.241 | switch-aruba-01 | v2c | community `netdefault` | HP/Aruba ProCurve 2910al |
-| 192.168.7.242 | switch (Omada) | v2c | community `public` | TP-Link Omada TL-SG3216 |
-| 192.168.7.243 | switch-flaky-01 | v2c | community `netdefault` | Malformed-LLDP profile (see below) |
-| 192.168.7.244 | switch-dlink-01 | v2c | community `netdefault` | D-Link DGS-1210-48 (see below) |
-| 192.168.7.245 | switch-tplink-01 | v2c | community `netdefault` | TP-Link TL-SX3016F (see below) |
-| 192.168.7.246 | switch-unsorted-01 | v2c | community `netdefault` | Out-of-order ARP table (see below) |
-| 192.168.7.247 | switch-macport-01 | v2c | community `netdefault` | Westermo WeOS, from the customer's walk (see below) |
-| 192.168.7.248 | switch-mute-01 | v2c | community `netdefault` | Answers the credential, serves nothing (see below) |
-| 192.168.7.249 | switch-stuck-01 | v2c | community `netdefault` | ARP table never advances (see below) |
-| 192.168.7.250 | switch-dell-01 | v2c | community `netdefault` | Dell PowerSwitch S4112T-ON, OS10 breakout ports (see below) |
-| 192.168.7.251 | switch-cisco-01 | **v3 only** | user `scanopyctx`, context `vlan-20` | Cisco Catalyst 3850, per-VLAN bridge context (see below) |
-| 192.168.7.227 | switch-mcast-rcv-01 | v2c | community `netdefault` | Shared L2 segment, host A (see below) |
-| 192.168.7.228 | switch-mcast-src-01 | v2c | community `netdefault` | Shared L2 segment, host B (see below) |
-| 192.168.7.229 | switch-segment-gw-01 | v2c | community `netdefault` | Shared L2 segment, router (see below) |
-| 192.168.7.224 | switch-fdb-only-01 | v2c | community `netdefault` | Bridge FDB served, no LLDP remote table at all (see below) |
-| 192.168.7.225 | switch-dlink-02 | v2c | community `netdefault` | D-Link DGS-1210-48, one port hearing a shared-NIC MAC (see below) |
-| 192.168.7.226 | pc-windows-nic-filters | v2c | community `public` | Windows host, one MAC on a real NIC and its NDIS filter/LWF pseudo-interfaces (see below) |
+Addresses below are current as of the last `make snmp-fixtures` run — look them up here, not in the
+prose above or elsewhere in this document, which names devices by identity rather than address for
+exactly this reason: the lab has been renumbered before and will be again.
 
-> `.252`–`.254` are already `switch-slowbulk-01`/`switch-shortports-01`/`switch-offsite-01` in
-> `sim/devices/` — present in `all()` but missing from this table before this edit. `.227`–`.229`
-> were the next genuinely free addresses below `.230`; every address from `.230` to `.254` is taken.
-> `.224`–`.226` are the next free addresses below `.227`: `switch-fdb-only-01` for GH #709, and
-> `switch-dlink-02`/`pc-windows-nic-filters` for GH #668's last reported symptom. Those two
-> branches were developed in parallel and both took `.226`; the FDB device moved to `.224` when
-> they merged.
+<!-- BEGIN GENERATED DEVICE TABLE -->
+| IP | Host | Version | Credential |
+|---|---|---|---|
+| 192.168.7.192 | switch-core-01 | v2c | community `netdefault` |
+| 192.168.7.193 | switch-access-01 | v2c | community `netdefault` |
+| 192.168.7.194 | router-gw-01 | v2c | community `secret42` |
+| 192.168.7.195 | firewall-01 | v2c | community `secret42` |
+| 192.168.7.196 | printer-lobby | v2c | community `public` |
+| 192.168.7.197 | ap-wireless-01 | v2c | community `netdefault` |
+| 192.168.7.198 | legacy-switch-01 | v1 | community `legacyv1` |
+| 192.168.7.199 | secure-switch-01 | v3 | user `scanopyv3` |
+| 192.168.7.200 | switch-exos-01 | v2c | community `netdefault` |
+| 192.168.7.201 | switch-voss-01 | v2c | community `netdefault` |
+| 192.168.7.202 | switch-netgear-01 | v2c | community `netdefault` |
+| 192.168.7.203 | switch-aruba-01 | v2c | community `netdefault` |
+| 192.168.7.204 | switch-omada-01 | v2c | community `public` |
+| 192.168.7.205 | switch-flaky-01 | v2c | community `netdefault` |
+| 192.168.7.206 | switch-dlink-01 | v2c | community `netdefault` |
+| 192.168.7.207 | switch-dlink-02 | v2c | community `netdefault` |
+| 192.168.7.208 | pc-windows-nic-filters | v2c | community `public` |
+| 192.168.7.209 | switch-tplink-01 | v2c | community `netdefault` |
+| 192.168.7.210 | switch-unsorted-01 | v2c | community `netdefault` |
+| 192.168.7.211 | switch-macport-01 | v2c | community `netdefault` |
+| 192.168.7.212 | switch-mute-01 | v2c | community `netdefault` |
+| 192.168.7.213 | switch-stuck-01 | v2c | community `netdefault` |
+| 192.168.7.214 | switch-dell-01 | v2c | community `netdefault` |
+| 192.168.7.215 | switch-cisco-01 | v3 | user `scanopyctx` |
+| 192.168.7.216 | switch-slowbulk-01 | v2c | community `netdefault` |
+| 192.168.7.217 | switch-shortports-01 | v2c | community `netdefault` |
+| 192.168.7.218 | switch-offsite-01 | v2c | community `netdefault` |
+| 192.168.7.219 | switch-fdb-only-01 | v2c | community `netdefault` |
+| 192.168.7.220 | switch-mcast-rcv-01 | v2c | community `netdefault` |
+| 192.168.7.221 | switch-mcast-src-01 | v2c | community `netdefault` |
+| 192.168.7.222 | switch-segment-gw-01 | v2c | community `netdefault` |
+<!-- END GENERATED DEVICE TABLE -->
 
 **LLDP local-port remap (`.238`/`.239`).** ExtremeXOS reports its `lldpRemTable` local-port index as an `lldpLocPortNum` (1..N) that is a **separate namespace from `ifIndex`** (switch-exos-01 uses ifIndex 1001+, ifName `1:N`), so neighbours only resolve if the daemon walks `lldpLocPortTable` (`1.0.8802.1.1.2.1.3.7`) and suffix-matches `lldpLocPortId` against `ifName`. Before the Issue 2 fix, switch-exos-01 yields **zero** LLDP neighbours. Extreme VOSS (switch-voss-01) reports local-port == ifIndex with `lldpLocPortId` matching `ifName` exactly, so it stays correct on both old and new code — the regression guard for the fix.
 
@@ -352,7 +369,7 @@ Three properties decide whether these are worth anything:
 > table because the scan was asking in the wrong context. That half is `.251`'s, and the check
 > there is the comparison between contexts rather than any single count.
 
-## FDB-only link resolution (`.226`) — #709
+## FDB-only link resolution (switch-fdb-only-01) — #709
 
 `resolve_fdb_links` (`backend/src/server/hosts/service/topology/mod.rs`) resolves single-MAC FDB
 ports to physical links server-side, but until #709 nothing ever called it — session completion
@@ -367,6 +384,28 @@ resolution test against it exercises real seeded data on both ends rather than a
 else in the network recognises. This is distinct from the four devices in the Bridge forwarding
 tables section above: those cover whether the daemon *collects* an FDB correctly; this one covers
 whether the server *resolves* one into a link at all when LLDP/CDP has nothing to offer.
+
+## Addressing
+
+The lab reserves `192.168.7.192`–`192.168.7.254` (63 addresses) on the `/22` the daemon already
+scans — the top block of `192.168.7.0/24`, clear of every real host on that network (checked
+against the live database, not just memory) and of `.255`, which is the `/22`'s own broadcast
+address. 63 is roughly double the lab's current 31 devices, so it can keep growing for a while
+without asking Maya for more space or shrinking a floor by hand again.
+
+No device chooses its own address. `assign_addresses`
+(`backend/src/daemon/discovery/integration/snmp/sim/allocation.rs`) walks `devices::all()`'s Vec in
+order and gives device `i` `192.168.7.192 + i` — a device module sets `ip: Ipv4Addr::UNSPECIFIED`
+and nothing else; setting a real address there is a hard test failure, not a style nit. Two
+branches that each add a device therefore cannot collide: they each append to the end of the same
+Vec, and whatever order git merges them in, the two new devices land at different positions and get
+different addresses. **`devices::all()` is append-only** — reordering or removing an entry
+renumbers everything after it.
+
+A peer's address (a CDP or LLDP management-address neighbour naming another lab device) is never a
+literal either, for the same reason: it does not exist yet while the naming device is being built.
+Name the peer — `router_gw_01::NAME`, `.mgmt_addr_of(switch_mute_01::NAME)` — and
+`resolve_peer_addresses` fills in the real address once every device has one.
 
 ## Adding a device
 
@@ -395,8 +434,9 @@ files and its agent config from that definition — there is no second copy to k
    ```
 
 2. **Write the device.** Copy the nearest existing module in `sim/devices/`, give it a `Purpose`
-   naming the issue and what breaks without it, and add it to `all()` in `sim/devices/mod.rs`.
-   `Purpose` is required: a device with no established defect must say `Purpose::Control`.
+   naming the issue and what breaks without it, and add it to `all()` in `sim/devices/mod.rs` —
+   always at the end; see **Addressing** above. `Purpose` is required: a device with no established
+   defect must say `Purpose::Control`. Set `ip: Ipv4Addr::UNSPECIFIED` — do not pick an address.
 
    **Rewrite identifiers consistently** — same value, same replacement, everywhere. MACs, the
    management address and neighbour hostnames all carry customer information, and all of them are
@@ -430,6 +470,8 @@ listed unit tests fail if one is broken:
 | "A data file no config serves / a config naming a file nobody wrote" | Registrations are derived from the tables held. `every_served_file_has_a_registration_and_vice_versa` |
 | "An ifTable served without its `ifNumber` registration" | Derived. `a_device_serving_an_if_table_registers_its_own_count` |
 | "Record what the fixture is for" | `Purpose` is a required field |
+| "Pick a free address, check nobody else has it" | Allocated by position in `devices::all()`. `assign_addresses` panics on a hand-set address; `every_device_has_its_own_address_and_name` |
+| "An agent must serve only its own address" | Synthesised automatically into `ipAddrTable`. `every_device_serves_only_its_own_addresses` |
 
 Two things the type system cannot check, and that still need care:
 

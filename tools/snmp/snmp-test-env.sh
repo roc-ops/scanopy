@@ -1,8 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# SNMP Test Environment — manages 22 snmpd instances on a Proxmox LXC
-# Subnet: 192.168.4.0/22 (hosts at 192.168.7.230–251)
+# SNMP Test Environment — manages simulated snmpd instances on a Proxmox LXC
+# Subnet: 192.168.4.0/22 (hosts in the reserved 192.168.7.192-254 block — see
+# SNMP-TEST-ENV.md's "Addressing" section for why that range is the lab's)
 # Usage: tools/snmp/snmp-test-env.sh deploy|verify|status
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -150,6 +151,70 @@ verify_vlan_context_fixture() {
     return 1
 }
 
+# Every agent must report only its own address(es) — its own, plus whatever `EXTRA_ADDRS` names
+# as a declared extra one (the `#663` guest-subnet fixture). This is the check that would have
+# caught two workers a cycle each: before it existed, 30 of 31 agents fell through to snmpd's
+# built-in IP module and answered from the VM's real kernel address table — loopback, the VM's
+# management address, and every other agent's macvlan address — so Scanopy's host-merge logic
+# (any one shared address is a match) collapsed the whole lab into a couple of host records.
+verify_no_leaked_addresses() {
+    local all_ok=true leaked_any=false
+    local i host version community
+    for i in "${!HOSTS[@]}"; do
+        host="${HOSTS[$i]}"
+        version="${VERSIONS[$i]}"
+        community="${COMMUNITIES[$i]}"
+        local allowed=("$host")
+        if [ -n "${EXTRA_ADDRS[$i]}" ]; then
+            local extra
+            IFS=',' read -ra extra <<< "${EXTRA_ADDRS[$i]}"
+            allowed+=("${extra[@]}")
+        fi
+
+        local reported
+        case "$version" in
+            v1)
+                reported=$("$SNMPWALK" -v1 -c "$community" -t 2 -r 1 -Ovq \
+                    "$host" 1.3.6.1.2.1.4.20.1.1 2>/dev/null || true)
+                ;;
+            v3)
+                local user="${V3_USERS[$i]:-$V3_USER}" apass="$V3_AUTH_PASS" ppass="$V3_PRIV_PASS"
+                if [ "$user" = "$V3_CTX_USER" ]; then
+                    apass="$V3_CTX_AUTH_PASS"
+                    ppass="$V3_CTX_PRIV_PASS"
+                fi
+                reported=$("$SNMPWALK" -v3 -l authPriv -u "$user" -a SHA-256 -A "$apass" \
+                    -x AES -X "$ppass" -t 2 -r 1 -Ovq "$host" 1.3.6.1.2.1.4.20.1.1 2>/dev/null || true)
+                ;;
+            *)
+                reported=$("$SNMPWALK" -v2c -c "$community" -t 2 -r 1 -Ovq \
+                    "$host" 1.3.6.1.2.1.4.20.1.1 2>/dev/null || true)
+                ;;
+        esac
+
+        local addr
+        while IFS= read -r addr; do
+            [ -z "$addr" ] && continue
+            local ok=false a
+            for a in "${allowed[@]}"; do
+                [ "$addr" = "$a" ] && ok=true && break
+            done
+            if ! $ok; then
+                printf "  ${RED}✗${NC} %-18s  %-20s  reports %s, which is not its own address\n" \
+                    "$host" "address-leak" "$addr"
+                all_ok=false
+                leaked_any=true
+            fi
+        done <<< "$reported"
+    done
+
+    if ! $leaked_any; then
+        printf "  ${GREEN}✓${NC} %-18s  %-20s  no agent reports an address it does not own\n" \
+            "(all hosts)" "address-leak"
+    fi
+    $all_ok
+}
+
 cmd_verify() {
     require_lab_env
     echo "Verifying SNMP test hosts..."
@@ -193,6 +258,7 @@ cmd_verify() {
     echo ""
     verify_guest_subnet_fixture || all_ok=false
     verify_vlan_context_fixture || all_ok=false
+    verify_no_leaked_addresses || all_ok=false
 
     echo ""
     if $all_ok; then
@@ -332,6 +398,11 @@ generate_fixtures() {
     rm -rf "$out"
     (cd "$SCRIPT_DIR/../../backend" &&
         cargo run --quiet --bin generate-snmp-fixtures --features snmp-sim -- "$out")
+    # Keeps the device table in SNMP-TEST-ENV.md from the same source as lab.env, so it cannot
+    # go stale the way the hand-maintained one did.
+    (cd "$SCRIPT_DIR/../../backend" &&
+        cargo run --quiet --bin generate-snmp-fixtures --features snmp-sim -- \
+            --device-table "$SCRIPT_DIR/SNMP-TEST-ENV.md")
 }
 
 cmd_deploy() {

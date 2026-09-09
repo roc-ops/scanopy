@@ -8,6 +8,7 @@
 //! Compiled under `cfg(test)` and behind the `snmp-sim` feature, which the fixture generator
 //! enables; the shipped `server` and `daemon` binaries carry none of it.
 
+pub mod allocation;
 pub mod devices;
 pub mod emit;
 pub mod harness;
@@ -53,7 +54,13 @@ pub struct Tables {
     pub lldp: Option<lldp::LldpTable>,
     pub bridge: mibs::BridgeTable,
     pub arp: mibs::ArpTable,
+    /// Addresses this device serves *beyond* its own. Its own address is never set here — every
+    /// device serves it automatically, at [`Tables::own_address`].
     pub ip_addr: mibs::IpAddrTable,
+    /// Where this device's own address rides in `ipAddrTable` — `ifIndex` and netmask. See
+    /// [`mibs::OwnAddress`]'s default for why the default `ifIndex` is not the device's first
+    /// port.
+    pub own_address: mibs::OwnAddress,
     pub entity: mibs::EntityTable,
     pub cdp: mibs::CdpTable,
     /// Alternative LLDP files written alongside the active one and swapped in by hand. Only
@@ -122,6 +129,14 @@ impl SimDevice {
             .unwrap_or_default()
     }
 
+    /// Whether this device deliberately serves no `ipAddrTable` at all — `switch-mute-01`, which
+    /// already registers the column against an empty file via [`Self::suppresses`]. Own-address
+    /// synthesis has to defer to that override rather than fight it for the same registration.
+    fn suppresses_ip_addr_table(&self) -> bool {
+        self.suppresses
+            .contains(&ip_mib::ip_addr_entry::IP_AD_ENT_ADDR)
+    }
+
     /// Subtrees this device refuses a GETBULK for, as `snmp-bulk-refuser.py` is configured.
     ///
     /// Empty for every device but the one that needs it, and empty means no shim: the agent binds
@@ -183,8 +198,15 @@ impl SimDevice {
             };
             files.push(self.file(ARP, ordering, self.tables.arp.wire_rows()));
         }
-        if !self.tables.ip_addr.is_empty() {
-            files.push(self.file(IPADDR, Ordering::Ascending, self.tables.ip_addr.wire_rows()));
+        if !self.suppresses_ip_addr_table() {
+            let mut rows = vec![mibs::IpAddrRow {
+                address: self.ip,
+                if_index: self.tables.own_address.if_index,
+                netmask: self.tables.own_address.netmask,
+            }];
+            rows.extend(self.tables.ip_addr.rows.iter().cloned());
+            let table = mibs::IpAddrTable { rows };
+            files.push(self.file(IPADDR, Ordering::Ascending, table.wire_rows()));
         }
         if !self.tables.entity.is_empty() {
             files.push(self.file(ENTITY, Ordering::Ascending, self.tables.entity.wire_rows()));
@@ -474,9 +496,12 @@ impl SimDevice {
     }
 }
 
-/// Every device in the lab, in address order.
+/// Every device in the lab, addressed and with every peer reference resolved.
 pub fn lab() -> Vec<SimDevice> {
-    devices::all()
+    let mut devices = devices::all();
+    allocation::assign_addresses(&mut devices);
+    allocation::resolve_peer_addresses(&mut devices);
+    devices
 }
 
 /// One device by name, for a test that wants to name what it is driving.
@@ -516,20 +541,71 @@ mod tests {
         for device in &lab {
             let octets = device.ip.octets();
             assert!(
-                // Floor lowered from 230 to 227 for GH #701's three devices, then to 224 for
-                // three more added in parallel branches: `switch-fdb-only-01` (GH #709) and
-                // `switch-dlink-02` / `pc-windows-nic-filters` (GH #668). .227-.254 (28
-                // addresses) were already fully occupied, with .255 unusable (broadcast on this
-                // /22) — there was no room left above .227.
-                //
-                // Both branches independently took .226; `switch-fdb-only-01` moved to .224 at
-                // merge. This assert only bounds the range, so it would not have caught that —
-                // the "two devices share an address" check above is what does.
-                octets[..3] == [192, 168, 7] && octets[3] >= 224,
-                "{} is at {}, outside the lab's range",
+                octets[..3] == [192, 168, 7] && octets[3] >= allocation::FIRST_OCTET,
+                "{} is at {}, outside the lab's reserved range",
                 device.name,
                 device.ip
             );
+        }
+    }
+
+    /// Every agent reports its own address, plus whatever it declares as an extra one — and
+    /// nothing else. No loopback, no VM management address, no other device's.
+    ///
+    /// Both directions matter and neither is redundant with the other: asserting only "nothing
+    /// unexpected" would still pass a device whose own-address synthesis silently stopped
+    /// running (an *empty* table has nothing unexpected in it either), and asserting only "the
+    /// own address is there" would miss the actual leak this guards against — a device that
+    /// serves its own address correctly but *also* falls through to the VM's kernel table.
+    ///
+    /// Lab-wide rather than per device, because the leak this guards is not a per-fixture defect:
+    /// it is what every device gets by default unless its own address is explicitly synthesised
+    /// into `ipAddrTable`, which is exactly the property this asserts. Covers the guest-subnet
+    /// device (own + extra), the Windows fixture (own only, at a non-default ifIndex) and the
+    /// mute device (deliberately suppressed, so an empty table is the one correct answer) with no
+    /// special-casing — each is just a different shape of "exactly the allowed set".
+    #[tokio::test]
+    async fn every_device_serves_only_its_own_addresses() {
+        for device in lab() {
+            let own = std::net::IpAddr::V4(device.ip);
+            let extra: Vec<std::net::IpAddr> = device
+                .tables
+                .ip_addr
+                .rows
+                .iter()
+                .map(|row| std::net::IpAddr::V4(row.address))
+                .collect();
+            let allowed: std::collections::HashSet<std::net::IpAddr> =
+                std::iter::once(own).chain(extra.iter().copied()).collect();
+
+            let scan = harness::collect(&device).await;
+            for addr in scan.ip_addr_table.keys() {
+                assert!(
+                    allowed.contains(addr),
+                    "{} reports {addr}, which is neither its own address nor a declared extra one",
+                    device.name
+                );
+            }
+            if device.suppresses_ip_addr_table() {
+                assert!(
+                    scan.ip_addr_table.is_empty(),
+                    "{} deliberately suppresses ipAddrTable but still reported one",
+                    device.name
+                );
+            } else {
+                assert!(
+                    scan.ip_addr_table.contains_key(&own),
+                    "{} did not report its own address at all",
+                    device.name
+                );
+                for addr in &extra {
+                    assert!(
+                        scan.ip_addr_table.contains_key(addr),
+                        "{} declared {addr} as an extra address but did not report it",
+                        device.name
+                    );
+                }
+            }
         }
     }
 

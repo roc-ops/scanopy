@@ -17,7 +17,7 @@ use super::inline;
 pub fn device() -> SimDevice {
     SimDevice {
         name: "switch-voss-01",
-        ip: Ipv4Addr::new(192, 168, 7, 239),
+        ip: Ipv4Addr::UNSPECIFIED,
         purpose: Purpose::Regression {
             issue: "Issue 2, July 2026",
             defect: "Extreme VOSS reports local-port == ifIndex, so it must stay correct on both old and new code — the regression guard for the remap",

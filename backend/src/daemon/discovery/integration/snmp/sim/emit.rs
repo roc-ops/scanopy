@@ -294,7 +294,88 @@ pub fn lab_env(devices: &[SimDevice]) -> String {
             )
         })
     ));
+    // Addresses a device serves *beyond* its own — empty for every device but the one guest-
+    // subnet fixture. `snmp-verify`'s leakage check reads this alongside `HOSTS` to build the
+    // exact set an agent is allowed to report, so it can fail on any address outside it.
+    out.push_str(&format!(
+        "EXTRA_ADDRS=({})\n",
+        field(&|d| {
+            if d.tables.ip_addr.rows.is_empty() {
+                return "\"\"".to_string();
+            }
+            let addrs: Vec<String> = d
+                .tables
+                .ip_addr
+                .rows
+                .iter()
+                .map(|row| row.address.to_string())
+                .collect();
+            format!("\"{}\"", addrs.join(","))
+        })
+    ));
     out
+}
+
+/// Markers `splice_device_table` replaces the content between, in `SNMP-TEST-ENV.md`.
+pub const DEVICE_TABLE_BEGIN: &str = "<!-- BEGIN GENERATED DEVICE TABLE -->";
+pub const DEVICE_TABLE_END: &str = "<!-- END GENERATED DEVICE TABLE -->";
+
+/// The device table `SNMP-TEST-ENV.md` publishes: address, name, SNMP version and credential.
+///
+/// The same source `lab_env` reads, so the table and the shell arrays it verifies against cannot
+/// disagree — the doc used to be a fourth hand-maintained copy of this list and was stale on
+/// arrival in two branches running at once.
+pub fn device_table(devices: &[SimDevice]) -> String {
+    let mut out = String::from("| IP | Host | Version | Credential |\n|---|---|---|---|\n");
+    for device in devices {
+        let version = match device.credential {
+            CredentialType::SnmpV1 { .. } => "v1",
+            CredentialType::SnmpV3 { .. } => "v3",
+            _ => "v2c",
+        };
+        let credential = match &device.credential {
+            CredentialType::SnmpV1 { community } | CredentialType::SnmpV2c { community } => {
+                format!("community `{}`", expose(community))
+            }
+            CredentialType::SnmpV3 { security_name, .. } => format!("user `{security_name}`"),
+            other => panic!("{} has a non-SNMP credential: {other:?}", device.name),
+        };
+        out.push_str(&format!(
+            "| {} | {} | {version} | {credential} |\n",
+            device.ip, device.name
+        ));
+    }
+    out
+}
+
+/// Rewrite the device table in `SNMP-TEST-ENV.md`, in place, between
+/// [`DEVICE_TABLE_BEGIN`]/[`DEVICE_TABLE_END`].
+///
+/// Panics if the markers are missing — a doc that lost them would otherwise silently stop being
+/// generated, which is the exact staleness this exists to prevent.
+pub fn splice_device_table(path: &std::path::Path, devices: &[SimDevice]) {
+    let doc =
+        std::fs::read_to_string(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let start = doc
+        .find(DEVICE_TABLE_BEGIN)
+        .unwrap_or_else(|| panic!("{} is missing {DEVICE_TABLE_BEGIN}", path.display()));
+    let end = doc
+        .find(DEVICE_TABLE_END)
+        .unwrap_or_else(|| panic!("{} is missing {DEVICE_TABLE_END}", path.display()));
+    assert!(
+        end > start,
+        "{} has the markers in the wrong order",
+        path.display()
+    );
+
+    let mut spliced = String::new();
+    spliced.push_str(&doc[..start]);
+    spliced.push_str(DEVICE_TABLE_BEGIN);
+    spliced.push('\n');
+    spliced.push_str(&device_table(devices));
+    spliced.push_str(&doc[end..]);
+
+    std::fs::write(path, spliced).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
 }
 
 /// A credential's JSONB, straight from the type the backend stores.

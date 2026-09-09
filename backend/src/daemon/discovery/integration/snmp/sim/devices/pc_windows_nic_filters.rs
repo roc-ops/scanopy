@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use crate::daemon::discovery::integration::snmp::sim::mibs::{IpAddrRow, IpAddrTable};
+use crate::daemon::discovery::integration::snmp::sim::mibs::OwnAddress;
 use crate::daemon::discovery::integration::snmp::sim::tables::{IfRow, IfTable};
 use crate::daemon::discovery::integration::snmp::sim::transport::Handler;
 use crate::daemon::discovery::integration::snmp::sim::{Purpose, SimDevice, Tables};
@@ -26,7 +26,7 @@ const SHARED_NIC_MAC: &str = "50:eb:f6:26:54:79";
 pub fn device() -> SimDevice {
     SimDevice {
         name: "pc-windows-nic-filters",
-        ip: Ipv4Addr::new(192, 168, 7, 226),
+        ip: Ipv4Addr::UNSPECIFIED,
         purpose: Purpose::Regression {
             issue: "#668",
             defect: "one MAC reported on a real NIC and its NDIS filter/LWF pseudo-interfaces makes LLDP port resolution ambiguous",
@@ -54,7 +54,12 @@ pub fn device() -> SimDevice {
 fn tables() -> Tables {
     Tables {
         if_table: Some(if_table()),
-        ip_addr: ip_addr_table(),
+        // Only the real NIC's ifIndex — never a filter driver's, on real Windows. The address
+        // itself is synthesised automatically; this only overrides which ifIndex it binds to.
+        own_address: OwnAddress {
+            if_index: 7,
+            netmask: "255.255.255.0".parse().unwrap(),
+        },
         // No LLDP local table: a stock Windows SNMP service does not answer lldpLocalSystemData
         // about itself. The neighbour evidence in this scenario comes entirely from what
         // `switch-dlink-02` reports having heard on its own port — this device only needs to be
@@ -97,17 +102,6 @@ pub fn if_table() -> IfTable {
     ])
 }
 
-pub fn ip_addr_table() -> IpAddrTable {
-    IpAddrTable {
-        rows: vec![IpAddrRow {
-            address: "192.168.7.226".parse().unwrap(),
-            // Only the real NIC's ifIndex — never a filter driver's, on real Windows.
-            if_index: 7,
-            netmask: "255.255.255.0".parse().unwrap(),
-        }],
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::daemon::discovery::integration::snmp::sim::harness;
@@ -142,8 +136,10 @@ mod tests {
     async fn only_the_real_nic_is_ip_bound() {
         use std::net::IpAddr;
 
-        let scan = harness::scan("pc-windows-nic-filters").await;
-        let addr: IpAddr = "192.168.7.226".parse().unwrap();
+        let device =
+            crate::daemon::discovery::integration::snmp::sim::device("pc-windows-nic-filters");
+        let scan = harness::collect(&device).await;
+        let addr = IpAddr::V4(device.ip);
         assert_eq!(scan.ip_addr_table.len(), 1);
         assert_eq!(scan.ip_addr_table.get(&addr).map(|e| e.if_index), Some(7));
     }
