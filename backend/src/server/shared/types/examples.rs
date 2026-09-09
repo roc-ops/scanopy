@@ -443,6 +443,9 @@ pub fn interface() -> Interface {
         last_seen_at: example_timestamp(),
         last_discovery_id: None,
         first_discovery_id: None,
+        // Matches the ladder `Interface::display_name` would compute for the `if_alias` below —
+        // an example should show what a real response actually looks like.
+        display_name: Some("Uplink to Core Switch".to_string()),
         base: InterfaceBase {
             host_id: ids::HOST,
             network_id: ids::NETWORK,

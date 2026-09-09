@@ -422,6 +422,17 @@ pub struct Interface {
     #[serde(default)]
     #[schema(read_only)]
     pub first_discovery_id: Option<Uuid>,
+    /// What to call this interface when it has no `if_alias`/`if_descr`: the MAC it was
+    /// identified by, or "Interface" when it has neither.
+    ///
+    /// Read-only and computed from [`Interface::display_name`] — the same ladder topology port
+    /// labels an interface with, so it cannot be called one thing in a list and another on the
+    /// map. Only set on outbound responses nested under a host (`HostResponse::interfaces`);
+    /// absent on a daemon's own submission and on the standalone `/interfaces` CRUD endpoints,
+    /// which return `Interface` directly without this computation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(read_only)]
+    pub display_name: Option<String>,
     #[serde(flatten)]
     #[validate(nested)]
     pub base: InterfaceBase,
@@ -484,6 +495,7 @@ impl Interface {
             last_seen_at: now,
             last_discovery_id: None,
             first_discovery_id: None,
+            display_name: None,
             legacy_neighbor_evidence: Default::default(),
             base,
         }
