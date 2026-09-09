@@ -39,6 +39,22 @@
     "SelfHostedStandard",
     "SelfHostedPlus"
   ],
+  "ClaimSource": [
+    "IfNumber",
+    "SysServicesBridgeBit",
+    "LldpLocalIdentity",
+    "Dot1dBaseNumPorts"
+  ],
+  "CredentialQueryPayloadDiscriminants": [
+    "Snmp",
+    "DockerProxy",
+    "DockerSocket",
+    "PodmanProxy",
+    "PodmanSocket",
+    "UnifiController",
+    "InstantOn",
+    "Unknown"
+  ],
   "CredentialType": [
     "SnmpV2c",
     "DockerProxy",
@@ -61,6 +77,50 @@
     "Docker",
     "Unified",
     "Rescan"
+  ],
+  "DiscoveryWarningCode": [
+    "InterfaceSetCutShort",
+    "InterfaceDetailsCutShort",
+    "SnmpWalkEntryCap",
+    "SnmpWalkUnsupported",
+    "SnmpWalkDesynchronised",
+    "SnmpWalkPartialDiscarded",
+    "SnmpWalkPartialRecorded",
+    "SnmpWalkBridgeMibAbsent",
+    "SnmpWalkNoAnswer",
+    "ClaimedCountReadCutShort",
+    "ClaimedCountUnderRead",
+    "ClaimedCapabilityReadCutShort",
+    "ClaimedCapabilityEmpty",
+    "LldpLocalPortDropped",
+    "LldpLocalPortMisplaced",
+    "MalformedNeighboursWalkCutShort",
+    "MalformedNeighboursGhostRows",
+    "MalformedNeighboursIncompleteRecords",
+    "MalformedNeighboursUnexpectedType",
+    "MalformedNeighboursUnreadableIndex",
+    "SnmpCollectedNothing",
+    "VlanRecordingFailed",
+    "CredentialTargetNotScanned",
+    "CredentialTargetNotResponding",
+    "CredentialGateClosed",
+    "CredentialRejected",
+    "CredentialMalformed",
+    "CredentialTlsFailed",
+    "CredentialNotThisService",
+    "CredentialCollectionFailed",
+    "CredentialCollectionTimedOut",
+    "CredentialUnreachable",
+    "CredentialTimedOut",
+    "ScanTimeLimitWithEstimate",
+    "ScanTimeLimit",
+    "LldpNeighbourNotFound",
+    "LldpNeighbourAmbiguous",
+    "LldpPortNoStrategy",
+    "LldpPortNotFound",
+    "LldpPortAmbiguous",
+    "WarningsTruncated",
+    "Unknown"
   ],
   "EdgeStyle": [
     "Straight",
@@ -106,7 +166,8 @@
     "DetectedService",
     "Hostname",
     "Integration",
-    "Manual"
+    "Manual",
+    "DnsSd"
   ],
   "HostVirtualization": [
     "Proxmox",
@@ -135,6 +196,10 @@
     "InterfaceName",
     "AgentCircuitId",
     "LocallyAssigned"
+  ],
+  "MalformedNeighbourConsequence": [
+    "AllLinksLost",
+    "SomeLinksLost"
   ],
   "OnboardingOperationDiscriminants": [
     "OrgCreated",
@@ -167,6 +232,19 @@
   "ServiceVirtualization": [
     "Docker",
     "Podman"
+  ],
+  "SnmpWalkGroup": [
+    "Lldp",
+    "Cdp",
+    "Interfaces",
+    "BridgePortNumbering",
+    "BridgeForwarding",
+    "VlanMembership",
+    "ArpTable",
+    "DeviceInventory",
+    "IpAddresses",
+    "LldpLocalPorts",
+    "VlanNames"
   ],
   "TopologyView": [
     "L2Physical",
