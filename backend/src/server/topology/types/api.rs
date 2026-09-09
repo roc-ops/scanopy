@@ -10,6 +10,7 @@ use crate::server::{
     ip_addresses::r#impl::base::IPAddress,
     ports::r#impl::base::Port,
     services::r#impl::base::Service,
+    shared::entities::EntityDiscriminants,
     subnets::r#impl::base::Subnet,
     tags::r#impl::base::Tag,
     topology::types::{edges::Edge, nodes::Node, views::TopologyView},
@@ -142,6 +143,18 @@ pub struct TopologyData {
     /// Connections between the nodes of the built graph.
     #[serde(default)]
     pub edges: HashMap<TopologyView, Vec<Edge>>,
+    /// How many entities of each type a server-side metadata filter removed, by the filter that
+    /// removed them.
+    ///
+    /// Server-filtered entities never reach the browser, so this is the only way the frontend can
+    /// say "171 interfaces hidden by By link" rather than presenting an empty view as an empty
+    /// network. Keyed by entity and filter only, with no view: the hide-set is per view but a drop
+    /// is not — an entity is removed from the one shared bundle only when *every* view that could
+    /// render it hides it (see `metadata_filter`).
+    ///
+    /// Empty when nothing was filtered, which is the common case.
+    #[serde(default)]
+    pub filtered_out: HashMap<EntityDiscriminants, BTreeMap<MetadataFilterType, usize>>,
     /// Views whose data is present in this entity set (L3/Workloads always;
     /// L2 Physical iff LLDP/CDP neighbors exist; Application iff app-flagged
     /// tags are used). The topology tab restricts a snapshot's view picker to

@@ -19,7 +19,8 @@ import type {
 	TopologyNode,
 	TopologyEdge,
 	Binding,
-	Vlan
+	Vlan,
+	FilteredOutCounts
 } from './types/base';
 import type { TopologyView } from './queries';
 import type {
@@ -50,6 +51,8 @@ export interface EntityBundle {
 	 */
 	neighbours?: InterfaceNeighborRow[];
 	candidates?: InterfaceNeighborCandidate[];
+	/** Server-side filter drop tally — see `RenderableTopology.filtered_out`. */
+	filtered_out?: FilteredOutCounts;
 	dependencies: Dependency[];
 	vlans: Vlan[];
 	entity_tags: Tag[];
@@ -68,6 +71,7 @@ export const EMPTY_ENTITY_BUNDLE: EntityBundle = {
 	interfaces: [],
 	neighbours: [],
 	candidates: [],
+	filtered_out: {},
 	dependencies: [],
 	vlans: [],
 	entity_tags: []
@@ -146,6 +150,9 @@ export function toRenderableTopology(
 		interfaces,
 		neighbours,
 		candidates,
+		// Network-scoped already: the bundle is fetched per network, so its tally needs no
+		// filtering the way the entity arrays above do.
+		filtered_out: bundle.filtered_out ?? {},
 		dependencies,
 		vlans,
 		entity_tags: entityTags,

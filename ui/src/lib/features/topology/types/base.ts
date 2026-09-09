@@ -24,6 +24,9 @@ export type EdgeHandle = components['schemas']['EdgeHandle'];
 export type Binding = components['schemas']['Binding'];
 export type Vlan = components['schemas']['Vlan'];
 
+/** `entity type → filter type → entities the server-side filter dropped`. */
+export type FilteredOutCounts = Record<string, Record<string, number>>;
+
 /**
  * Topology row plus the built graph + entity arrays needed for inspectors,
  * resolvers, and rendering. The slim backend `Topology` only carries
@@ -57,6 +60,12 @@ export interface RenderableTopology extends Topology {
 	neighbours: InterfaceNeighborRow[];
 	/** Raw LLDP/CDP evidence behind `neighbours` — see `InterfaceNeighborCandidate`. */
 	candidates: InterfaceNeighborCandidate[];
+	/**
+	 * What the server-side metadata filters removed, by entity type and filter — see
+	 * `TopologyData.filtered_out`. These entities are absent from the arrays above, so this is the
+	 * only record that they exist at all.
+	 */
+	filtered_out: FilteredOutCounts;
 	dependencies: Dependency[];
 	vlans: Vlan[];
 	entity_tags: Tag[];

@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -13,7 +13,7 @@ use uuid::Uuid;
 use super::metadata_filter;
 use crate::server::shared::entities::{ChangeTriggersTopologyStaleness, EntityDiscriminants};
 use crate::server::shared::events::traits::{EntityEventFlags, EntityScope, Event};
-use crate::server::topology::types::views::FilterValueContext;
+use crate::server::topology::types::views::{FilterValueContext, MetadataFilterType};
 use crate::server::{
     auth::middleware::auth::AuthenticatedEntity,
     bindings::{r#impl::base::Binding, service::BindingService},
@@ -418,6 +418,9 @@ impl TopologyService {
             // loader leaves them empty.
             nodes: HashMap::new(),
             edges: HashMap::new(),
+            // Filled by `apply_server_metadata_filters`, which runs on the way to the render
+            // path; nothing has been dropped yet at this point.
+            filtered_out: HashMap::new(),
         })
     }
 
@@ -553,23 +556,47 @@ impl TopologyService {
             ),
         };
 
-        let dropped = metadata_filter::retain_visible(
-            &mut data.interfaces,
-            hide_sets.get(&EntityDiscriminants::Interface),
-            &ctx,
-        ) + metadata_filter::retain_visible(
-            &mut data.hosts,
-            hide_sets.get(&EntityDiscriminants::Host),
-            &ctx,
-        ) + metadata_filter::retain_visible(
-            &mut data.services,
-            hide_sets.get(&EntityDiscriminants::Service),
-            &ctx,
+        let mut filtered_out: HashMap<EntityDiscriminants, BTreeMap<MetadataFilterType, usize>> =
+            HashMap::new();
+        let mut record = |entity, tally: BTreeMap<MetadataFilterType, usize>| {
+            if !tally.is_empty() {
+                filtered_out.insert(entity, tally);
+            }
+        };
+
+        record(
+            EntityDiscriminants::Interface,
+            metadata_filter::retain_visible(
+                &mut data.interfaces,
+                hide_sets.get(&EntityDiscriminants::Interface),
+                &ctx,
+            ),
+        );
+        record(
+            EntityDiscriminants::Host,
+            metadata_filter::retain_visible(
+                &mut data.hosts,
+                hide_sets.get(&EntityDiscriminants::Host),
+                &ctx,
+            ),
+        );
+        record(
+            EntityDiscriminants::Service,
+            metadata_filter::retain_visible(
+                &mut data.services,
+                hide_sets.get(&EntityDiscriminants::Service),
+                &ctx,
+            ),
         );
 
+        let dropped: usize = filtered_out
+            .values()
+            .flat_map(|by_filter| by_filter.values())
+            .sum();
         if dropped > 0 {
             tracing::debug!(dropped, "server-side metadata filters removed entities");
         }
+        data.filtered_out = filtered_out;
     }
 
     /// Add tags referenced by grouping rules (ByTag element rules, ByApplication

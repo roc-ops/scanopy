@@ -20,6 +20,11 @@ import {
 import type { Network } from '$lib/features/networks/types';
 import { entityFreshness, type FreshnessSubject } from '$lib/shared/utils/freshness';
 import { buildFullParentMap, resolveCollapsedAncestor } from './collapse';
+import { formatEntityLabelTitle } from './labels';
+import { common_byTag, common_untagged } from '$lib/paraglide/messages';
+import type { components } from '$lib/api/schema';
+
+type Entity = components['schemas']['EntityDiscriminants'];
 
 // Shared stores for hover state across all component instances
 export const groupHoverState = writable<Map<string, boolean>>(new Map());
@@ -655,6 +660,111 @@ function hasAnyMetadataFilter(m: Record<string, Record<string, string[]>> | unde
 		}
 	}
 	return false;
+}
+
+/** One control currently hiding something, named the way the options panel names it. */
+export interface ActiveFilterSummary {
+	/** The control's own label: "By link", or the entity's plural name for an eye toggle. */
+	label: string;
+	/** Value labels it is hiding. Empty for a control that hides a whole entity type. */
+	values: string[];
+	/** Entities it removed from this view, where that is knowable. */
+	count?: number;
+}
+
+type MetadataFilterDef = {
+	filter_type: string;
+	label: string;
+	values: Array<{ id: string; label: string }>;
+};
+
+/** The metadata filters a view declares, keyed by entity type — from the generated view fixture. */
+function declaredMetadataFilters(view: string): Record<string, MetadataFilterDef[]> {
+	const meta = views.getMetadata(view) as {
+		element_config?: { metadata_filters?: Record<string, MetadataFilterDef[]> };
+	} | null;
+	return meta?.element_config?.metadata_filters ?? {};
+}
+
+/**
+ * Which controls are hiding something in `view`, and how much.
+ *
+ * The point of it is an emptied view that can say what emptied it. A server-applied filter removes
+ * its entities from the response entirely, so the browser cannot count what it never received —
+ * `topology.filtered_out` is the backend's tally of exactly that, and the client-side hidden sets
+ * cover the rest.
+ *
+ * Edge-type hides are deliberately absent: they remove edges, never nodes, so they cannot be the
+ * reason a view has nothing in it.
+ */
+export function activeViewFilters(
+	view: string,
+	topology: RenderableTopology | undefined,
+	hiddenMetadataValues: Record<string, Record<string, string[]>> | undefined,
+	hiddenEntityTypes: string[] | undefined,
+	tagFilter: TagFilter | undefined,
+	network?: Network
+): ActiveFilterSummary[] {
+	const summaries: ActiveFilterSummary[] = [];
+	if (!topology) return summaries;
+
+	const declared = declaredMetadataFilters(view);
+	const serverDropped = topology.filtered_out ?? {};
+
+	for (const [entityType, byFilter] of Object.entries(hiddenMetadataValues ?? {})) {
+		for (const [filterType, hiddenValues] of Object.entries(byFilter)) {
+			if (!hiddenValues.length) continue;
+			const def = declared[entityType]?.find((f) => f.filter_type === filterType);
+			// A hide entry for a filter this view no longer declares matches nothing and is not
+			// hiding anything, so it has no business being named as a cause.
+			if (!def) continue;
+
+			// Entities this filter removed: those dropped before the response was built, plus
+			// those still in the bundle that the browser is hiding. Counted per filter with the
+			// same extractor the hide pass uses, so two filters on one entity type each report
+			// their own share rather than both claiming the total.
+			let count = serverDropped[entityType]?.[filterType] ?? 0;
+			const extract = FILTER_VALUE_EXTRACTORS[entityType]?.[filterType];
+			if (extract) {
+				for (const entity of entityCollection(topology, entityType) ?? []) {
+					const value = extract(entity, { network, topology });
+					if (value && hiddenValues.includes(value)) count++;
+				}
+			}
+
+			summaries.push({
+				label: def.label,
+				values: hiddenValues.map((id) => def.values.find((v) => v.id === id)?.label ?? id),
+				count
+			});
+		}
+	}
+
+	for (const entityType of hiddenEntityTypes ?? []) {
+		summaries.push({
+			label: formatEntityLabelTitle([entityType as Entity]),
+			values: [],
+			count: entityCollection(topology, entityType)?.length
+		});
+	}
+
+	if (tagFilter && !isTagFilterEmpty(tagFilter)) {
+		const hiddenTagIds = [
+			...(tagFilter.hidden_host_tag_ids ?? []),
+			...(tagFilter.hidden_service_tag_ids ?? []),
+			...(tagFilter.hidden_subnet_tag_ids ?? [])
+		];
+		summaries.push({
+			label: common_byTag(),
+			values: hiddenTagIds.map(
+				(id) =>
+					topology.entity_tags.find((t) => t.id === id)?.name ??
+					(id === UNTAGGED_SENTINEL ? common_untagged() : id)
+			)
+		});
+	}
+
+	return summaries;
 }
 
 /** For non-Service metadata filters: check that an Element node represents

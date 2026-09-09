@@ -8,7 +8,7 @@ use crate::server::{
     interface_neighbors::r#impl::base::{
         InterfaceNeighborCandidate, InterfaceNeighborRow, Neighbor,
     },
-    interfaces::r#impl::base::Interface,
+    interfaces::r#impl::base::{Interface, InterfaceLinkState},
     ip_addresses::r#impl::base::IPAddress,
     ports::r#impl::base::Port,
     services::r#impl::base::Service,
@@ -243,10 +243,29 @@ impl<'a> TopologyContext<'a> {
 
     /// Whether `interface_id` has at least one live row of its own in either resolved-neighbour
     /// table — the successor to reading `Interface.neighbor.is_some()` directly.
+    ///
+    /// The **outbound direction only**. Almost every caller wants
+    /// [`Self::interface_link_state`] instead: a link is recorded on one side, so this answers
+    /// `false` for the far end of most links.
     pub fn interface_has_neighbor(&self, interface_id: Uuid) -> bool {
         self.neighbours
             .iter()
             .any(|n| n.interface_id == interface_id)
+    }
+
+    /// Whether `interface_id` is linked, judged in **both** directions.
+    ///
+    /// Delegates to [`InterfaceLinkState::classify`], so a port is classified the same way here as
+    /// it is by the server-side metadata filter — the graph cannot drop a port the filter kept.
+    /// Judging the outbound direction alone is the mistake that drew 11 edges where there were
+    /// ~720; see `FilterValueContext`.
+    pub fn interface_link_state(&self, interface_id: Uuid) -> InterfaceLinkState {
+        InterfaceLinkState::classify(
+            self.interface_has_neighbor(interface_id),
+            self.neighbours
+                .iter()
+                .any(|n| n.neighbor.interface_id() == Some(interface_id)),
+        )
     }
 
     // ============================================================================
