@@ -67,12 +67,24 @@ impl InterfaceNeighborService {
         self.candidates.get_for_parents(interface_ids).await
     }
 
-    /// Replace an interface's candidate rows with what this scan submitted, honoring per-group
-    /// completeness the same way `Interface::preserve_uncollected_data` guarded the scalar fields
-    /// these candidates replaced: a group (LLDP or CDP) this scan did not finish reading keeps
-    /// whichever stored candidates have that shape, rather than losing them to a walk cut short by
-    /// timeout — losing them drops the row out of L2 resolution the same way losing
-    /// `lldp_chassis_id` used to.
+    /// Replace an interface's candidate rows with what this scan submitted.
+    ///
+    /// A row present in `incoming` has already passed the daemon's own per-row validation — a
+    /// malformed LLDP/CDP record (missing chassis id, wrong ASN.1 type, a key no chassis column
+    /// ever listed) is dropped at the source before it can become evidence at all (see
+    /// `query_lldp_neighbors_for`) — so it is trusted outright here regardless of `collected`.
+    /// `collected` being false for the walk as a whole no longer vetoes a row that already proved
+    /// itself individually; earlier it did, which is what let one malformed row on one port veto
+    /// every other interface's good row on the same device.
+    ///
+    /// `collected` still answers the one thing a validated row can't: what about a group this
+    /// interface reported *nothing* for this scan? That silence is ambiguous — the neighbour
+    /// could be gone, or the walk just never reached it — so a stored row of that shape is carried
+    /// forward unchanged, `created_at` included, the same way `Interface::preserve_uncollected_data`
+    /// guarded the scalar fields these candidates replaced. Scoped per interface, not per host: an
+    /// interface that *did* submit fresh evidence for a group this scan has already answered the
+    /// question for itself, and carrying forward stale history for it too would plant a
+    /// duplicate, possibly conflicting neighbour beside the fresh one.
     pub async fn replace_candidates_from_discovery(
         &self,
         network_id: Uuid,
@@ -86,9 +98,6 @@ impl InterfaceNeighborService {
         // `created_at` must mean "last confirmed by a scan", not "last written to storage".
         let mut rows: Vec<InterfaceNeighborCandidate> = incoming
             .into_iter()
-            .filter(|e| {
-                (collected.lldp || !e.has_lldp_data()) && (collected.cdp || !e.has_cdp_data())
-            })
             .map(|evidence| {
                 InterfaceNeighborCandidate::new(InterfaceNeighborCandidateBase::new(
                     network_id,
@@ -98,15 +107,19 @@ impl InterfaceNeighborService {
             })
             .collect();
 
-        // A group this scan did not finish reading: carry the *existing* rows of that shape
-        // forward unchanged, `created_at` included — a walk cut short must not look like fresh
-        // evidence, or a link whose neighbour walk has been failing for a month would read as
-        // just-confirmed on every scan.
+        // A group this scan did not finish reading, for an interface that got no fresh row of
+        // that shape either: carry the *existing* rows of that shape forward unchanged,
+        // `created_at` included — a walk cut short must not look like fresh evidence, or a link
+        // whose neighbour walk has been failing for a month would read as just-confirmed on every
+        // scan. Skipped entirely for a group this interface *did* submit fresh evidence for, so a
+        // recovering port never gets its fresh neighbour joined by a stale one.
         if !collected.lldp || !collected.cdp {
+            let fresh_has_lldp = rows.iter().any(|r| r.base.evidence.has_lldp_data());
+            let fresh_has_cdp = rows.iter().any(|r| r.base.evidence.has_cdp_data());
             for candidate in self.candidates_for_interface(&interface_id).await? {
                 let evidence = &candidate.base.evidence;
-                let keep_lldp = !collected.lldp && evidence.has_lldp_data();
-                let keep_cdp = !collected.cdp && evidence.has_cdp_data();
+                let keep_lldp = !collected.lldp && !fresh_has_lldp && evidence.has_lldp_data();
+                let keep_cdp = !collected.cdp && !fresh_has_cdp && evidence.has_cdp_data();
                 if keep_lldp || keep_cdp {
                     rows.push(candidate);
                 }
