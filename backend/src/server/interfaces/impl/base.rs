@@ -431,23 +431,6 @@ pub struct Interface {
     #[serde(flatten)]
     #[validate(nested)]
     pub base: InterfaceBase,
-    /// Wire-compat only: the old scalar LLDP/CDP shape a pre-migration daemon still submits.
-    ///
-    /// GH #701 replaced these twelve columns with `interface_neighbor_candidates`, but a daemon
-    /// predating that has no way to know (see the `<0.17.5 deprecated at v1.0` convention — old
-    /// daemons are supported for a whole deprecation window). This codebase never sets
-    /// `deny_unknown_fields`, so simply removing the fields from `InterfaceBase` would silently
-    /// swallow an old daemon's submission rather than erroring or translating it — flattening this
-    /// alongside `base` is what makes the old JSON shape still deserialize. Reuses
-    /// `InterfaceNeighborEvidence`'s field names/shape exactly, since that *is* the old scalar
-    /// shape.
-    ///
-    /// Drained into `base.neighbor_candidates` by `Interface::drain_legacy_neighbor_evidence`
-    /// on the discovery ingest path and never read anywhere else — keep it that way; nothing
-    /// outside that one function should reference this field. Never serialized: a new server
-    /// response or a current daemon's own submission never emits this shape.
-    #[serde(flatten, default, skip_serializing)]
-    pub legacy_neighbor_evidence: InterfaceNeighborEvidence,
 }
 
 impl ChangeTriggersTopologyStaleness<Interface> for Interface {
@@ -490,7 +473,6 @@ impl Interface {
             last_seen_at: now,
             last_discovery_id: None,
             first_discovery_id: None,
-            legacy_neighbor_evidence: Default::default(),
             base,
         }
     }
@@ -574,24 +556,6 @@ impl Interface {
             .is_some_and(|alias| alias.trim().is_empty())
         {
             self.base.if_alias = None;
-        }
-    }
-
-    /// Daemon-compat only: fold the old scalar `lldp_*`/`cdp_*` shape (see
-    /// [`legacy_neighbor_evidence`](Self::legacy_neighbor_evidence)) into `base.neighbor_candidates`
-    /// as one additional candidate, so a pre-migration daemon's submission produces exactly the
-    /// same `interface_neighbor_candidates` row a current daemon's `neighbor_candidates` entry
-    /// would. A no-op when the legacy shape carries nothing (a current daemon never sets it).
-    ///
-    /// Call this once, on the raw incoming row, before anything else reads `base.
-    /// neighbor_candidates` — isolated here rather than folded into discovery ingest generally,
-    /// so the translation stays a single, clearly-named daemon-compat step rather than steady-state
-    /// logic. Not part of `create_or_update_from_discovery`'s core path: that function calls this
-    /// explicitly, once, at the top.
-    pub fn drain_legacy_neighbor_evidence(&mut self) {
-        let legacy = std::mem::take(&mut self.legacy_neighbor_evidence);
-        if legacy != InterfaceNeighborEvidence::default() {
-            self.base.neighbor_candidates.push(legacy);
         }
     }
 }

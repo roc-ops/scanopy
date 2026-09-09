@@ -232,6 +232,22 @@ pub fn has_correct_docker_volume_mount(version: Option<&Version>) -> bool {
     version.is_some_and(|v| v >= &minimum_correct_docker_volume_mount())
 }
 
+/// The last release whose daemon submits the pre-#701 scalar LLDP/CDP shape — twelve fields flat
+/// on each interface, rather than the `neighbor_candidates` array that replaced them.
+///
+/// A ceiling, not a floor, which is why it is not in [`capability_floors`]: every other constant
+/// here says "this version and above can do X", and this one says "this version and below still
+/// speaks the old shape". Keyed on the last old release rather than the first new one so it names
+/// a version that exists — the first release carrying #701 is unpublished, and a floor above
+/// `own_version()` would fail `capability_floors_within_server_version` on day one.
+///
+/// Read by `legacy_neighbor_wire_shim_still_needed`, which fails once the enforced floor passes
+/// it. That is the whole end-condition: see
+/// [`DiscoveryInterface`](crate::server::interfaces::r#impl::wire::DiscoveryInterface).
+pub fn last_legacy_neighbor_wire() -> Version {
+    Version::new(0, 17, 14)
+}
+
 /// Every capability floor owned by this module. The rot-guard test asserts each
 /// is ≤ the current server version, so a floor can never quietly reference a
 /// version this build doesn't know about.
@@ -679,5 +695,24 @@ mod tests {
                  version this build doesn't know; move the floor or delete the shim"
             );
         }
+    }
+
+    /// The pre-#701 neighbour wire shim outlives its usefulness the moment no supported daemon
+    /// can still send that shape. Nothing else notices when that happens: the shim keeps
+    /// compiling, keeps passing, and keeps costing every reader of the ingest path an
+    /// explanation. So this fails instead, on the date `scheduled_sunsets()` says, with no one
+    /// having to remember.
+    #[test]
+    fn legacy_neighbor_wire_shim_still_needed() {
+        let floor = enforced_floor(Utc::now());
+        let last = last_legacy_neighbor_wire();
+        assert!(
+            floor <= last,
+            "the enforced daemon floor is {floor}, above {last}: every supported daemon now \
+             submits `neighbor_candidates`, so the pre-#701 scalar LLDP/CDP shape is dead. \
+             Delete `DiscoveryInterface`'s `legacy_neighbor_evidence` field and its translation \
+             (server/interfaces/impl/wire.rs), the `OutdatedDaemonFormat` warning if nothing \
+             else raises it, `last_legacy_neighbor_wire`, and this test."
+        );
     }
 }

@@ -66,7 +66,6 @@ pub(super) fn generate_interfaces(
 
         // WAN interface
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -102,7 +101,6 @@ pub(super) fn generate_interfaces(
 
         // LAN interface — connected to HQ switch port 1
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -144,7 +142,6 @@ pub(super) fn generate_interfaces(
 
         // OPT1 interface (disabled)
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -190,7 +187,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -242,7 +238,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -284,7 +279,6 @@ pub(super) fn generate_interfaces(
 
         // Loopback
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -327,7 +321,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -379,7 +372,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -432,7 +424,6 @@ pub(super) fn generate_interfaces(
 
         // Port 1 ↔ pfsense-fw01
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -474,7 +465,6 @@ pub(super) fn generate_interfaces(
 
         // Port 2 ↔ truenas-primary
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -516,7 +506,6 @@ pub(super) fn generate_interfaces(
 
         // Port 3 ↔ proxmox-hv01
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -558,7 +547,6 @@ pub(super) fn generate_interfaces(
 
         // Port 4 ↔ proxmox-hv02
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -600,7 +588,6 @@ pub(super) fn generate_interfaces(
 
         // Port 5 ↔ docker-prod01
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -642,7 +629,6 @@ pub(super) fn generate_interfaces(
 
         // Port 6 ↔ unifi-ap-lobby (deferred via NeighborUpdate)
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -685,7 +671,6 @@ pub(super) fn generate_interfaces(
         // Ports 7-48 — empty/down
         for port_num in 7..=48 {
             interfaces.push(Interface {
-                legacy_neighbor_evidence: Default::default(),
                 valid_from: now,
                 valid_to: None,
                 lineage_id: None,
@@ -739,7 +724,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -792,7 +776,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -835,7 +818,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -887,7 +869,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -939,7 +920,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -991,7 +971,6 @@ pub(super) fn generate_interfaces(
         let ip_address = find_ip_address(host.id);
 
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1044,7 +1023,6 @@ pub(super) fn generate_interfaces(
 
         // Port 1 ↔ dc-fw01
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1086,7 +1064,6 @@ pub(super) fn generate_interfaces(
 
         // Port 2 ↔ dc-proxmox-hv01
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1128,7 +1105,6 @@ pub(super) fn generate_interfaces(
 
         // Port 3 ↔ dc-docker01
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1170,7 +1146,6 @@ pub(super) fn generate_interfaces(
 
         // Port 4 ↔ haproxy-lb01
         interfaces.push(Interface {
-            legacy_neighbor_evidence: Default::default(),
             valid_from: now,
             valid_to: None,
             lineage_id: None,
@@ -1213,7 +1188,6 @@ pub(super) fn generate_interfaces(
         // Ports 5-24 — empty/down
         for port_num in 5..=24 {
             interfaces.push(Interface {
-                legacy_neighbor_evidence: Default::default(),
                 valid_from: now,
                 valid_to: None,
                 lineage_id: None,

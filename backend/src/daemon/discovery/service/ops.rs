@@ -1109,6 +1109,8 @@ impl DiscoveryOps {
             subnets,
             interfaces_complete,
             interface_data_complete,
+            // This daemon is this build; it submits the current shape by construction.
+            superseded_wire_shape: false,
         };
 
         self.entity_buffer.push_host(request.clone()).await;

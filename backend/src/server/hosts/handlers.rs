@@ -613,7 +613,20 @@ async fn create_host(
                 subnets,
                 interfaces_complete,
                 interface_data_complete,
+                superseded_wire_shape,
             } = discovery_request;
+
+            // Always true on this branch — reaching it means the daemon sent the pre-0.16.0
+            // body. Recorded against the daemon so the scan record carries it, which the
+            // `tracing::warn!` above never could: a self-hosted operator does not read server
+            // logs.
+            if superseded_wire_shape {
+                state
+                    .services
+                    .discovery_service
+                    .note_superseded_wire_shape(*daemon_id)
+                    .await;
+            }
 
             // Capture one scan_time for the whole submission so all entities
             // share consistent SCD2 timestamps. See ScanContext for rationale.

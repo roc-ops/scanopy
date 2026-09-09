@@ -28,6 +28,7 @@ import {
 	common_andNMore,
 	common_host,
 	common_moreItems,
+	common_unknown,
 	common_unknownEntity,
 	discovery_warningNoFurtherDetail,
 	discovery_warningAtAddress,
@@ -335,6 +336,13 @@ const WARNING_PARAMS = {
 	FdbResolutionIncomplete: (w) => ({
 		budget_seconds: w[0].budget_seconds,
 		interfaces: w[0].interfaces
+	}),
+
+	// One per session: the server raises it once, on the terminal payload, for the one daemon that
+	// ran the scan. A daemon too old to report a version at all still has to read as a sentence,
+	// so the empty case says so rather than leaving a hole where the number goes.
+	OutdatedDaemonFormat: (w) => ({
+		daemon_version: w[0].daemon_version ?? common_unknown()
 	}),
 
 	WarningsTruncated: (w) => ({ elided: sum(w.map((x) => x.elided)) }),
