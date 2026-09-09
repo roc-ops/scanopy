@@ -203,6 +203,7 @@
 	type MetadataFilterDef = {
 		filter_type: string;
 		label: string;
+		applies: string;
 		values: Array<{ id: string; label: string; color: string; icon: string | null }>;
 	};
 	let metadataFiltersByEntity = $derived(
@@ -215,8 +216,18 @@
 	 * would either show everything or hide everything. Undefined means the
 	 * present-value scan hasn't run yet (no topology loaded), in which case the
 	 * group is shown rather than flickering out.
+	 *
+	 * A `Server` filter is always offered, because the response is not evidence of which values
+	 * exist: its hidden entities were dropped before the bundle was built. `presentFilterValues`
+	 * folds the hidden values back in to compensate, but that only holds while something is
+	 * hidden — clear the filter and the fold-back contributes nothing, so the group is judged on
+	 * a bundle that has not been refetched yet and disappears, taking with it the only control
+	 * that could put the filter back. `hide_metadata_values` reaching the server, the rebuild and
+	 * the refetch are three round trips; the panel must not blink out for the length of them.
 	 */
 	function filterOffersAChoice(entityType: string, filterType: string): boolean {
+		const filter = metadataFiltersByEntity[entityType]?.find((f) => f.filter_type === filterType);
+		if (filter?.applies === 'Server') return true;
 		const present = $presentFilterValues[entityType]?.[filterType];
 		return present === undefined || present.length > 1;
 	}
