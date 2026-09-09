@@ -1749,6 +1749,8 @@
 	"meta_warning_codes_CredentialTlsFailed_name": "TLS negotiation failed",
 	"meta_warning_codes_CredentialUnreachable_description": "The {credential} credential for {addresses} could not be reached — check the address, port and that the service is listening. ({detail})",
 	"meta_warning_codes_CredentialUnreachable_name": "Credential target unreachable",
+	"meta_warning_codes_FdbResolutionIncomplete_description": "Matching single-MAC forwarding-table entries to the devices they name was stopped after {budget_seconds}s, with {interfaces} interface(s) still carrying one. Physical Topology is missing links this scan would otherwise have drawn; the next scan retries from scratch. Narrow what the scan covers, or split the network across daemons, if it keeps happening.",
+	"meta_warning_codes_FdbResolutionIncomplete_name": "FDB link resolution did not finish",
 	"meta_warning_codes_InterfaceDetailsCutShort_description": "{addresses} returned every SNMP interface but stopped while reading their details, so some descriptions or speeds may be blank.",
 	"meta_warning_codes_InterfaceDetailsCutShort_name": "Interface details cut short",
 	"meta_warning_codes_InterfaceSetCutShort_description": "{addresses} stopped responding partway through the SNMP interface list, so some interfaces are missing.",

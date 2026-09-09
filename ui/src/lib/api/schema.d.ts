@@ -7145,6 +7145,19 @@ export interface components {
              */
             neighbours: number;
         } | {
+            /**
+             * Format: int32
+             * @description Seconds the pass was allowed before it was stopped.
+             */
+            budget_seconds: number;
+            /** @enum {string} */
+            code: "FdbResolutionIncomplete";
+            /**
+             * Format: int32
+             * @description Interfaces with an unresolved single-MAC FDB entry it was working through.
+             */
+            interfaces: number;
+        } | {
             /** @enum {string} */
             code: "WarningsTruncated";
             /**

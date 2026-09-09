@@ -200,6 +200,7 @@ impl DiscoveryWarningCode {
             Self::ProvisionalSubnetInferred => &["count"],
 
             Self::NeighbourResolutionIncomplete => &["budget_seconds", "neighbours"],
+            Self::FdbResolutionIncomplete => &["budget_seconds", "interfaces"],
 
             Self::WarningsTruncated => &["elided"],
             Self::Unknown => &["detail"],
@@ -266,7 +267,8 @@ impl DiscoveryWarningCode {
             | Self::Unknown => Severity::Informational,
             // Links are missing that the device did advertise, which is data loss for this scan
             // rather than something for the operator to confirm.
-            Self::NeighbourResolutionIncomplete => Severity::Degraded,
+            Self::NeighbourResolutionIncomplete
+            | Self::FdbResolutionIncomplete => Severity::Degraded,
         }
     }
 
@@ -307,7 +309,8 @@ impl DiscoveryWarningCode {
             // shipped action.
             | Self::LldpNeighbourAmbiguous
             // Narrowing what one scan covers is the lever that brings the pass back inside budget.
-            | Self::NeighbourResolutionIncomplete => WarningRemedy::FixInScanopy,
+            | Self::NeighbourResolutionIncomplete
+            | Self::FdbResolutionIncomplete => WarningRemedy::FixInScanopy,
 
             // The device says one thing and serves another. No Scanopy setting reaches these:
             // what has to change is the agent's view of its own tables.
@@ -420,6 +423,7 @@ impl TypeMetadataProvider for DiscoveryWarningCode {
             Self::LldpPortAmbiguous => "Advertised port not unique",
             Self::ProvisionalSubnetInferred => "Address range assumed, please confirm",
             Self::NeighbourResolutionIncomplete => "Link resolution did not finish",
+            Self::FdbResolutionIncomplete => "FDB link resolution did not finish",
             Self::WarningsTruncated => "Some warnings not recorded",
             Self::Unknown => "Warning from another version",
         }
@@ -560,6 +564,9 @@ impl TypeMetadataProvider for DiscoveryWarningCode {
             }
             Self::NeighbourResolutionIncomplete => {
                 "Matching LLDP/CDP neighbours to the devices and ports they name was stopped after {budget_seconds}s, with {neighbours} interface(s) advertising a neighbour on this network. Physical Topology is missing links this scan would otherwise have drawn; the next scan retries from scratch. Narrow what the scan covers, or split the network across daemons, if it keeps happening."
+            }
+            Self::FdbResolutionIncomplete => {
+                "Matching single-MAC forwarding-table entries to the devices they name was stopped after {budget_seconds}s, with {interfaces} interface(s) still carrying one. Physical Topology is missing links this scan would otherwise have drawn; the next scan retries from scratch. Narrow what the scan covers, or split the network across daemons, if it keeps happening."
             }
             Self::WarningsTruncated => {
                 "{elided} further warnings from this scan were not recorded, because it produced more than the scan record holds. Narrow what the scan covers to see the rest."

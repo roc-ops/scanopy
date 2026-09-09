@@ -330,6 +330,12 @@ const WARNING_PARAMS = {
 		budget_seconds: w[0].budget_seconds,
 		neighbours: w[0].neighbours
 	}),
+	// Same reasoning as NeighbourResolutionIncomplete: the FDB pass also runs once per session and
+	// is cut short at most once.
+	FdbResolutionIncomplete: (w) => ({
+		budget_seconds: w[0].budget_seconds,
+		interfaces: w[0].interfaces
+	}),
 
 	WarningsTruncated: (w) => ({ elided: sum(w.map((x) => x.elided)) }),
 	// The whole sentence *is* the detail: a warning from another version, or one written before
