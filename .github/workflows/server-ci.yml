@@ -72,6 +72,15 @@ jobs:
       - name: Test server binary
         run: cargo test --lib
 
+      # The identity predicate is generated as SQL and as Rust from one list, and only this
+      # test asks a real PostgreSQL whether the two agree. Left out of `cargo test --lib` (it
+      # is `#[ignore]`d because it starts a container), it guarded nothing: a coordinated edit
+      # of the generator and the golden string it is checked against reintroduced a dropped
+      # neighbour class with the whole suite still green. One filter per invocation, as in
+      # release.yml -- cargo test takes a single TESTNAME.
+      - name: Test the generated identity SQL against a real PostgreSQL
+        run: cargo test --lib the_generated_sql_answers_the_table_on_a_real_postgres -- --ignored
+
       - name: Install squawk
         run: npm install -g squawk-cli@2.47.0
 
