@@ -24,6 +24,14 @@ Xid, carrying the given name in a Device Properties / Name of Station block, sen
 the requester's own MAC. (Unicast is this script's own choice for the reply, matching what the
 daemon's receive-side filter currently assumes — it does not settle whether a *real* PROFINET
 device replies unicast or multicast, which is still an open question noted in `dcp/packet.rs`.)
+
+The Response's reported source MAC (--device-mac) is a fabricated, vendor-style address, not
+en0's real hardware MAC, on purpose: `dcp/packet.rs::parse_identify_response` reads the
+discovered host's identifying MAC straight from the Ethernet frame's source address, and the
+backend refuses to mint a host from a MAC with the locally-administered bit set (real industrial
+devices carry a real vendor OUI; this Mac's own en0 MAC happens to be locally-administered, and
+so was the original macvlan sim's auto-generated one). Sending the frame itself still goes out
+en0 as usual — only the *reported* identity differs from the physical interface's own address.
 """
 
 import argparse
@@ -35,6 +43,13 @@ import bpf_raw
 
 ETHERTYPE_PROFINET = 0x8892
 DCP_IDENTIFY_MULTICAST = bytes.fromhex("010ecf000000")
+
+# 00:1a:2b is the same Cisco OUI tools/snmp/'s own fixture data already uses for its simulated
+# switches (see the chassis/port MACs documented in tools/snmp/SNMP-TEST-ENV.md) — a real,
+# globally-unique vendor OUI, so it passes the backend's "vendor-assigned unicast address"
+# minting check, unlike a locally-administered one. dc:90 marks it as this tool's own sub-range,
+# distinct from SNMP's.
+DEFAULT_DEVICE_MAC = "00:1a:2b:dc:90:01"
 
 FRAME_ID_DCP_IDENT_REQ = 0xFEFE
 FRAME_ID_DCP_IDENT_RES = 0xFEFF
@@ -92,6 +107,13 @@ def main():
     parser.add_argument("interface", help="interface to listen/answer on, e.g. en0")
     parser.add_argument("--name", default="scanopy-dcp-sim", help="Name of Station to answer with")
     parser.add_argument(
+        "--device-mac",
+        default=DEFAULT_DEVICE_MAC,
+        help="the MAC this sim reports as its identity in the Response (default a fabricated, "
+        "vendor-style address — see the module doc for why this deliberately isn't the "
+        "interface's own MAC)",
+    )
+    parser.add_argument(
         "--pidfile",
         help="write our own pid here once bound and listening, for a wrapper script to track "
         "us reliably when backgrounded under sudo (shell-level $! after 'sudo ... &' isn't "
@@ -99,14 +121,19 @@ def main():
     )
     args = parser.parse_args()
 
-    own_mac = bpf_raw.get_mac(args.interface)
+    interface_mac = bpf_raw.get_mac(args.interface)
+    device_mac = bytes.fromhex(args.device_mac.replace(":", ""))
     fd = bpf_raw.open_bpf(args.interface)
 
     if args.pidfile:
         with open(args.pidfile, "w") as f:
             f.write(str(os.getpid()))
 
-    print(f"listening on {args.interface} ({own_mac.hex(':')}), answering as '{args.name}'", file=sys.stderr)
+    print(
+        f"listening on {args.interface} ({interface_mac.hex(':')}), "
+        f"answering as '{args.name}' ({device_mac.hex(':')})",
+        file=sys.stderr,
+    )
 
     while True:
         frame = bpf_raw.read_frame(fd, timeout_s=None)
@@ -124,7 +151,7 @@ def main():
         if parsed is None:
             continue
         requester_mac, xid = parsed
-        response = build_identify_response(requester_mac, own_mac, xid, args.name)
+        response = build_identify_response(requester_mac, device_mac, xid, args.name)
         bpf_raw.write_frame(fd, response)
         print(f"answered identify request from {requester_mac.hex(':')} (xid={xid:#x})", file=sys.stderr)
 
