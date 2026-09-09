@@ -19,6 +19,10 @@ use crate::server::{
     bindings::{r#impl::base::Binding, service::BindingService},
     dependencies::{r#impl::base::Dependency, service::DependencyService},
     hosts::{r#impl::base::Host, service::HostService},
+    interface_neighbors::{
+        r#impl::base::{InterfaceNeighborCandidate, InterfaceNeighborRow},
+        service::InterfaceNeighborService,
+    },
     interfaces::{r#impl::base::Interface, service::InterfaceService},
     ip_addresses::{r#impl::base::IPAddress, service::IPAddressService},
     networks::service::NetworkService,
@@ -59,6 +63,7 @@ pub struct TopologyService {
     pub(crate) port_service: Arc<PortService>,
     pub(crate) binding_service: Arc<BindingService>,
     pub(crate) interface_service: Arc<InterfaceService>,
+    pub(crate) interface_neighbor_service: Arc<InterfaceNeighborService>,
     pub(crate) tag_service: Arc<TagService>,
     pub(crate) vlan_service: Arc<VlanService>,
     pub(crate) network_service: Arc<NetworkService>,
@@ -180,6 +185,10 @@ pub struct BuildGraphParams<'a> {
     pub ports: &'a [Port],
     pub bindings: &'a [Binding],
     pub interfaces: &'a [Interface],
+    /// GH #701: the merged neighbour read-model — see `TopologyContext::neighbours`.
+    pub neighbours: &'a [InterfaceNeighborRow],
+    /// Raw candidate evidence — see `TopologyContext::candidates`.
+    pub candidates: &'a [InterfaceNeighborCandidate],
     pub entity_tags: &'a [Tag],
     pub vlans: &'a [Vlan],
     pub old_nodes: &'a [Node],
@@ -198,15 +207,22 @@ pub struct BuildGraphParams<'a> {
 /// a resolved neighbour (port-precise or device-level), or a host with no IP address at all,
 /// identified only by an interface's MAC — the PROFINET DCP identify case, which has neither a
 /// neighbour nor an IP for `subnet_graph_builder.rs` to place it by.
+///
+/// Neighbours arrive as `has_resolved_neighbours` rather than being read off the interfaces:
+/// they live in their own tables now (GH #701), so the caller resolves them from
+/// `InterfaceNeighborService` and passes the answer in.
 fn any_interface_qualifies_l2_physical(
     interfaces: &[Interface],
     ip_addresses: &[IPAddress],
+    has_resolved_neighbours: bool,
 ) -> bool {
+    if has_resolved_neighbours {
+        return true;
+    }
     let hosts_with_ip: HashSet<Uuid> = ip_addresses.iter().map(|ip| ip.base.host_id).collect();
-    interfaces.iter().any(|i| {
-        i.base.neighbor.is_some()
-            || (i.base.mac_address.is_some() && !hosts_with_ip.contains(&i.base.host_id))
-    })
+    interfaces
+        .iter()
+        .any(|i| i.base.mac_address.is_some() && !hosts_with_ip.contains(&i.base.host_id))
 }
 
 impl TopologyService {
@@ -220,6 +236,7 @@ impl TopologyService {
         port_service: Arc<PortService>,
         binding_service: Arc<BindingService>,
         interface_service: Arc<InterfaceService>,
+        interface_neighbor_service: Arc<InterfaceNeighborService>,
         tag_service: Arc<TagService>,
         vlan_service: Arc<VlanService>,
         network_service: Arc<NetworkService>,
@@ -237,6 +254,7 @@ impl TopologyService {
             port_service,
             binding_service,
             interface_service,
+            interface_neighbor_service,
             tag_service,
             vlan_service,
             network_service,
@@ -323,6 +341,18 @@ impl TopologyService {
                 snapshot_id,
             ))
             .await?;
+        // GH #701: the merged neighbour read-model, pinned to the same live/snapshot state as
+        // `interfaces` above. `candidates` are never Snapshotable (disposable, replaced wholesale
+        // every scan — see `interface_neighbors`), so they're always read live regardless of
+        // `snapshot_id`; a historical snapshot's L2 view renders from `neighbours` alone.
+        let neighbours = self
+            .interface_neighbor_service
+            .resolved_for_network(network_id, snapshot_id)
+            .await?;
+        let candidates = self
+            .interface_neighbor_service
+            .candidates_for_network(network_id)
+            .await?;
         let services = self
             .service_service
             .get_all_as_of_snapshot(
@@ -349,7 +379,16 @@ impl TopologyService {
         // snapshot can't populate (no LLDP neighbors → no L2; no app tags → no
         // Application).
         let support = TopologyViewSupport {
-            l2_physical: any_interface_qualifies_l2_physical(&interfaces, &ip_addresses),
+            // Any resolved neighbour, port-precise or device-level. A network whose links have
+            // all degraded to `Neighbor::Host` still has an L2 topology to show — dashed
+            // `NeighborLink` edges between host containers — and hiding the view is the one
+            // outcome that leaves the operator nothing to look at. Failing that, a no-IP host
+            // identified only by MAC evidence still qualifies.
+            l2_physical: any_interface_qualifies_l2_physical(
+                &interfaces,
+                &ip_addresses,
+                !neighbours.is_empty(),
+            ),
             application: tags.iter().any(|t| t.base.is_application),
         };
         let available_views: Vec<TopologyView> = TopologyView::iter()
@@ -369,6 +408,8 @@ impl TopologyService {
             ports,
             bindings,
             interfaces,
+            neighbours,
+            candidates,
             services,
             vlans,
             tags,
@@ -423,6 +464,13 @@ impl TopologyService {
     /// querying raw entity tables — independent of whatever the topology
     /// was last rebuilt under.
     pub async fn get_view_support(&self, network_id: Uuid) -> Result<TopologyViewSupport, Error> {
+        // Device-level neighbours count too — see the equivalent in `get_topology_data`. Live
+        // only: this check has no snapshot context, and the live view is what it governs.
+        let has_resolved_neighbours = !self
+            .interface_neighbor_service
+            .resolved_for_network(network_id, None)
+            .await?
+            .is_empty();
         let interfaces = self
             .interface_service
             .get_all(StorableFilter::<Interface>::new_from_network_ids(&[
@@ -435,7 +483,11 @@ impl TopologyService {
                 network_id,
             ]))
             .await?;
-        let l2_physical = any_interface_qualifies_l2_physical(&interfaces, &ip_addresses);
+        let l2_physical = any_interface_qualifies_l2_physical(
+            &interfaces,
+            &ip_addresses,
+            has_resolved_neighbours,
+        );
 
         let application = match self.network_service.get_by_id(&network_id).await? {
             Some(network) => self
@@ -494,7 +546,10 @@ impl TopologyService {
 
         let ctx = FilterValueContext {
             interfaces_referenced_as_neighbours: metadata_filter::referenced_neighbour_interfaces(
-                data.interfaces.iter(),
+                data.neighbours.iter(),
+            ),
+            interfaces_with_neighbours: metadata_filter::interfaces_with_neighbours(
+                data.neighbours.iter(),
             ),
         };
 
@@ -609,6 +664,8 @@ impl TopologyService {
                 ports: &data.ports,
                 bindings: &data.bindings,
                 interfaces: &data.interfaces,
+                neighbours: &data.neighbours,
+                candidates: &data.candidates,
                 entity_tags: &data.tags,
                 vlans: &data.vlans,
                 // No stored prior graph to preserve handles from — overrides
@@ -637,6 +694,8 @@ impl TopologyService {
             ports,
             bindings,
             interfaces,
+            neighbours,
+            candidates,
             entity_tags,
             vlans,
             old_edges,
@@ -660,7 +719,9 @@ impl TopologyService {
             vlans,
             options,
             view,
-        );
+        )
+        .with_neighbours(neighbours)
+        .with_candidates(candidates);
 
         // Build grouping config from request options
         let grouping = GroupingConfig::from_request_options(&options.request, view);
@@ -820,7 +881,7 @@ mod tests {
     fn a_no_ip_mac_only_host_qualifies_the_network_for_l2() {
         let host_id = Uuid::new_v4();
         let interfaces = vec![interface(host_id, Some("aa:bb:cc:dd:ee:ff"))];
-        assert!(any_interface_qualifies_l2_physical(&interfaces, &[]));
+        assert!(any_interface_qualifies_l2_physical(&interfaces, &[], false));
     }
 
     /// The condition is "no IP *at all*", not "this interface has no IP" — a host with an IP
@@ -833,13 +894,33 @@ mod tests {
         let ip_addresses = vec![ip_address(host_id)];
         assert!(!any_interface_qualifies_l2_physical(
             &interfaces,
-            &ip_addresses
+            &ip_addresses,
+            false
         ));
     }
 
     #[test]
     fn no_mac_and_no_neighbour_does_not_qualify() {
         let interfaces = vec![interface(Uuid::new_v4(), None)];
-        assert!(!any_interface_qualifies_l2_physical(&interfaces, &[]));
+        assert!(!any_interface_qualifies_l2_physical(
+            &interfaces,
+            &[],
+            false
+        ));
+    }
+
+    /// The other half of the predicate, which moved out of `Interface` and into its own tables
+    /// (GH #701): a resolved neighbour qualifies the network on its own, whatever the interfaces
+    /// carry. A host with an IP and no MAC fails every other condition.
+    #[test]
+    fn a_resolved_neighbour_qualifies_the_network_on_its_own() {
+        let host_id = Uuid::new_v4();
+        let interfaces = vec![interface(host_id, None)];
+        let ip_addresses = vec![ip_address(host_id)];
+        assert!(any_interface_qualifies_l2_physical(
+            &interfaces,
+            &ip_addresses,
+            true
+        ));
     }
 }

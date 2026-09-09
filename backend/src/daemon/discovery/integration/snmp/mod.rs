@@ -55,6 +55,7 @@ use crate::{
             base::{Host, HostBase},
             name::{HostName, HostNameSources},
         },
+        interface_neighbors::r#impl::base::InterfaceNeighborEvidence,
         interfaces::r#impl::base::{
             IfAdminStatus, IfOperStatus, Interface, InterfaceBase, InterfaceDataComplete, if_type,
         },
@@ -307,7 +308,19 @@ impl DiscoveryIntegration for SnmpIntegration {
             snmp_if_entries
                 .iter()
                 .map(|entry| {
-                    convert_snmp_if_entry(entry, network_id, &[], &[], &[], &[], &no_vlan_uuids)
+                    // ipAddrTable hasn't been queried yet at this early checkpoint (see below) —
+                    // every row reports `ip_configured: false` here and gets the real value once the
+                    // authoritative interface set is written later in this same poll.
+                    convert_snmp_if_entry(
+                        entry,
+                        network_id,
+                        &[],
+                        &[],
+                        &[],
+                        &[],
+                        &no_vlan_uuids,
+                        &HashSet::new(),
+                    )
                 })
                 .collect(),
             if_table.set_complete,
@@ -498,6 +511,14 @@ impl DiscoveryIntegration for SnmpIntegration {
             claim: ip_addr_table.claim,
         };
         let ip_addr_table = ip_addr_table.records;
+        // ifIndexes the device's own ipAddrTable binds an IP address to. On a host that exposes
+        // one MAC across a real NIC and several NDIS filter/LWF pseudo-interfaces (GH #668), only
+        // the real NIC's ifIndex ever appears here — a filter driver is not a distinct entry the
+        // IP stack configures an address on. Kept independent of `ip_address_id`, which requires
+        // the MAC to be unique on the host before it links anything and is therefore blank for
+        // exactly the hosts this signal exists to help.
+        let ip_configured_if_indexes: HashSet<i32> =
+            ip_addr_table.values().map(|entry| entry.if_index).collect();
 
         // Query ARP table for remote host discovery
         let arp = query_or_default(ip, "arp", query_arp_table(&mut session, ip)).await;
@@ -778,6 +799,7 @@ impl DiscoveryIntegration for SnmpIntegration {
                         &bridge_fdb,
                         &port_vlan_membership,
                         &vlan_number_to_uuid,
+                        &ip_configured_if_indexes,
                     )
                 })
                 .collect(),
@@ -1192,34 +1214,30 @@ pub(crate) fn remap_lldp_local_ports(
 
 /// Count the neighbours that will reach no interface, naming each one's evidence.
 ///
-/// Mirrors the attachment rule in [`convert_snmp_if_entry`] exactly — first neighbour whose
-/// `local_port_index` equals an interface's `if_index` — so "counted as dropped" and "actually
-/// dropped" cannot drift apart. The evidence line carries the far end's own identity as well as
-/// the local-port columns, because on the identity path there is no `lldpLocPortTable` row to
-/// describe and the neighbour's chassis is the only thing that names what was lost.
+/// GH #701: `convert_snmp_if_entry` used to keep only the first neighbour per `local_port_index`
+/// and this function counted every neighbour behind it as dropped — the exact mechanism behind
+/// "only 2 of 3 edges render on a shared L2 segment." `convert_snmp_if_entry` now emits every
+/// matching neighbour as its own candidate, so a second neighbour on an already-claimed port is no
+/// longer discarded and must not be counted here either — only a neighbour naming an `ifIndex`
+/// nothing on the device has is genuinely lost, and that is the one case left.
 pub(crate) fn count_dropped_neighbours(
     neighbors: &[LldpNeighbor],
     loc_ports: &HashMap<i32, LldpLocalPort>,
     if_entries: &[IfTableEntry],
 ) -> usize {
     let if_indexes: HashSet<i32> = if_entries.iter().map(|e| e.if_index).collect();
-    let mut claimed: HashSet<i32> = HashSet::new();
     let mut dropped = 0;
 
     for neighbor in neighbors {
         let port = neighbor.local_port_index;
-        let reason = if !if_indexes.contains(&port) {
-            "no interface on the device has this ifIndex"
-        } else if !claimed.insert(port) {
-            "another neighbour on the same port was recorded first"
-        } else {
+        if if_indexes.contains(&port) {
             continue;
-        };
+        }
 
         let entry = loc_ports.get(&port);
         tracing::debug!(
             local_port = port,
-            reason,
+            reason = "no interface on the device has this ifIndex",
             subtype = ?entry.and_then(|e| e.port_id_subtype),
             port_id = ?entry.and_then(|e| e.port_id.as_deref()),
             port_id_mac = ?entry.and_then(|e| e.port_id_mac),
@@ -1417,8 +1435,60 @@ fn resolve_lldp_local_port(
     None
 }
 
+/// Build one candidate per LLDP neighbour record heard on this port.
+///
+/// GH #701: previously `convert_snmp_if_entry` kept only the *first* matching record
+/// (`.find()`), which is the confirmed root cause of "only 2 of 3 edges render on a shared L2
+/// segment" — a shared segment's ports each hear more than one neighbour, and every one past the
+/// first was silently discarded. `.filter()` instead of `.find()` is the entire fix at this layer;
+/// resolution (server-side) is what turns multiple candidates into multiple links.
+fn lldp_candidates_for_port(
+    entry: &IfTableEntry,
+    lldp_neighbors: &[LldpNeighbor],
+) -> Vec<InterfaceNeighborEvidence> {
+    lldp_neighbors
+        .iter()
+        .filter(|n| n.local_port_index == entry.if_index)
+        .map(|n| InterfaceNeighborEvidence {
+            lldp_chassis_id: n
+                .remote_chassis_id_subtype
+                .zip(n.remote_chassis_id_bytes.as_ref())
+                .and_then(|(subtype, bytes)| LldpChassisId::from_snmp(subtype, bytes)),
+            lldp_port_id: n
+                .remote_port_id_subtype
+                .zip(n.remote_port_id_bytes.as_ref())
+                .and_then(|(subtype, bytes)| LldpPortId::from_snmp(subtype, bytes)),
+            lldp_sys_name: n.remote_sys_name.clone(),
+            lldp_port_desc: n.remote_port_desc.clone(),
+            lldp_mgmt_addr: n.remote_mgmt_addr,
+            lldp_sys_desc: n.remote_sys_desc.clone(),
+            ..Default::default()
+        })
+        .collect()
+}
+
+/// Build one candidate per CDP neighbour record heard on this port. See
+/// [`lldp_candidates_for_port`] — same fix, CDP side.
+fn cdp_candidates_for_port(
+    entry: &IfTableEntry,
+    cdp_neighbors: &[CdpNeighbor],
+) -> Vec<InterfaceNeighborEvidence> {
+    cdp_neighbors
+        .iter()
+        .filter(|n| n.local_port_index == entry.if_index)
+        .map(|n| InterfaceNeighborEvidence {
+            cdp_device_id: n.remote_device_id.clone(),
+            cdp_port_id: n.remote_port_id.clone(),
+            cdp_platform: n.remote_platform.clone(),
+            cdp_address: n.remote_address,
+            ..Default::default()
+        })
+        .collect()
+}
+
 /// Convert SNMP ifTable entry to Interface entity with LLDP/CDP/FDB neighbor data.
 /// Uses Uuid::nil() for host_id as placeholder - server will set correct host_id.
+#[allow(clippy::too_many_arguments)]
 fn convert_snmp_if_entry(
     entry: &IfTableEntry,
     network_id: Uuid,
@@ -1427,30 +1497,14 @@ fn convert_snmp_if_entry(
     bridge_fdb: &[BridgeFdbEntry],
     port_vlan_membership: &[PortVlanMembership],
     vlan_number_to_uuid: &std::collections::HashMap<u16, Uuid>,
+    ip_configured_if_indexes: &HashSet<i32>,
 ) -> Interface {
-    // Find LLDP neighbor data for this port (match by local_port_index == if_index)
-    let lldp_neighbor = lldp_neighbors
-        .iter()
-        .find(|n| n.local_port_index == entry.if_index);
-
-    // Find CDP neighbor data for this port
-    let cdp_neighbor = cdp_neighbors
-        .iter()
-        .find(|n| n.local_port_index == entry.if_index);
-
-    // Convert LLDP chassis ID using subtype + raw bytes via from_snmp()
-    let lldp_chassis_id = lldp_neighbor.and_then(|n| {
-        let subtype = n.remote_chassis_id_subtype?;
-        let bytes = n.remote_chassis_id_bytes.as_ref()?;
-        LldpChassisId::from_snmp(subtype, bytes)
-    });
-
-    // Convert LLDP port ID using subtype + raw bytes via from_snmp()
-    let lldp_port_id = lldp_neighbor.and_then(|n| {
-        let subtype = n.remote_port_id_subtype?;
-        let bytes = n.remote_port_id_bytes.as_ref()?;
-        LldpPortId::from_snmp(subtype, bytes)
-    });
+    // Every LLDP record and every CDP record heard on this port becomes its own candidate — an
+    // LLDP entry and a CDP entry for the same physical neighbour stay two rows (see
+    // `InterfaceNeighborEvidence`'s module docs), and a shared segment's port hearing several
+    // distinct neighbours keeps every one of them instead of the first.
+    let mut neighbor_candidates = lldp_candidates_for_port(entry, lldp_neighbors);
+    neighbor_candidates.extend(cdp_candidates_for_port(entry, cdp_neighbors));
 
     // Find VLAN membership for this port
     let vlan_membership = port_vlan_membership
@@ -1488,21 +1542,8 @@ fn convert_snmp_if_entry(
             )
         }),
         ip_address_id: None, // Linked server-side via MAC matching
-        neighbor: None,      // Resolved server-side from LLDP/CDP data
-        // Stamped server-side from the evidence carried in this payload, on ingest.
-        neighbor_seen_at: None,
-        // LLDP raw data
-        lldp_chassis_id,
-        lldp_port_id,
-        lldp_sys_name: lldp_neighbor.and_then(|n| n.remote_sys_name.clone()),
-        lldp_port_desc: lldp_neighbor.and_then(|n| n.remote_port_desc.clone()),
-        lldp_mgmt_addr: lldp_neighbor.and_then(|n| n.remote_mgmt_addr),
-        lldp_sys_desc: lldp_neighbor.and_then(|n| n.remote_sys_desc.clone()),
-        // CDP raw data
-        cdp_device_id: cdp_neighbor.and_then(|n| n.remote_device_id.clone()),
-        cdp_port_id: cdp_neighbor.and_then(|n| n.remote_port_id.clone()),
-        cdp_platform: cdp_neighbor.and_then(|n| n.remote_platform.clone()),
-        cdp_address: cdp_neighbor.and_then(|n| n.remote_address),
+        ip_configured: ip_configured_if_indexes.contains(&entry.if_index),
+        neighbor_candidates,
         // Bridge FDB data
         fdb_macs: if fdb_macs.is_empty() {
             None
@@ -1608,6 +1649,7 @@ mod tests {
             &[],
             &[],
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
 
         // ifTable data survives the enrichment-free conversion.
@@ -1619,8 +1661,7 @@ mod tests {
         assert_eq!(interface.base.network_id, network_id);
 
         // Enrichment that hasn't been collected yet is absent, not fabricated.
-        assert!(interface.base.lldp_chassis_id.is_none());
-        assert!(interface.base.cdp_device_id.is_none());
+        assert!(interface.base.neighbor_candidates.is_empty());
         assert!(interface.base.fdb_macs.is_none());
         assert!(interface.base.native_vlan_id.is_none());
         assert!(interface.base.vlan_ids.is_none());
@@ -1679,6 +1720,7 @@ mod tests {
             &[],
             &membership,
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
 
         assert_eq!(result.base.native_vlan_id, None);
@@ -1705,6 +1747,7 @@ mod tests {
             &[],
             &[],
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
 
         assert_eq!(result.base.native_vlan_id, None);
@@ -1738,6 +1781,7 @@ mod tests {
             &[],
             &membership,
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
 
         assert_eq!(result.base.native_vlan_id, None);
@@ -1853,20 +1897,46 @@ mod tests {
         );
     }
 
-    /// `convert_snmp_if_entry` attaches the first neighbour whose index matches and no more, so a
-    /// second one on the same port is lost as completely as one on no port. Counting only the
-    /// index misses would report this device as clean.
+    /// GH #701: `convert_snmp_if_entry` used to attach only the first neighbour whose index
+    /// matched, so a second one on the same port was lost as completely as one on no port — the
+    /// confirmed root cause of "only 2 of 3 edges render on a shared L2 segment." It now emits
+    /// every matching neighbour as its own candidate, so both survive: neither
+    /// `remap_lldp_local_ports`' drop count nor `convert_snmp_if_entry`'s candidate set loses the
+    /// second one.
     #[test]
-    fn a_second_neighbour_on_one_port_is_counted_as_dropped() {
-        use super::remap_lldp_local_ports;
+    fn a_second_neighbour_on_one_port_is_kept() {
+        use super::{convert_snmp_if_entry, remap_lldp_local_ports};
+        use uuid::Uuid;
 
         let if_entries = [if_entry(3, "Gi0/3")];
         let empty = std::collections::HashMap::new();
         let mut neighbors = vec![lldp_neighbor(3, "phone"), lldp_neighbor(3, "laptop")];
 
         let outcome = remap_lldp_local_ports(&mut neighbors, &empty, &if_entries);
+        assert_eq!(outcome.dropped, 0, "both neighbours reach a real ifIndex");
 
-        assert_eq!(outcome.dropped, 1);
+        let result = convert_snmp_if_entry(
+            &if_entries[0],
+            Uuid::nil(),
+            &neighbors,
+            &[],
+            &[],
+            &[],
+            &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
+        );
+
+        let sys_names: Vec<Option<String>> = result
+            .base
+            .neighbor_candidates
+            .iter()
+            .map(|c| c.lldp_sys_name.clone())
+            .collect();
+        assert_eq!(
+            sys_names,
+            vec![Some("phone".to_string()), Some("laptop".to_string())],
+            "both neighbours on the shared port must survive as distinct candidates"
+        );
     }
 
     #[test]
@@ -1903,8 +1973,16 @@ mod tests {
             &[],
             &[],
             &std::collections::HashMap::new(),
+            &std::collections::HashSet::new(),
         );
-        assert_eq!(result.base.lldp_sys_name, Some("switch-peer".to_string()));
+        assert_eq!(
+            result
+                .base
+                .neighbor_candidates
+                .first()
+                .and_then(|c| c.lldp_sys_name.clone()),
+            Some("switch-peer".to_string())
+        );
     }
 
     // --- macAddress(3) local ports (Westermo industrial switches) ---

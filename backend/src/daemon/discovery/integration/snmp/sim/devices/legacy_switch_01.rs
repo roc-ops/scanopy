@@ -17,7 +17,7 @@ use super::inline;
 pub fn device() -> SimDevice {
     SimDevice {
         name: "legacy-switch-01",
-        ip: Ipv4Addr::new(192, 168, 7, 236),
+        ip: Ipv4Addr::UNSPECIFIED,
         purpose: Purpose::Regression {
             issue: "#557",
             defect: "SNMPv1 has no getbulk, so every table must come back over getnext",

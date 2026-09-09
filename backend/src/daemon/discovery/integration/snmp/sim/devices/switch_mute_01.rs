@@ -8,10 +8,14 @@ use crate::server::credentials::r#impl::types::CredentialType;
 
 use super::inline;
 
+/// This device's identity, for a peer that names it rather than typing its address — see
+/// `switch_offsite_01::lldp`.
+pub const NAME: &str = "switch-mute-01";
+
 pub fn device() -> SimDevice {
     SimDevice {
-        name: "switch-mute-01",
-        ip: Ipv4Addr::new(192, 168, 7, 248),
+        name: NAME,
+        ip: Ipv4Addr::UNSPECIFIED,
         purpose: Purpose::Regression {
             issue: "the partial-failure reporting",
             defect: "answers the credential and serves nothing, which used to read to an operator as a clean scan",

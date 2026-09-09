@@ -17,7 +17,7 @@ use super::inline;
 pub fn device() -> SimDevice {
     SimDevice {
         name: "switch-access-01",
-        ip: Ipv4Addr::new(192, 168, 7, 231),
+        ip: Ipv4Addr::UNSPECIFIED,
         purpose: Purpose::Control {
             role: "a far end named by switch-core-01's Gi0/1, and the lab's only stacked chassis — the one entPhysicalTable serving several chassis rows, which is what the collapse's index tiebreak is selecting between",
         },

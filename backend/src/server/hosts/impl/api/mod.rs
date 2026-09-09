@@ -595,23 +595,15 @@ impl InterfaceInput {
                     .mac_address
                     .map(|m| MacEvidence::new(MacEvidenceValue(m), AttributeSource::Manual)),
                 ip_address_id: self.ip_address_id,
-                // Neighbor resolution fields - not set from API, resolved server-side
-                neighbor: None,
-                neighbor_seen_at: None,
-                lldp_chassis_id: None,
-                lldp_port_id: None,
-                lldp_sys_name: None,
-                lldp_port_desc: None,
-                lldp_mgmt_addr: None,
-                lldp_sys_desc: None,
-                cdp_device_id: None,
-                cdp_port_id: None,
-                cdp_platform: None,
-                cdp_address: None,
+                // Not an SNMP walk — no ipAddrTable to read, so this signal is unavailable here.
+                ip_configured: false,
+                // Neighbor resolution — not set from API, resolved server-side.
+                neighbor_candidates: Vec::new(),
                 fdb_macs: None,
                 native_vlan_id: None,
                 vlan_ids: None,
             },
+            legacy_neighbor_evidence: Default::default(),
         }
     }
 }

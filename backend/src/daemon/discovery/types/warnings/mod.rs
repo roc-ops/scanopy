@@ -358,6 +358,19 @@ pub enum DiscoveryWarning {
         /// "this network is large" from "something is wrong".
         neighbours: u32,
     },
+    /// FDB link resolution ran out of its time budget, so this scan's FDB-derived links are
+    /// incomplete.
+    ///
+    /// Distinct from `NeighbourResolutionIncomplete`: that pass runs first and this one is
+    /// strictly sequenced after it, so a reader needs to know which pass stopped to judge how
+    /// much of Physical Topology is affected.
+    #[schema(title = "FdbResolutionIncomplete")]
+    FdbResolutionIncomplete {
+        /// Seconds the pass was allowed before it was stopped.
+        budget_seconds: u32,
+        /// Interfaces with an unresolved single-MAC FDB entry it was working through.
+        interfaces: u32,
+    },
 
     // ---- Meta ------------------------------------------------------------
     /// The run produced more warnings than the scan record holds. Emitted rather than dropping
@@ -567,6 +580,7 @@ pub enum DiscoveryWarningCode {
     LldpPortAmbiguous,
     ProvisionalSubnetInferred,
     NeighbourResolutionIncomplete,
+    FdbResolutionIncomplete,
     WarningsTruncated,
     /// Absorbs a code from a newer binary. Fieldless, so `#[serde(other)]` applies — the text of
     /// an unrecognised warning rides on [`DiscoveryWarning::Unknown`] instead, where no metric
@@ -649,6 +663,7 @@ impl DiscoveryWarning {
             Self::NeighbourResolutionIncomplete { .. } => {
                 DiscoveryWarningCode::NeighbourResolutionIncomplete
             }
+            Self::FdbResolutionIncomplete { .. } => DiscoveryWarningCode::FdbResolutionIncomplete,
             Self::WarningsTruncated { .. } => DiscoveryWarningCode::WarningsTruncated,
             Self::Unknown { .. } => DiscoveryWarningCode::Unknown,
         }
@@ -709,6 +724,7 @@ impl DiscoveryWarning {
             | Self::LldpPortAmbiguous(_)
             | Self::ProvisionalSubnetInferred(_)
             | Self::NeighbourResolutionIncomplete { .. }
+            | Self::FdbResolutionIncomplete { .. }
             | Self::WarningsTruncated { .. }
             | Self::Unknown { .. } => None,
         }

@@ -84,11 +84,14 @@ impl Lab {
         let device = crate::daemon::discovery::integration::snmp::sim::device(name);
         let collected = harness::collect(&device).await;
 
-        let lldp = device.tables.lldp.as_ref();
-        let (subtype, value) = lldp
-            .map(|table| table.chassis.id.to_snmp(table.chassis.encoding))
-            .expect("every device in these tests advertises LLDP");
-        let chassis_id = LldpChassisId::from_snmp(subtype, &value).map(|id| id.identifier());
+        // Most devices in this lab advertise LLDP; a stock Windows SNMP service does not answer
+        // `lldpLocalSystemData` about itself (GH #668's `pc-windows-nic-filters`), which must still
+        // be a scannable host — its resolution as a neighbour rests entirely on its interfaces'
+        // MACs, not on a self-reported chassis id.
+        let chassis_id = device.tables.lldp.as_ref().and_then(|table| {
+            let (subtype, value) = table.chassis.id.to_snmp(table.chassis.encoding);
+            LldpChassisId::from_snmp(subtype, &value).map(|id| id.identifier())
+        });
 
         let mut record = host(&self.network_id);
         record.base.name = HostName::manual(name.to_string());
@@ -101,8 +104,22 @@ impl Lab {
             .map(|v| Attributed::new(HostSysNameValue(v), SNMP_READ));
         self.storage.hosts.create(&record).await.unwrap();
 
+        // Which ifIndexes the device's own ipAddrTable binds an address to — see
+        // `InterfaceBase::ip_configured`. Computed once per scan, exactly as `convert_snmp_if_
+        // entry` does daemon-side, so a seeded interface's tie-break signal matches what a real
+        // scan of this device would have set.
+        let ip_configured_if_indexes: std::collections::HashSet<i32> = collected
+            .ip_addr_table
+            .values()
+            .map(|e| e.if_index)
+            .collect();
         for entry in &collected.if_table.entries {
-            self.interface(record.id, entry).await;
+            self.interface(
+                record.id,
+                entry,
+                ip_configured_if_indexes.contains(&entry.if_index),
+            )
+            .await;
         }
 
         Scanned {
@@ -137,7 +154,12 @@ impl Lab {
         record
     }
 
-    async fn interface(&self, host_id: Uuid, entry: &IfTableEntry) -> Interface {
+    async fn interface(
+        &self,
+        host_id: Uuid,
+        entry: &IfTableEntry,
+        ip_configured: bool,
+    ) -> Interface {
         let interface = Interface::new(InterfaceBase {
             host_id,
             network_id: self.network_id,
@@ -151,6 +173,7 @@ impl Lab {
                 .map(|m| MacEvidence::new(MacEvidenceValue(m), SNMP_READ)),
             admin_status: Some(IfAdminStatus::Up),
             oper_status: Some(IfOperStatus::Up),
+            ip_configured,
             ..Default::default()
         });
         self.storage.interfaces.create(&interface).await.unwrap();
@@ -491,6 +514,62 @@ async fn a_mac_that_identifies_exactly_one_port_still_resolves() {
         mac_of(&interface.base.mac_address),
         Some("00:07:7c:20:01:e3".parse::<MacAddress>().unwrap()),
         "it must land on the port that actually carries that address"
+    );
+}
+
+/// GH #668's last reported symptom, and the acceptance case for `ip_configured`.
+///
+/// `pc-windows-nic-filters` exposes one MAC on a real NIC (ifIndex 7) and on three NDIS filter/LWF
+/// pseudo-interfaces layered on top of it (18-20) — all four report an ordinary ethernet
+/// `if_type`, so `physical_if_types()`'s exclusion does not separate them and, before the fix,
+/// this is exactly `a_mac_on_every_port_of_the_far_end_resolves_to_no_port`'s shape:
+/// `switch-dlink-02`'s neighbour on port 7 resolves the host but leaves the port `Ambiguous`. The
+/// one thing that does separate the four candidates, confirmed against the reporting customer's
+/// own debug log: `ipAddrTable` binds the host's address to the real NIC's ifIndex only.
+#[tokio::test]
+async fn the_ip_configured_nic_resolves_among_its_own_filter_pseudo_interfaces() {
+    let lab = Lab::new().await;
+    let pc = lab.scan("pc-windows-nic-filters").await;
+    let switch = lab.scan("switch-dlink-02").await;
+
+    let neighbour = switch
+        .collected
+        .neighbours_on(7)
+        .into_iter()
+        .next()
+        .expect("a neighbour on local port 7");
+    let port_id = Scanned::advertised_port(neighbour);
+    assert!(matches!(port_id, LldpPortId::MacAddress(_)));
+
+    // The host resolves via the MAC on its interfaces — this device never advertises its own
+    // chassis id, matching the real PC-069's `has_lldp_local=false`.
+    assert_eq!(
+        Scanned::advertised_chassis(neighbour)
+            .resolve_host_id(&lab.resolver, lab.network_id, AdvertisedIdentity::default())
+            .await,
+        IdentityResolution::Resolved(pc.host.id)
+    );
+
+    let resolved = port_id.resolve_if_entry_id(&lab.resolver, pc.host.id).await;
+    let IdentityResolution::Resolved(interface_id) = resolved else {
+        panic!("the ipAddrTable-bound NIC must resolve the tie, got {resolved:?}");
+    };
+
+    let interface = lab
+        .storage
+        .interfaces
+        .get_by_id(&interface_id)
+        .await
+        .unwrap()
+        .expect("the interface exists");
+    assert_eq!(
+        interface.base.if_index,
+        Some(7),
+        "it must land on the real NIC, not one of its filter pseudo-interfaces"
+    );
+    assert!(
+        interface.base.ip_configured,
+        "the resolved interface must be the one ipAddrTable actually bound"
     );
 }
 

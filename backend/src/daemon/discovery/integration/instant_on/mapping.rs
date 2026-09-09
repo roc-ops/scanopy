@@ -30,6 +30,7 @@ use std::net::IpAddr;
 use uuid::Uuid;
 
 use crate::daemon::discovery::integration::controller::{ControllerIdentity, MappedClient};
+use crate::server::interface_neighbors::r#impl::base::InterfaceNeighborEvidence;
 use crate::server::interfaces::r#impl::base::{
     IfAdminStatus, IfOperStatus, Interface, InterfaceBase,
 };
@@ -317,21 +318,27 @@ fn apply_uplink(
         return;
     };
 
-    interface.base.lldp_chassis_id = Some(LldpChassisId::MacAddress(parent_mac));
-    // `LocallyAssigned` holding the parent's *if_index*, not its port id string: the resolver
-    // tries a name lookup and then parses the value as an ifIndex, and the parent's interfaces are
-    // numbered by the same `port_if_index`, so the index tier hits. Passing the raw `"1/1/1"`
-    // would dead-end in both tiers.
-    interface.base.lldp_port_id = uplink
-        .remote_port_id
-        .as_deref()
-        .map(str::trim)
-        .zip(parent)
-        .and_then(|(remote, parent)| index_of_port(parent, remote))
-        .map(|idx| LldpPortId::LocallyAssigned(idx.to_string()));
-    interface.base.lldp_sys_name = parent
-        .and_then(|p| p.name.clone())
-        .filter(|n| !n.trim().is_empty());
+    // One candidate, replacing whatever this port already held — this function is authoritative
+    // for the port it names (mirrors the pre-GH #701 scalar-overwrite semantics `InterfaceBase.
+    // lldp_*` had).
+    interface.base.neighbor_candidates = vec![InterfaceNeighborEvidence {
+        lldp_chassis_id: Some(LldpChassisId::MacAddress(parent_mac)),
+        // `LocallyAssigned` holding the parent's *if_index*, not its port id string: the resolver
+        // tries a name lookup and then parses the value as an ifIndex, and the parent's
+        // interfaces are numbered by the same `port_if_index`, so the index tier hits. Passing
+        // the raw `"1/1/1"` would dead-end in both tiers.
+        lldp_port_id: uplink
+            .remote_port_id
+            .as_deref()
+            .map(str::trim)
+            .zip(parent)
+            .and_then(|(remote, parent)| index_of_port(parent, remote))
+            .map(|idx| LldpPortId::LocallyAssigned(idx.to_string())),
+        lldp_sys_name: parent
+            .and_then(|p| p.name.clone())
+            .filter(|n| !n.trim().is_empty()),
+        ..Default::default()
+    }];
 }
 
 /// The `if_index` this device's port with `port_id` was mapped to.
@@ -547,6 +554,12 @@ mod tests {
             .unwrap_or_else(|| panic!("expected an interface at index {if_index}"))
     }
 
+    /// The single candidate `apply_uplink` writes for a port — it is authoritative for the port
+    /// it names, so a mapped port never carries more than one.
+    fn candidate(port: &Interface) -> Option<&InterfaceNeighborEvidence> {
+        port.base.neighbor_candidates.first()
+    }
+
     /// The rule that stacking depends on. A stack numbers ports per member, so `"1/1/1"` and
     /// `"2/1/1"` are different physical ports on different member switches. Keying on
     /// `portNumber` would collapse them onto one interface and silently lose half the stack's
@@ -607,17 +620,17 @@ mod tests {
         let uplink_port = interface(edge, 24);
 
         assert_eq!(
-            uplink_port.base.lldp_chassis_id,
+            candidate(uplink_port).and_then(|c| c.lldp_chassis_id.clone()),
             Some(LldpChassisId::MacAddress("aa:bb:cc:00:00:01".to_string()))
         );
         // "1/1/2" on the parent stack maps to if_index 1_001_002.
         assert_eq!(
-            uplink_port.base.lldp_port_id,
+            candidate(uplink_port).and_then(|c| c.lldp_port_id.clone()),
             Some(LldpPortId::LocallyAssigned("1001002".to_string()))
         );
         assert_eq!(
-            uplink_port.base.lldp_sys_name.as_deref(),
-            Some("Core Stack")
+            candidate(uplink_port).and_then(|c| c.lldp_sys_name.clone()),
+            Some("Core Stack".to_string())
         );
     }
 

@@ -5,6 +5,7 @@ use crate::server::{
     bindings::r#impl::base::Binding,
     dependencies::r#impl::base::Dependency,
     hosts::r#impl::base::Host,
+    interface_neighbors::r#impl::base::{InterfaceNeighborCandidate, InterfaceNeighborRow},
     interfaces::r#impl::base::Interface,
     ip_addresses::r#impl::base::IPAddress,
     ports::r#impl::base::Port,
@@ -116,6 +117,17 @@ pub struct TopologyData {
     pub bindings: Vec<Binding>,
     /// Interfaces included in this topology.
     pub interfaces: Vec<Interface>,
+    /// Resolved LLDP/CDP neighbour adjacencies (GH #701): the merged read-model of
+    /// `interface_neighbor_interfaces` + `interface_neighbor_hosts`, replacing the old
+    /// `Interface.neighbor` scalar now that a port can anchor several links.
+    #[serde(default)]
+    pub neighbours: Vec<InterfaceNeighborRow>,
+    /// Raw LLDP/CDP candidate evidence behind `neighbours` (GH #701) — for the admin/debug
+    /// unresolved-evidence display and per-adjacency protocol derivation
+    /// (`TopologyContext::interface_has_lldp_evidence`), neither of which the resolved rows alone
+    /// can answer (they carry no raw evidence, by design — see `interface_neighbors`).
+    #[serde(default)]
+    pub candidates: Vec<InterfaceNeighborCandidate>,
     /// Services included in this topology.
     pub services: Vec<Service>,
     /// VLANs included in this topology.

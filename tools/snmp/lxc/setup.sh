@@ -50,22 +50,103 @@ systemctl stop snmpd 2>/dev/null || true
 systemctl disable snmpd 2>/dev/null || true
 sleep 1
 
-# ── 2. Add macvlan interfaces (each with unique MAC) ────────────────
-echo "Configuring macvlan interfaces on $IFACE..."
-for i in "${!HOSTS[@]}"; do
-    ip="${HOSTS[$i]}"
-    mvname="mv-snmp${i}"
-    if ip link show "$mvname" &>/dev/null; then
-        echo "  $mvname ($ip) already exists"
+# ── 2. Durable management address ────────────────────────────────────
+#
+# eth0 is a DHCP lease today. `make snmp-deploy`'s SSH target must stay reachable even when
+# the lab below is completely broken, so it needs an address that does not depend on any
+# macvlan link existing. This adds a static secondary address alongside the existing DHCP
+# config cloud-init already wrote (50-cloud-init.yaml) rather than replacing it — netplan
+# merges list-valued keys like `addresses` across files for the same interface id, so DHCP
+# keeps running and this just adds a second, durable address on top of it.
+#
+# Risk, not silently resolved: 192.168.4.21 is presently only a DHCP-assigned lease. Pinning
+# it here does not reserve it — if the router's DHCP pool later hands that address to a
+# different host, both claim it. A router-side static reservation (this VM's MAC → .21) is
+# still recommended and out of reach from this script.
+if [ -d /etc/netplan ]; then
+    echo "Adding durable management address 192.168.4.21/24 on $IFACE..."
+    cat > /etc/netplan/55-snmp-mgmt.yaml << EOF
+network:
+  version: 2
+  ethernets:
+    ${IFACE}:
+      addresses:
+        - 192.168.4.21/24
+EOF
+    chmod 600 /etc/netplan/55-snmp-mgmt.yaml
+    netplan apply 2>/dev/null || true
+fi
+
+# ── 3. Own the lab's macvlan links and addresses, ordered before snmpd ──
+#
+# Previously this ran once, imperatively, right here, and a separate netplan file tried to
+# re-address the links on boot by matching a MAC that only exists once the link has already
+# been created. Nothing recreated the links themselves — split, order-dependent, and exactly
+# what let the lab go dark across a reboot. Now a single oneshot unit owns both link creation
+# and addressing, runs at every boot ordered before any snmpd unit starts (see make_unit()
+# below), and this script just installs and enables it — which also runs it immediately, for
+# this deploy.
+echo "Installing snmp-lab-network.service (macvlan links + addresses)..."
+cat > /usr/local/bin/snmp-lab-network-up.sh << EOF
+#!/bin/bash
+set -euo pipefail
+IFACE="$IFACE"
+CIDR="$CIDR"
+HOSTS=(${HOSTS[@]})
+for i in "\${!HOSTS[@]}"; do
+    ip="\${HOSTS[\$i]}"
+    mvname="mv-snmp\${i}"
+    if ip link show "\$mvname" &>/dev/null; then
+        echo "  \$mvname (\$ip) already exists"
     else
-        ip link add "$mvname" link "$IFACE" type macvlan mode bridge
-        ip addr add "$ip/$CIDR" dev "$mvname"
-        ip link set "$mvname" up
-        mac=$(ip link show "$mvname" | awk '/ether/{print $2}')
-        echo "  Created $mvname ($ip) mac=$mac"
+        ip link add "\$mvname" link "\$IFACE" type macvlan mode bridge
+        ip link set "\$mvname" up
+        echo "  Created \$mvname"
+    fi
+    if ! ip -4 addr show "\$mvname" | grep -q " \${ip}/"; then
+        ip addr add "\$ip/\$CIDR" dev "\$mvname"
+        echo "  Addressed \$mvname (\$ip)"
     fi
 done
-# ── 3. Write pass handler ────────────────────────────────────────────
+EOF
+chmod +x /usr/local/bin/snmp-lab-network-up.sh
+
+cat > /etc/systemd/system/snmp-lab-network.service << 'EOF'
+[Unit]
+Description=Create and address SNMP lab macvlan interfaces
+After=sys-subsystem-net-devices-eth0.device
+Requires=sys-subsystem-net-devices-eth0.device
+Before=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/snmp-lab-network-up.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Retire the old MAC-matched netplan file: its match can never fire on a fresh boot (nothing
+# recreated the link before netplan ran), and a stale copy next to the unit above that now
+# owns this would just be confusing.
+if [ -f /etc/netplan/60-snmp-test.yaml ]; then
+    echo "Removing stale /etc/netplan/60-snmp-test.yaml..."
+    rm -f /etc/netplan/60-snmp-test.yaml
+    netplan apply 2>/dev/null || true
+fi
+
+systemctl daemon-reload
+systemctl enable snmp-lab-network.service
+# `restart`, not `enable --now`. This is a RemainAfterExit=yes oneshot, so after its first run it
+# stays `active (exited)` forever and `--now` becomes a no-op — the script rewritten above never
+# executes, and any device added since the last reboot silently has no address. That is how three
+# new agents came up dead on a deploy that reported every unit "started": the addresses they bind
+# were never created. Restart re-runs ExecStart unconditionally. The script is idempotent, and the
+# agents are all (re)started further down, after this.
+systemctl restart snmp-lab-network.service
+
+# ── 4. Write pass handler ────────────────────────────────────────────
 #
 # KNOWN CHAOS — read this before chasing a truncation warning.
 #
@@ -272,7 +353,7 @@ install -m 755 "$SCRIPT_DIR/snmp-bulk-refuser.py" "$CONF_DIR/snmp-bulk-refuser.p
 
 
 
-# ── 4. Install the generated devices ─────────────────────────────────
+# ── 5. Install the generated devices ─────────────────────────────────
 #
 # Every data file and every agent config comes from the typed definitions. This step is a copy,
 # deliberately: the checks that used to live here — a data file nobody serves, a config naming a
@@ -295,23 +376,40 @@ printf "  %d data file(s), %d agent config(s)\n" \
     "$(find "$CONF_DIR" -maxdepth 1 -name 'snmpd-*.conf' | wc -l)"
 
 
-# ── 5. Create systemd services ───────────────────────────────────────
+# ── 6. Create systemd services ───────────────────────────────────────
 #
 # One unit per device, plus any context back end. `-I -ifTable,-ifXTable` stops net-snmp answering
 # the interface tables from the VM's own kernel; the subtrees a `pass` cannot displace that way are
 # registered at priority 1 in the generated configs instead.
+#
+# `-M ""` plus `Environment=MIBS=` stop snmpd loading any textual MIB modules at startup: with
+# every OID served from `pass` handlers on numeric OIDs, it never needs to resolve a symbolic
+# name, and the default startup list (UCD-SNMP-MIB, NET-SNMP-AGENT-MIB, ...) was only ever used
+# by the built-in disk/load/extend helper modules this lab doesn't use — silencing it at the
+# source instead of filtering the ~130 lines/start it otherwise emits.
+#
+# `StartLimitIntervalSec=`/`StartLimitBurst=` (new) bound a bind failure to a handful of restarts
+# before systemd gives up and leaves the unit `failed`, where `systemctl --failed` and
+# `make snmp-status` can see it, instead of `Restart=on-failure` retrying forever.
+#
+# `Requires=`/`After=snmp-lab-network.service` orders every agent behind the macvlan links and
+# addresses it binds to (see step 3) — never starts against a bind address that doesn't exist yet.
 echo "Creating systemd services..."
 make_unit() {
     local name="$1" description="$2" extra="${3:-}"
     cat > "/etc/systemd/system/snmpd-${name}.service" << UNIT
 [Unit]
 Description=SNMP Test Agent — ${description}
-After=network.target
+After=network.target snmp-lab-network.service
+Requires=snmp-lab-network.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
 ${extra}
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/snmpd -f -Lo -I -ifTable,-ifXTable -C -c ${CONF_DIR}/snmpd-${name}.conf
+Environment=MIBS=
+ExecStart=/usr/sbin/snmpd -f -Lo -I -ifTable,-ifXTable -M "" -C -c ${CONF_DIR}/snmpd-${name}.conf
 Restart=on-failure
 RestartSec=2
 
@@ -338,7 +436,10 @@ for entry in "${SHIMS[@]:-}"; do
     cat > "/etc/systemd/system/snmp-bulk-refuser-${sname}.service" << UNIT
 [Unit]
 Description=SNMP GETBULK refuser — ${sname} (${slisten}:161 → 127.0.0.1:${sport})
-After=network.target snmpd-${sname}.service
+After=network.target snmp-lab-network.service snmpd-${sname}.service
+Requires=snmp-lab-network.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -363,42 +464,31 @@ for conf in "$CONF_DIR"/snmpd-*-vlan20.conf; do
     make_unit "$name" "${name} bridge context (loopback)" "Before=snmpd-${name%-vlan20}.service"
 done
 
-# ── 6. Persist macvlan interfaces ────────────────────────────────────
-if [ -d /etc/netplan ]; then
-    echo "Persisting macvlan interfaces via netplan..."
-    cat > /etc/netplan/60-snmp-test.yaml << EOF
-network:
-  version: 2
-  ethernets:
-$(for i in "${!HOSTS[@]}"; do
-        mvname="mv-snmp${i}"
-        mac=$(ip link show "$mvname" 2>/dev/null | awk '/ether/{print $2}')
-        cat << INNER
-    ${mvname}:
-      match:
-        macaddress: "${mac}"
-      addresses:
-        - ${HOSTS[$i]}/${CIDR}
-INNER
-done)
+# ── 7. Cap log volume ─────────────────────────────────────────────────
+#
+# Silencing the MIB-parse noise at the source (step 6) removes the everyday volume; this is
+# the backstop so a future restart loop or noisy device still cannot fill the disk the way
+# this one did (3.3 GB in /var/log/syslog alone, from 28 units x ~130 MIB-parse lines/start x
+# tens of thousands of restarts).
+echo "Capping journald and rsyslog..."
+mkdir -p /etc/systemd/journald.conf.d
+cat > /etc/systemd/journald.conf.d/snmp-test-caps.conf << 'EOF'
+[Journal]
+SystemMaxUse=200M
+RateLimitIntervalSec=30s
+RateLimitBurst=1000
 EOF
-    netplan apply 2>/dev/null || true
-elif [ -f /etc/network/interfaces ]; then
-    echo "Persisting macvlan interfaces in /etc/network/interfaces..."
-    for i in "${!HOSTS[@]}"; do
-        mvname="mv-snmp${i}"
-        if ! grep -q "$mvname" /etc/network/interfaces; then
-            cat >> /etc/network/interfaces << EOF
+systemctl restart systemd-journald
 
-auto ${mvname}
-iface ${mvname} inet static
-    address ${HOSTS[$i]}/${CIDR}
-EOF
-        fi
-    done
+# rsyslog mirrors the journal to /var/log/syslog; the packaged logrotate stanza only rotates it
+# weekly, which is not fast enough on its own to bound a burst. Add a size trigger to the
+# existing shared stanza (also covers mail.log/kern.log/auth.log/user.log/cron.log) rather than
+# duplicating the stanza, which would rotate the same files twice per run.
+if [ -f /etc/logrotate.d/rsyslog ] && ! grep -qP '^\tsize 100M$' /etc/logrotate.d/rsyslog; then
+    sed -i '/^\tweekly$/a\	size 100M' /etc/logrotate.d/rsyslog
 fi
 
-# ── 7. Start everything ──────────────────────────────────────────────
+# ── 8. Start everything ──────────────────────────────────────────────
 echo "Starting SNMP agents..."
 systemctl daemon-reload
 # Ahead of the loop: a front agent proxies to these, and a proxy to a dead port answers nothing.
@@ -422,7 +512,7 @@ for name in "${SHIM_UNITS[@]:-}"; do
 done
 
 
-# ── 8. Verify ─────────────────────────────────────────────────────────
+# ── 9. Verify ─────────────────────────────────────────────────────────
 #
 # NOTE: we check systemd service health here, NOT snmpget. The agents bind to
 # macvlan interfaces, and the Linux kernel does not let a host reach its own

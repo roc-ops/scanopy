@@ -17,8 +17,9 @@ use crate::server::{
         base::{Host, HostBase},
         name::{HostName, HostNameSources},
     },
+    interface_neighbors::{r#impl::base::Neighbor, service::InterfaceNeighborService},
     interfaces::{
-        r#impl::base::{Interface, InterfaceDataComplete, Neighbor},
+        r#impl::base::{Interface, InterfaceDataComplete},
         service::InterfaceService,
     },
     ip_addresses::{
@@ -79,6 +80,7 @@ pub struct HostService {
     port_service: Arc<PortService>,
     service_service: Arc<ServiceService>,
     interface_service: Arc<InterfaceService>,
+    interface_neighbor_service: Arc<InterfaceNeighborService>,
     pub daemon_service: Arc<DaemonService>,
     credential_service: Arc<CredentialService>,
     subnet_service: Arc<SubnetService>,
