@@ -113,6 +113,11 @@
 	let hasEmail = $derived(configQuery.data?.has_email_service ?? false);
 	let serverUrl = $derived(configQuery.data?.public_url ?? '');
 
+	// MSI support is hidden for now (revisit later) — flip this back on to restore the
+	// Windows exe/msi toggle. Nothing else is removed; this just stops OsSelector from
+	// rendering the toggle, so windowsMethod stays 'exe' and the MSI download UI is unreachable.
+	const WINDOWS_MSI_ENABLED = false;
+
 	const windowsDownloadUrl =
 		'https://github.com/scanopy/scanopy/releases/latest/download/scanopy-daemon-windows-amd64.exe';
 	const windowsInstallCommand = `Invoke-WebRequest -Uri "${windowsDownloadUrl}" -OutFile "scanopy-daemon-windows-amd64.exe"`;
@@ -384,7 +389,9 @@
 				{linuxMethod}
 				onLinuxMethodChange={(method) => onLinuxMethodChange?.(method)}
 				{windowsMethod}
-				onWindowsMethodChange={(method) => onWindowsMethodChange?.(method)}
+				onWindowsMethodChange={WINDOWS_MSI_ENABLED
+					? (method) => onWindowsMethodChange?.(method)
+					: undefined}
 			>
 				{#snippet afterLabel()}
 					<DocsHint
