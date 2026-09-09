@@ -93,9 +93,17 @@ BSD architecture taken on faith.
 
 1. `tools/dcp/dcp-test-env.sh start` (confirm with `verify` first).
 2. Run discovery from the installed daemon on this Mac, same as any other scan.
-3. Confirm in the DB: a host with no IP addresses, one interface carrying the sim's MAC,
-   sourced `AttributeSource::ProfinetDcp`, named `scanopy-dcp-sim` (from the Identify Response's
-   Name of Station block).
+3. Confirm in the DB: a host with no IP addresses, one interface carrying the sim's reported MAC
+   (`00:1a:2b:dc:90:01` by default — see `dcp-sim.py --device-mac`, not `en0`'s own MAC), sourced
+   `AttributeSource::ProfinetDcp`, named `scanopy-dcp-sim` (from the Identify Response's Name of
+   Station block).
+
+The sim's reported MAC is deliberately not `en0`'s own hardware MAC: `en0`'s real address has the
+locally-administered bit set (so did the original macvlan sim's auto-generated one), and the
+backend refuses to mint a host from a MAC that isn't a real vendor-assigned unicast address —
+confirmed live, the first local run answered correctly but the daemon logged exactly that
+rejection for `en0`'s own MAC. `dcp-sim.py` fabricates a vendor-style address instead (the same
+Cisco OUI `tools/snmp/`'s own fixtures use), so the full mint path can actually be exercised.
 
 This is the last piece of end-to-end proof the unit tests (`dcp/packet.rs`, `dcp/identify.rs`)
 can't provide on their own — they're honest about testing this daemon's understanding of the wire
