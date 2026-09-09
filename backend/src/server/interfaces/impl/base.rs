@@ -758,6 +758,16 @@ mod tests {
             b.fdb_macs = Some(vec!["00:ad:24:af:4e:00".into()]);
         });
         assert!(blank.port_bound_by_mac());
+
+        // ...but a blank chassis id with a usable `sysName` *is* an LLDP row: the chassis arm's
+        // last rung places it, so the FDB tier never claims it and re-examining its binding
+        // against a MAC's uniqueness would judge it by a tier that did not place it.
+        let named = interface(|b| {
+            b.lldp_chassis_id = Some(LldpChassisId::LocallyAssigned(String::new()));
+            b.lldp_sys_name = Some("core-sw1".into());
+            b.fdb_macs = Some(vec!["00:ad:24:af:4e:00".into()]);
+        });
+        assert!(!named.port_bound_by_mac());
     }
 
     /// An identifier with nothing in it is not evidence that anything is attached, so it must not
@@ -774,6 +784,15 @@ mod tests {
             b.lldp_chassis_id = Some(LldpChassisId::MacAddress("00:ad:24:af:4e:00".into()));
         });
         assert!(real.has_neighbor_evidence());
+
+        // A blank chassis id with a `sysName` behind it is evidence, because that is a row the
+        // ladder places. Getting this wrong stops `neighbor_seen_at` advancing on a live port,
+        // and the binding then ages out of the reciprocal tier with no rescan able to repair it.
+        let named = interface(|b| {
+            b.lldp_chassis_id = Some(LldpChassisId::LocallyAssigned(String::new()));
+            b.lldp_sys_name = Some("core-sw1".into());
+        });
+        assert!(named.has_neighbor_evidence());
     }
 
     /// FDB resolution only claims rows with no LLDP/CDP data, so a row carrying both is judged by

@@ -32,9 +32,16 @@ impl UnresolvedReason {
 
 /// The warning for a far end no strategy could place, or `None` when it is not worth reporting.
 ///
-/// `NoStrategy` is deliberately silent on the host side: it counts the `cdp_address`-only rows the
-/// resolver itself calls "nothing here to resolve", and a warning per one of those would bury the
-/// two that mean something.
+/// `NoStrategy` reaches no warning on the host side, and no longer because it is a benign
+/// population worth suppressing — the `cdp_address`-only rows it used to name are not selected at
+/// all now. It is a *divergence* between the guard and the chassis ladder, which is not a far end
+/// anyone can go and scan, so describing it as an unmatched neighbour would misdirect the operator
+/// reading the scan record. It is reported where it belongs instead:
+/// [`LldpResolutionStats::ladder_divergences`], which warns.
+///
+/// The port side is unaffected: `UnresolvedReason::NoStrategy` there means the far end advertised
+/// a port id no tier can look up, which is a real and reportable outcome — see
+/// [`unresolved_port_warning`].
 ///
 /// What each warning carries is what it takes to decide whether an unresolved neighbour is a
 /// device that should have been scanned or one that never will be: which of our devices saw it, on
@@ -360,7 +367,7 @@ impl HostService {
                 // row that got this far has an arm. Kept as the place a future divergence lands,
                 // and made loud rather than silent — a row that is counted but never judged is
                 // exactly how the last three of these went unnoticed.
-                stats.host_no_strategy += 1;
+                stats.ladder_divergences += 1;
                 tracing::warn!(
                     interface_id = %interface.id,
                     "interface passed the resolvable-identity guard but matched no resolution \
@@ -386,11 +393,10 @@ impl HostService {
             ports_resolved_reciprocal = stats.ports_resolved_reciprocal,
             // The five per-reason failure counters this line used to carry are now exactly the
             // count of their `DiscoveryWarning`s, and two sources for one number can only
-            // disagree. `host_no_strategy` stays because nothing warns on it: it counts the
-            // neighbours whose advertised identifier has no lookup strategy at all. It no longer
-            // counts `cdp_address`-only rows, which the shared resolvable-identity predicate
-            // stops admitting in the first place.
-            host_no_strategy = stats.host_no_strategy,
+            // disagree. What is left is not a failure counter at all: it reads zero unless the
+            // guard and the ladder have come apart, and a non-zero here is a defect in this
+            // module rather than anything about the network. See its doc for the two sites.
+            ladder_divergences = stats.ladder_divergences,
             reopened,
             rebound,
             "LLDP/CDP link resolution complete"

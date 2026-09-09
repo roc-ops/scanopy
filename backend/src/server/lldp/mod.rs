@@ -255,7 +255,9 @@ pub fn accept_port_identifier<'a>(source: &str, value: &'a str) -> Option<Cow<'a
 /// and the one #88 exists to prevent, so it is not something to introduce as a side effect of
 /// fixing #88. A port id has a next tier to fall to; a chassis id has none. Refusing one safely
 /// needs the filter and the topology ladder to admit a row on `lldp_sys_name` alone first —
-/// tracked as its own issue, deliberately not folded in here.
+/// tracked as its own issue, deliberately not folded in here. `InterfaceBase`'s
+/// resolvable-identity predicate does read `lldp_sys_name`, but only as the *last rung of the
+/// chassis arm*: it still requires a chassis id to be present, so it is not that work.
 fn decode_tlv_name(value: &[u8]) -> Option<String> {
     // Strict, not lossy: the decode failing *is* the finding. `from_utf8_lossy` answered "here is
     // a string" for a payload that is not one, and that answer is what reached the database.
@@ -1273,6 +1275,93 @@ mod resolution_tests {
             // the verdict it carries out must be the ambiguity, not the miss before it.
             IdentityResolution::Ambiguous
         );
+    }
+
+    /// The row the resolvable-identity refactor silently dropped, end to end: a chassis id that is
+    /// present but blank, with a usable `sysName` beside it. It has always resolved, through the
+    /// last rung of this same arm — so the predicate deciding whether the arm is reached at all
+    /// has to agree, or the row is not selected, stores no neighbour, and raises no warning.
+    ///
+    /// Three links, and a fix needs all three: `interfaces::impl::identity` asserts that the row
+    /// is admitted and that the chassis arm applies to it, and this asserts that the arm, once
+    /// reached, places it.
+    #[tokio::test]
+    async fn a_blank_chassis_id_with_a_sys_name_still_resolves_through_the_fallback() {
+        use crate::server::interfaces::r#impl::base::InterfaceBase;
+
+        let switch = Uuid::new_v4();
+        let inventory = FakeInventory {
+            hosts: vec![FakeHost {
+                id: switch,
+                sys_name: Some("core-sw1".to_string()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        let base = InterfaceBase {
+            lldp_chassis_id: Some(LldpChassisId::LocallyAssigned(String::new())),
+            lldp_sys_name: Some("core-sw1".to_string()),
+            ..Default::default()
+        };
+
+        assert!(
+            base.has_resolvable_identity(),
+            "a row the SQL will not select never gets here at all"
+        );
+        let chassis = base
+            .resolvable_chassis_id()
+            .expect("the chassis arm applies to this row");
+        assert_eq!(
+            chassis
+                .resolve_host_id(&inventory, Uuid::new_v4(), base.lldp_sys_name.as_deref())
+                .await,
+            IdentityResolution::Resolved(switch)
+        );
+    }
+
+    /// The one input that can still reach `LldpResolutionStats::ladder_divergences`, pinned so
+    /// that alarm is known to be able to fire rather than assumed dead — a counter that cannot
+    /// fire reports health it never measured.
+    ///
+    /// Emptiness is written twice on purpose: `identifier_is_resolvable` is ASCII whitespace,
+    /// because it must also be expressible as Postgres `btrim`, while `resolve_host_id`'s
+    /// `sysName` fallback trims with `str::trim`, which is Unicode. A `sysName` of a single
+    /// U+00A0 is therefore content to the guard and padding to the ladder — the row is admitted,
+    /// takes the chassis arm, and no strategy runs. Narrow enough to leave alone rather than
+    /// widen either rule for it, and it is that counter's whole remaining population.
+    #[tokio::test]
+    async fn a_unicode_blank_sys_name_is_the_one_row_the_guard_and_the_ladder_judge_differently() {
+        use crate::server::interfaces::r#impl::base::InterfaceBase;
+
+        let inventory = FakeInventory::default();
+        let base = InterfaceBase {
+            // The two subtypes with no lookup of their own, so only the fallbacks can run.
+            lldp_chassis_id: Some(LldpChassisId::InterfaceAlias(String::new())),
+            lldp_sys_name: Some("\u{a0}".to_string()),
+            ..Default::default()
+        };
+
+        assert!(base.has_resolvable_identity());
+        let chassis = base
+            .resolvable_chassis_id()
+            .expect("the guard admits this row");
+        assert_eq!(
+            chassis
+                .resolve_host_id(&inventory, Uuid::new_v4(), base.lldp_sys_name.as_deref())
+                .await,
+            IdentityResolution::NoStrategy,
+            "no strategy ran, which is what the divergence counter exists to catch"
+        );
+
+        // An ordinary blank sysName is not that case: both rules call it empty, so the row is
+        // never admitted and the alarm stays silent rather than firing on every such port.
+        let ascii_blank = InterfaceBase {
+            lldp_chassis_id: Some(LldpChassisId::InterfaceAlias(String::new())),
+            lldp_sys_name: Some("  ".to_string()),
+            ..Default::default()
+        };
+        assert!(!ascii_blank.has_resolvable_identity());
     }
 
     /// GH #649: Aruba/HP switches advertise the remote port as subtype 7 (locally assigned)

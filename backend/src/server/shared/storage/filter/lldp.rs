@@ -126,6 +126,13 @@ impl<T: Storable> StorableFilter<T> {
     /// "Names a neighbour" is `InterfaceBase::has_resolvable_identity`, rendered into SQL from
     /// the same column list the Rust predicate reads, so this filter cannot select a row the
     /// resolution loop will then throw away unjudged.
+    ///
+    /// **Currently unused.** The resolution pass reads
+    /// [`Self::lldp_neighbors_in_network`] — its superset — and re-examines already-bound rows
+    /// rather than skipping them, which is what this filter's `neighbor_interface_id IS NULL`
+    /// clause would do. Kept and kept correct because `re_examine_port_binding` documents its
+    /// scoping against this predicate, but nothing calls it; it is not a second live definition of
+    /// anything.
     pub fn unresolved_lldp_port_in_network(mut self, network_id: Uuid) -> Self {
         let network_col = self.qualify_column("network_id");
         let has_identity = sql_has_resolvable_identity(|c| self.qualify_column(c));
