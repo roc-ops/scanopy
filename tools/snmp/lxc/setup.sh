@@ -137,7 +137,14 @@ if [ -f /etc/netplan/60-snmp-test.yaml ]; then
 fi
 
 systemctl daemon-reload
-systemctl enable --now snmp-lab-network.service
+systemctl enable snmp-lab-network.service
+# `restart`, not `enable --now`. This is a RemainAfterExit=yes oneshot, so after its first run it
+# stays `active (exited)` forever and `--now` becomes a no-op — the script rewritten above never
+# executes, and any device added since the last reboot silently has no address. That is how three
+# new agents came up dead on a deploy that reported every unit "started": the addresses they bind
+# were never created. Restart re-runs ExecStart unconditionally. The script is idempotent, and the
+# agents are all (re)started further down, after this.
+systemctl restart snmp-lab-network.service
 
 # ── 4. Write pass handler ────────────────────────────────────────────
 #
