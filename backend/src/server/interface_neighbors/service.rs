@@ -132,13 +132,6 @@ impl InterfaceNeighborService {
         // dead code caught here only because nothing else calls it yet). Mirrors
         // `DependencyMemberStorage::save_for_dependency`'s delete-then-insert-in-one-transaction
         // shape instead.
-        // TEMPORARY: diagnosing why interface_neighbor_candidates stays empty for some hosts
-        // despite a clean submission. Remove once found.
-        tracing::info!(
-            interface_id = %interface_id,
-            rows_to_write = rows.len(),
-            "TEMP: replace_candidates_from_discovery writing rows"
-        );
         let mut tx = self.candidates.inner().begin_transaction().await?;
         let filter = StorableFilter::<InterfaceNeighborCandidate>::new_from_uuids_column(
             "interface_id",
@@ -149,12 +142,6 @@ impl InterfaceNeighborService {
             tx.create(row).await?;
         }
         tx.commit().await?;
-        // TEMPORARY: confirm the commit actually landed.
-        tracing::info!(
-            interface_id = %interface_id,
-            rows_written = rows.len(),
-            "TEMP: replace_candidates_from_discovery committed"
-        );
         Ok(())
     }
 
