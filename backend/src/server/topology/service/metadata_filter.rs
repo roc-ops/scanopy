@@ -24,7 +24,7 @@
 //! where toggling them costs nothing. See `FilterApplication` for the rule governing which may be
 //! which.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use uuid::Uuid;
 
@@ -49,18 +49,24 @@ pub struct ServerHideSet {
 }
 
 impl ServerHideSet {
-    /// Whether an entity carrying these filter values should be dropped from the bundle.
+    /// Which filter drops an entity carrying these filter values, if any.
     ///
-    /// True only when some value it holds is hidden in every view that could render it.
-    fn hides(&self, values: &std::collections::BTreeMap<MetadataFilterType, String>) -> bool {
+    /// `Some` only when some value it holds is hidden in every view that could render it. Naming
+    /// the filter rather than answering yes/no is what lets the caller tally drops per filter, so
+    /// the response can say *which* control emptied a view rather than only that something did.
+    fn hidden_by(
+        &self,
+        values: &std::collections::BTreeMap<MetadataFilterType, String>,
+    ) -> Option<MetadataFilterType> {
         if self.rendering_views == 0 {
-            return false;
+            return None;
         }
-        values.iter().any(|(filter, value)| {
+        values.iter().find_map(|(filter, value)| {
             self.by_filter
                 .get(filter)
                 .and_then(|vals| vals.get(value))
                 .is_some_and(|hiding| *hiding >= self.rendering_views)
+                .then_some(*filter)
         })
     }
 }
@@ -132,21 +138,30 @@ pub fn interfaces_with_neighbours<'a>(
     neighbours.map(|row| row.interface_id).collect()
 }
 
-/// Drop entities of one type that every rendering view hides.
+/// Drop entities of one type that every rendering view hides, tallied by the filter responsible.
 ///
 /// Generic over the entity so this file names no entity type; the caller supplies the vector and
-/// the id accessor.
+/// the id accessor. The tally is what the response carries back: an entity dropped here never
+/// reaches the browser, so nothing downstream can count it or say what removed it.
 pub fn retain_visible<T: HasFilterValues>(
     entities: &mut Vec<T>,
     hide_set: Option<&ServerHideSet>,
     ctx: &FilterValueContext,
-) -> usize {
+) -> BTreeMap<MetadataFilterType, usize> {
+    let mut dropped = BTreeMap::new();
     let Some(hide_set) = hide_set else {
-        return 0;
+        return dropped;
     };
-    let before = entities.len();
-    entities.retain(|entity| !hide_set.hides(&entity.filter_values(ctx)));
-    before - entities.len()
+    entities.retain(
+        |entity| match hide_set.hidden_by(&entity.filter_values(ctx)) {
+            Some(filter) => {
+                *dropped.entry(filter).or_insert(0) += 1;
+                false
+            }
+            None => true,
+        },
+    );
+    dropped
 }
 
 #[cfg(test)]
@@ -196,6 +211,10 @@ mod tests {
         }
     }
 
+    fn total(dropped: &BTreeMap<MetadataFilterType, usize>) -> usize {
+        dropped.values().sum()
+    }
+
     /// The behaviour the whole feature turns on: a port nothing points at, and which points at
     /// nothing, is the one that gets dropped.
     #[test]
@@ -220,7 +239,12 @@ mod tests {
             &ctx,
         );
 
-        assert_eq!(dropped, 1);
+        // Attributed to the filter that did it, not just counted: this is what lets an emptied
+        // view name the control responsible instead of reporting the network as empty.
+        assert_eq!(
+            dropped,
+            BTreeMap::from([(MetadataFilterType::LinkState, 1)])
+        );
         let kept: Vec<_> = interfaces.iter().map(|i| i.id).collect();
         assert!(kept.contains(&linked_out));
         // Named as a neighbour but reports none of its own — dropping this is the bug the
@@ -245,7 +269,8 @@ mod tests {
         );
 
         assert_eq!(
-            dropped, 0,
+            total(&dropped),
+            0,
             "a view that does not hide the value must keep it"
         );
     }
@@ -265,7 +290,7 @@ mod tests {
             hide_sets.get(&EntityDiscriminants::Interface),
             &FilterValueContext::default(),
         );
-        assert_eq!(dropped, 1);
+        assert_eq!(total(&dropped), 1);
     }
 
     /// Clearing the hide-set has to bring them back, which is the only way a user can inspect a
@@ -279,7 +304,7 @@ mod tests {
             hide_sets.get(&EntityDiscriminants::Interface),
             &FilterValueContext::default(),
         );
-        assert_eq!(dropped, 0);
+        assert_eq!(total(&dropped), 0);
         assert_eq!(interfaces.len(), 1);
     }
 }

@@ -10,7 +10,7 @@ use super::{
     view::ViewBuilder,
 };
 use crate::server::{
-    interfaces::r#impl::base::{Neighbor, if_type::EXCLUDED_IF_TYPES},
+    interfaces::r#impl::base::{InterfaceLinkState, Neighbor, if_type::EXCLUDED_IF_TYPES},
     shared::entities::EntityDiscriminants,
     topology::types::{
         edges::{DiscoveryProtocol, Edge, EdgeHandle, EdgeType, EdgeViewConfig},
@@ -206,11 +206,15 @@ impl ViewBuilder for L2Builder {
                 // An unread type is not an excluded one. A port learned from a neighbour's
                 // advertisement has no ifType, and dropping it for that would remove exactly the
                 // far ends this view exists to draw.
+                // Linked in *either* direction, not just outbound: a link is recorded on one side,
+                // so the far end of nearly every link reports no neighbour of its own. Judging the
+                // outbound direction here dropped exactly the ports the metadata filter had kept,
+                // and `EdgeBuilder` then dropped the link that named them.
                 if entry
                     .base
                     .if_type
                     .is_some_and(|if_type| EXCLUDED_IF_TYPES.contains(&if_type))
-                    && !ctx.interface_has_neighbor(entry.id)
+                    && ctx.interface_link_state(entry.id) == InterfaceLinkState::Unlinked
                 {
                     continue;
                 }
@@ -622,6 +626,60 @@ mod tests {
             assert!(drawn.contains(&edge.source), "edge source has no node");
             assert!(drawn.contains(&edge.target), "edge target has no node");
         }
+    }
+
+    /// The far end of a link is virtual-typed and reports no neighbour of its own.
+    ///
+    /// A link is recorded on one side, so the remote port of most links has no row of its own —
+    /// judging the virtual-type exemption on the outbound direction alone therefore drew no node
+    /// for it, and `EdgeBuilder` then dropped the very link that named it. The metadata filter had
+    /// already classified that port `Linked` and kept it in the bundle, so the graph and the
+    /// filter disagreed about the same port.
+    #[test]
+    fn a_virtual_interface_named_only_as_a_neighbour_is_drawn() {
+        let h1 = make_host("switch-1");
+        let h2 = make_host("westermo");
+
+        let physical = make_if_entry(h1.id, 1, if_type::ETHERNET_CSMA_CD);
+        // Named by the switch, reports nothing itself, and carries an excluded ifType.
+        let virtual_far_end = make_if_entry(h2.id, 1, if_type::PROP_VIRTUAL);
+        let neighbours = vec![neighbor_row(
+            physical.id,
+            Neighbor::Interface(virtual_far_end.id),
+        )];
+
+        let hosts = vec![h1, h2];
+        let interfaces = vec![physical.clone(), virtual_far_end.clone()];
+        let options = TopologyOptions::default();
+        let ctx = TopologyContext::new(
+            &hosts,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &interfaces,
+            &[],
+            &[],
+            &options,
+            crate::server::topology::types::views::TopologyView::L3Logical,
+        )
+        .with_neighbours(&neighbours);
+
+        let (nodes, edges) = L2Builder.build(&ctx, &l2_grouping());
+        let drawn: Vec<Uuid> = nodes.iter().map(|n| n.id).collect();
+
+        assert!(
+            drawn.contains(&virtual_far_end.id),
+            "a port named as another port's neighbour is linked and must be drawn"
+        );
+        assert!(
+            edges
+                .iter()
+                .any(|e| e.source == physical.id && e.target == virtual_far_end.id),
+            "the link that named it must survive"
+        );
     }
 
     #[test]
