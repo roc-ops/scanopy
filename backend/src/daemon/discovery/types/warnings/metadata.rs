@@ -577,7 +577,7 @@ impl TypeMetadataProvider for DiscoveryWarningCode {
                 "Matching single-MAC forwarding-table entries to the devices they name was stopped after {budget_seconds}s, with {interfaces} interface(s) still carrying one. Physical Topology is missing links this scan would otherwise have drawn; the next scan retries from scratch. Narrow what the scan covers, or split the network across daemons, if it keeps happening."
             }
             Self::OutdatedDaemonFormat => {
-                "The daemon that ran this scan (version {daemon_version}) sent it in a format newer daemons no longer use. Scanopy read it in full and nothing was lost, but that translation is removed once this version stops being supported. Upgrade the daemon."
+                "The daemon that ran this scan is on {daemon_version}. Upgrade it."
             }
             Self::WarningsTruncated => {
                 "{elided} further warnings from this scan were not recorded, because it produced more than the scan record holds. Narrow what the scan covers to see the rest."

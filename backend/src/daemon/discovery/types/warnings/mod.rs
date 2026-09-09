@@ -379,7 +379,12 @@ pub enum DiscoveryWarning {
     /// Server-side finding, raised where the raw request body is read. The server translates the
     /// old format, so nothing was lost — this says the translation happened, which is the only
     /// evidence an operator ever gets that a daemon is behind. Which superseded format it was is
-    /// deliberately not carried: the answer is the same either way, upgrade the daemon.
+    /// deliberately not carried, and neither is the fact that the translation worked: the reader
+    /// needs one thing from this, which is that the daemon is out of date.
+    ///
+    /// The daemon to upgrade is the session's own — the UI reads `daemon_id` off the payload this
+    /// rides on rather than repeating it here, which is what lets the row deep-link to that
+    /// daemon's upgrade modal.
     ///
     /// Ends with the compatibility window. When the enforced floor rises past the last release
     /// that sends an old format, the translations go and this goes with them.
