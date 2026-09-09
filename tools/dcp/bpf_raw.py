@@ -8,10 +8,16 @@ codes and struct layouts below are cross-checked against that vendored source (w
 /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/net/bpf.h) rather than reconstructed
 from scratch, so this script and the real daemon are reading the exact same kernel interface.
 
-Deliberately does not set BIOCPROMISC. Neither does the real daemon's bpf.rs — grep it, there's no
-promiscuous ioctl call anywhere on the macOS backend, only on Linux's macvlan setup and pcap's
-`.promisc()` builder call. Confirmed live: production DCP scans already receive multicast-addressed
-Identify traffic through a plain BIOCSETIF-bound BPF device with no promiscuous flag at all.
+Sets BIOCPROMISC. An earlier version of this didn't, reasoning that the real daemon's bpf.rs has
+no promiscuous ioctl call anywhere on the macOS backend and it works fine in production — true,
+but the wrong comparison: the daemon only ever *sends* DCP multicast (transmit isn't filtered by
+promiscuous) and only ever *receives* the sim's *unicast* reply (always delivered to its own MAC
+regardless of promiscuous mode). This sim is different — it has to *receive* an arbitrary
+multicast Identify Request nobody addressed to it, and without promiscuous mode that's exactly
+the traffic a NIC drops before a non-promiscuous BPF listener ever sees it. Confirmed live: a
+`tcpdump -i en0 -e 'ether proto 0x8892'` (promiscuous by default) saw the Request that a
+non-promiscuous sim never did — the identical bug class the original Linux/macvlan version hit
+for the same underlying reason (see DCP-TEST-ENV.md's own history section on that).
 """
 
 import fcntl
@@ -23,9 +29,14 @@ import subprocess
 
 _IF_NAMESIZE = 16
 _SIZEOF_IFREQ = 32
+_IOC_VOID = 0x20000000
 _IOC_IN = 0x80000000
 _IOC_OUT = 0x40000000
 _IOCPARM_MASK = 0x1FFF
+
+
+def _io(group: str, num: int) -> int:
+    return _IOC_VOID | (ord(group) << 8) | num
 
 
 def _iow(group: str, num: int, length: int) -> int:
@@ -37,6 +48,7 @@ def _iowr(group: str, num: int, length: int) -> int:
 
 
 _BIOCSBLEN = _iowr("B", 102, 4)  # set read buffer length — must precede BIOCSETIF
+_BIOCPROMISC = _io("B", 105)  # accept frames not addressed to us — needed to see DCP's multicast
 _BIOCSETIF = _iow("B", 108, _SIZEOF_IFREQ)  # bind the device to an interface
 _BIOCIMMEDIATE = _iow("B", 112, 4)  # return from read as soon as a packet is available
 _BIOCSHDRCMPLT = _iow("B", 117, 4)  # we supply the full L2 header ourselves; don't overwrite it
@@ -77,6 +89,7 @@ def open_bpf(interface: str, buffer_size: int = 4096) -> int:
     ifreq = name_field + b"\x00" * (_SIZEOF_IFREQ - _IF_NAMESIZE)
     fcntl.ioctl(fd, _BIOCSETIF, ifreq)
 
+    fcntl.ioctl(fd, _BIOCPROMISC)
     fcntl.ioctl(fd, _BIOCIMMEDIATE, struct.pack("=I", 1))
     fcntl.ioctl(fd, _BIOCSHDRCMPLT, struct.pack("=I", 1))
     return fd
