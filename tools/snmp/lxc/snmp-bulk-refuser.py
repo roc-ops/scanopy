@@ -16,7 +16,7 @@ So the refusal belongs in front of the agent rather than inside it. This drops t
 silence a client sees when a device does not answer — and costs the agent nothing, so a getnext
 arriving 5s later is served immediately.
 
-    snmp-bulk-refuser.py --listen 192.168.7.252:161 --upstream 127.0.0.1:16252 \\
+    snmp-bulk-refuser.py --listen 192.168.7.216:161 --upstream 127.0.0.1:16216 \\
                          --refuse 1.0.8802.1.1.2.1.4
 
 Everything that is not a refused GETBULK is relayed untouched, including SNMPv3, whose PDU this
