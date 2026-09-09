@@ -9,6 +9,7 @@
 	import CollapsibleCard from '$lib/shared/components/data/CollapsibleCard.svelte';
 	import InfoRow from '$lib/shared/components/data/InfoRow.svelte';
 	import InterfaceDetailsCard from '$lib/features/hosts/components/InterfaceDetailsCard.svelte';
+	import { interfaceDisplayName } from '$lib/features/hosts/interface-display-name';
 	import {
 		hosts_interfaces_cdpNeighbor,
 		hosts_interfaces_cdpNeighborNumbered,
@@ -23,8 +24,7 @@
 		hosts_interfaces_remotePort,
 		hosts_interfaces_remoteSystemName,
 		hosts_snmp_chassisId,
-		hosts_snmp_sysDescr,
-		hosts_unnamedInterface
+		hosts_snmp_sysDescr
 	} from '$lib/paraglide/messages';
 
 	interface Props {
@@ -89,7 +89,7 @@
 
 <div class="space-y-6">
 	<ConfigHeader
-		title={iface.if_name || iface.if_descr || hosts_unnamedInterface()}
+		title={interfaceDisplayName(iface)}
 		subtitle={iface.if_index == null ? null : hosts_interfaces_index({ index: iface.if_index })}
 	/>
 

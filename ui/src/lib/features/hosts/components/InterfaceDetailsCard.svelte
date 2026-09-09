@@ -3,6 +3,7 @@
 	import type { Subnet } from '$lib/features/subnets/types/base';
 	import type { Host } from '$lib/features/hosts/types/base';
 	import { hostDisplayName } from '$lib/features/hosts/host-display-name';
+	import { interfaceDisplayName } from '$lib/features/hosts/interface-display-name';
 	import { getAdminStatusLabels, getOperStatusLabels } from '$lib/features/credentials/types/base';
 	import CollapsibleCard from '$lib/shared/components/data/CollapsibleCard.svelte';
 	import InfoRow from '$lib/shared/components/data/InfoRow.svelte';
@@ -171,9 +172,7 @@
 									neighbour.neighborInterface.id,
 									neighbour.neighborInterface
 								)}
-								label={neighbour.neighborInterface.if_name ||
-									neighbour.neighborInterface.if_descr ||
-									`Index ${neighbour.neighborInterface.if_index}`}
+								label={interfaceDisplayName(neighbour.neighborInterface)}
 								icon={entities.getIconComponent('Interface')}
 								color={entities.getColorHelper('Interface').color}
 							/>

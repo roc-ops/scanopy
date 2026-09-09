@@ -577,6 +577,7 @@ impl InterfaceInput {
             last_seen_at: now,
             last_discovery_id: None,
             first_discovery_id: None,
+            display_name: None,
             base: InterfaceBase {
                 host_id,
                 network_id,

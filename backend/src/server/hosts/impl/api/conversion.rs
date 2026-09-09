@@ -138,6 +138,20 @@ impl HostResponse {
         // called.
         let display_name = host.display_name(ip_addresses.iter());
 
+        // Same reasoning, one level down: an interface's `display_name` is computed here rather
+        // than walked again in the frontend, so a port cannot be labelled one thing in a list and
+        // another in its own detail panel (a PROFINET DCP identify's bare-MAC interface used to
+        // render as the literal string "Interface null" — `if_descr || \`Interface ${if_index}\``
+        // interpolating two absent fields — because the frontend had reimplemented this ladder
+        // three different, disagreeing ways instead of reading it from here).
+        let interfaces: Vec<Interface> = interfaces
+            .into_iter()
+            .map(|mut interface| {
+                interface.display_name = Some(interface.display_name());
+                interface
+            })
+            .collect();
+
         // Exhaustive destructuring of Host
         let Host {
             id,

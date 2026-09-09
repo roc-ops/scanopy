@@ -10,6 +10,7 @@
 	import EmptyState from '$lib/shared/components/layout/EmptyState.svelte';
 	import PreDaemonEmptyState from '$lib/shared/components/layout/PreDaemonEmptyState.svelte';
 	import { hostDisplayName } from '$lib/features/hosts/host-display-name';
+	import { interfaceDisplayName } from '$lib/features/hosts/interface-display-name';
 	import HostEditor from './HostEditModal/HostEditor.svelte';
 	import HostConsolidationModal from './HostConsolidationModal.svelte';
 	import HostExportModal from './HostExportModal.svelte';
@@ -58,8 +59,7 @@
 		common_updated,
 		daemons_installPromptHosts,
 		hosts_fields_virtualizedBy,
-		hosts_notVirtualized,
-		hosts_unnamedInterface
+		hosts_notVirtualized
 	} from '$lib/paraglide/messages';
 
 	let { isReadOnly = false }: TabProps = $props();
@@ -562,14 +562,13 @@
 					label: common_interfaces(),
 					type: 'array',
 					searchable: true,
-					getValue: (host) =>
-						hostInterfaces(host).map((i) => i.if_descr || hosts_unnamedInterface()),
+					getValue: (host) => hostInterfaces(host).map((i) => interfaceDisplayName(i)),
 					display: {
 						order: 4,
 						getItems: (host) =>
 							hostInterfaces(host).map((iface) => ({
 								id: iface.id,
-								label: iface.if_descr || hosts_unnamedInterface(),
+								label: interfaceDisplayName(iface),
 								color: entities.getColorHelper('Interface').color,
 								entityRef: entityRef('Interface', iface.id, iface)
 							}))

@@ -78,6 +78,7 @@ impl Storable for Interface {
             last_seen_at: now,
             last_discovery_id: None,
             first_discovery_id: None,
+            display_name: None,
             base,
             legacy_neighbor_evidence: Default::default(),
         }
@@ -98,6 +99,7 @@ impl Storable for Interface {
             last_seen_at,
             last_discovery_id,
             first_discovery_id,
+            display_name: _,
             legacy_neighbor_evidence: _,
             base:
                 Self::BaseData {
@@ -210,6 +212,9 @@ impl Storable for Interface {
             last_seen_at: row.get("last_seen_at"),
             last_discovery_id: row.get("last_discovery_id"),
             first_discovery_id: row.get("first_discovery_id"),
+            // Never stored — computed at response-serialization time, see
+            // `HostResponse::from_host_with_children`.
+            display_name: None,
             // Never stored — see `to_params`'s note on `neighbor_candidates`.
             legacy_neighbor_evidence: Default::default(),
             base: InterfaceBase {
