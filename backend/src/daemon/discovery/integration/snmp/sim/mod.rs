@@ -516,10 +516,16 @@ mod tests {
         for device in &lab {
             let octets = device.ip.octets();
             assert!(
-                // Floor lowered from 230 to 227 for GH #701's three devices, then to 226 for
-                // #709's one: .227-.254 (28 addresses) were already fully occupied, with .255
-                // unusable (broadcast on this /22) — there was no room left above .227 either.
-                octets[..3] == [192, 168, 7] && octets[3] >= 226,
+                // Floor lowered from 230 to 227 for GH #701's three devices, then to 224 for
+                // three more added in parallel branches: `switch-fdb-only-01` (GH #709) and
+                // `switch-dlink-02` / `pc-windows-nic-filters` (GH #668). .227-.254 (28
+                // addresses) were already fully occupied, with .255 unusable (broadcast on this
+                // /22) — there was no room left above .227.
+                //
+                // Both branches independently took .226; `switch-fdb-only-01` moved to .224 at
+                // merge. This assert only bounds the range, so it would not have caught that —
+                // the "two devices share an address" check above is what does.
+                octets[..3] == [192, 168, 7] && octets[3] >= 224,
                 "{} is at {}, outside the lab's range",
                 device.name,
                 device.ip

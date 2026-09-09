@@ -1514,6 +1514,7 @@ mod tests {
             oper_status: Some(IfOperStatus::Up),
             mac_address: None,
             ip_address_id: None,
+            ip_configured: false,
             neighbor_candidates: Vec::new(),
             fdb_macs: None,
             native_vlan_id: None,

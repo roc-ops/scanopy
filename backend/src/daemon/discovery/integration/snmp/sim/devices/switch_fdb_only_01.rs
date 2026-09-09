@@ -17,7 +17,10 @@ use super::inline;
 pub fn device() -> SimDevice {
     SimDevice {
         name: "switch-fdb-only-01",
-        ip: Ipv4Addr::new(192, 168, 7, 226),
+        // .226 at authoring time; moved down to .224 when GH #668's `pc-windows-nic-filters`
+        // landed on .226 in a branch developed in parallel. Two agents on one address bind the
+        // same socket and the lab fails in a way that reads like flaky device behaviour.
+        ip: Ipv4Addr::new(192, 168, 7, 224),
         purpose: Purpose::Regression {
             issue: "#709",
             defect: "serves dot1dTpFdbTable but no LLDP remote table at all, so a port with an unambiguous single-MAC FDB entry never became a physical link before resolve_fdb_links was wired in",

@@ -15,8 +15,8 @@ use std::net::IpAddr;
 use super::SimDevice;
 use crate::daemon::discovery::integration::snmp::queries::{IfTableWalk, SnmpCollection};
 use crate::daemon::discovery::integration::snmp::types::{
-    ArpEntry, BridgeFdbEntry, CdpNeighbor, DeviceInventory, IfTableEntry, LldpLocalPort,
-    LldpNeighbor, SystemInfo,
+    ArpEntry, BridgeFdbEntry, CdpNeighbor, DeviceInventory, IfTableEntry, IpAddrEntry,
+    LldpLocalPort, LldpNeighbor, SystemInfo,
 };
 use crate::daemon::discovery::integration::snmp::{
     LocalPortOutcome, count_dropped_neighbours, query_arp_table, query_bridge_fdb,
@@ -53,6 +53,10 @@ pub struct Collected {
     /// all — every column the fixtures emitted for it proved only that it had been written.
     pub entity: SnmpCollection<Option<DeviceInventory>>,
     pub ip_addresses: usize,
+    /// The raw `ipAddrTable` walk, keyed by address — what `convert_snmp_if_entry` reads to decide
+    /// `InterfaceBase::ip_configured` (GH #668). `ip_addresses` above only counts rows; this is for
+    /// tests that need to know *which* ifIndex a row names.
+    pub ip_addr_table: HashMap<IpAddr, IpAddrEntry>,
 }
 
 impl Collected {
@@ -143,10 +147,11 @@ pub async fn collect(device: &SimDevice) -> Collected {
     let entity = query_entity_physical(&mut agent, ip)
         .await
         .unwrap_or_default();
-    let ip_addresses = query_ip_addr_table(&mut agent, ip)
+    let ip_addr_table = query_ip_addr_table(&mut agent, ip)
         .await
-        .map(|c| c.records.len())
+        .map(|c| c.records)
         .unwrap_or_default();
+    let ip_addresses = ip_addr_table.len();
 
     Collected {
         system,
@@ -162,6 +167,7 @@ pub async fn collect(device: &SimDevice) -> Collected {
         fdb,
         entity,
         ip_addresses,
+        ip_addr_table,
     }
 }
 

@@ -44,6 +44,7 @@ pub struct InterfaceCsvRow {
     pub oper_status: String,
     pub mac_address: Option<String>,
     pub ip_address_id: Option<Uuid>,
+    pub ip_configured: bool,
     pub fdb_macs: Option<String>,
     pub native_vlan_id: Option<Uuid>,
     pub vlan_ids: Option<String>,
@@ -112,6 +113,7 @@ impl Storable for Interface {
                     oper_status,
                     mac_address,
                     ip_address_id,
+                    ip_configured,
                     // Wire-only (daemon submission), never a column on `interfaces` — drained into
                     // `interface_neighbor_candidates` by `InterfaceService::create_or_update_from_
                     // discovery` before this ever runs. See `interface_neighbors`.
@@ -139,6 +141,7 @@ impl Storable for Interface {
             "mac_address",
             "mac_address_source",
             "ip_address_id",
+            "ip_configured",
             "fdb_macs",
             "native_vlan_id",
             "vlan_ids",
@@ -167,6 +170,7 @@ impl Storable for Interface {
             mac_value,
             mac_source,
             SqlValue::OptionalUuid(ip_address_id),
+            SqlValue::Bool(ip_configured),
             SqlValue::OptionalFdbMacs(fdb_macs),
             SqlValue::OptionalUuid(native_vlan_id),
             SqlValue::OptionVecUuid(vlan_ids),
@@ -221,6 +225,7 @@ impl Storable for Interface {
                 oper_status: oper_status_raw.map(IfOperStatus::from),
                 mac_address,
                 ip_address_id: row.get("ip_address_id"),
+                ip_configured: row.get("ip_configured"),
                 neighbor_candidates: Vec::new(),
                 fdb_macs: row
                     .try_get::<Option<serde_json::Value>, _>("fdb_macs")
@@ -272,6 +277,7 @@ impl Entity for Interface {
             oper_status: csv_status(self.base.oper_status),
             mac_address: mac_of(&self.base.mac_address).map(|m| m.to_string()),
             ip_address_id: self.base.ip_address_id,
+            ip_configured: self.base.ip_configured,
             fdb_macs: self
                 .base
                 .fdb_macs
