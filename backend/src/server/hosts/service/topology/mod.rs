@@ -204,10 +204,11 @@ impl HostService {
             // Rows admitted only because they already carry a resolved neighbour — an FDB-matched
             // port, say — have no protocol identity to run the tiers against. Persist a downgrade
             // if one just happened and move on.
-            if interface.base.lldp_chassis_id.is_none()
-                && interface.base.cdp_device_id.is_none()
-                && interface.base.cdp_address.is_none()
-            {
+            //
+            // The one predicate, so this guard cannot throw back a row the filter above admitted
+            // *for* its identity, nor keep one the tiers below have no arm for. It used to test
+            // three columns by hand, one of them (`cdp_address`) that no tier reads.
+            if !interface.base.has_resolvable_identity() {
                 self.persist_neighbor(&mut interface, &original_neighbor)
                     .await?;
                 continue;
@@ -225,7 +226,8 @@ impl HostService {
             // Only chassis_id and port_id are used for neighbor resolution — they represent
             // actual physical connections. lldp_mgmt_addr / cdp_address are where you manage the
             // device, not necessarily the physical connection point.
-            let resolved_neighbor = if let Some(ref chassis_id) = interface.base.lldp_chassis_id {
+            let resolved_neighbor = if let Some(chassis_id) = interface.base.resolvable_chassis_id()
+            {
                 let host = match known_host_id {
                     Some(host_id) => IdentityResolution::Resolved(host_id),
                     // Already run once while building the adjacency — reusing the verdict is what
@@ -302,7 +304,7 @@ impl HostService {
                         Some(stats.record_port(port, host_id))
                     }
                 }
-            } else if let Some(ref device_id) = interface.base.cdp_device_id {
+            } else if let Some(device_id) = interface.base.resolvable_cdp_device_id() {
                 // CDP device_id is typically sysName, resolve against sys_name field
                 let host = match known_host_id {
                     Some(host_id) => IdentityResolution::Resolved(host_id),
@@ -314,7 +316,7 @@ impl HostService {
                 if let Some(reason) = UnresolvedReason::from_resolution(host) {
                     warnings.extend(unmatched_neighbour_warning(
                         &interface,
-                        device_id.clone(),
+                        device_id.to_string(),
                         None,
                         reason,
                     ));
@@ -354,9 +356,16 @@ impl HostService {
                     }
                 }
             } else {
-                // Admitted by the filter on cdp_address alone, which is a management address and
-                // never a physical connection — there is nothing here to resolve.
+                // Unreachable: the guard above and the two arms here read the same predicate, so a
+                // row that got this far has an arm. Kept as the place a future divergence lands,
+                // and made loud rather than silent — a row that is counted but never judged is
+                // exactly how the last three of these went unnoticed.
                 stats.host_no_strategy += 1;
+                tracing::warn!(
+                    interface_id = %interface.id,
+                    "interface passed the resolvable-identity guard but matched no resolution \
+                     arm; the guard and the ladder have diverged"
+                );
                 None
             };
 
@@ -378,7 +387,9 @@ impl HostService {
             // The five per-reason failure counters this line used to carry are now exactly the
             // count of their `DiscoveryWarning`s, and two sources for one number can only
             // disagree. `host_no_strategy` stays because nothing warns on it: it counts the
-            // `cdp_address`-only rows there was never anything to resolve in.
+            // neighbours whose advertised identifier has no lookup strategy at all. It no longer
+            // counts `cdp_address`-only rows, which the shared resolvable-identity predicate
+            // stops admitting in the first place.
             host_no_strategy = stats.host_no_strategy,
             reopened,
             rebound,

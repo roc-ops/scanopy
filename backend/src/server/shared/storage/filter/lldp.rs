@@ -1,6 +1,9 @@
 //! LLDP/FDB neighbor-resolution filters.
 use super::*;
 use crate::server::interfaces::r#impl::base::if_type::EXCLUDED_IF_TYPES;
+use crate::server::interfaces::r#impl::identity::{
+    sql_has_no_resolvable_identity, sql_has_resolvable_identity,
+};
 
 impl<T: Storable> StorableFilter<T> {
     // =========================================================================
@@ -119,22 +122,21 @@ impl<T: Storable> StorableFilter<T> {
     ///
     /// Scoped to live SCD2 rows: snapshot close-and-clone leaves closed historical copies of these
     /// interfaces behind, and resolving/updating those would both waste the pass and mutate history.
+    ///
+    /// "Names a neighbour" is `InterfaceBase::has_resolvable_identity`, rendered into SQL from
+    /// the same column list the Rust predicate reads, so this filter cannot select a row the
+    /// resolution loop will then throw away unjudged.
     pub fn unresolved_lldp_port_in_network(mut self, network_id: Uuid) -> Self {
         let network_col = self.qualify_column("network_id");
-        let lldp_chassis_col = self.qualify_column("lldp_chassis_id");
-        let cdp_device_col = self.qualify_column("cdp_device_id");
-        let cdp_addr_col = self.qualify_column("cdp_address");
+        let has_identity = sql_has_resolvable_identity(|c| self.qualify_column(c));
         let neighbor_if_entry_col = self.qualify_column("neighbor_interface_id");
 
         self.conditions
             .push(format!("{} = ${}", network_col, self.values.len() + 1));
         self.values.push(SqlValue::Uuid(network_id));
 
-        // Has LLDP or CDP data
-        self.conditions.push(format!(
-            "({} IS NOT NULL OR {} IS NOT NULL OR {} IS NOT NULL)",
-            lldp_chassis_col, cdp_device_col, cdp_addr_col
-        ));
+        // Names a neighbour the ladder has a strategy for...
+        self.conditions.push(has_identity);
         // ...but no remote port yet (unresolved, or resolved only as far as the host)
         self.conditions
             .push(format!("{} IS NULL", neighbor_if_entry_col));
@@ -153,11 +155,14 @@ impl<T: Storable> StorableFilter<T> {
     ///
     /// Bounded by adjacencies rather than by interfaces — a switch contributes one row per port
     /// that sees something, not one per port.
+    ///
+    /// The superset is *composed*, not restated: `InterfaceBase::has_resolvable_identity` in SQL,
+    /// OR an already-stored neighbour. Spelling the identity half out again here is what let this
+    /// filter admit rows on `cdp_address` — a management address the resolution ladder has no arm
+    /// for — while the FDB filter and the MAC-binding test, writing the same rule by hand, did not.
     pub fn lldp_neighbors_in_network(mut self, network_id: Uuid) -> Self {
         let network_col = self.qualify_column("network_id");
-        let lldp_chassis_col = self.qualify_column("lldp_chassis_id");
-        let cdp_device_col = self.qualify_column("cdp_device_id");
-        let cdp_addr_col = self.qualify_column("cdp_address");
+        let has_identity = sql_has_resolvable_identity(|c| self.qualify_column(c));
         let neighbor_if_entry_col = self.qualify_column("neighbor_interface_id");
         let neighbor_host_col = self.qualify_column("neighbor_host_id");
 
@@ -166,8 +171,7 @@ impl<T: Storable> StorableFilter<T> {
         self.values.push(SqlValue::Uuid(network_id));
 
         self.conditions.push(format!(
-            "({lldp_chassis_col} IS NOT NULL OR {cdp_device_col} IS NOT NULL \
-             OR {cdp_addr_col} IS NOT NULL OR {neighbor_if_entry_col} IS NOT NULL \
+            "({has_identity} OR {neighbor_if_entry_col} IS NOT NULL \
              OR {neighbor_host_col} IS NOT NULL)"
         ));
 
@@ -175,21 +179,24 @@ impl<T: Storable> StorableFilter<T> {
     }
 
     /// Filter interfaces with unresolved single-MAC FDB data in a network.
-    /// Matches entries that have exactly 1 learned MAC, no existing neighbor,
-    /// and no LLDP/CDP data (FDB is lower-priority than protocol-based discovery).
+    /// Matches entries that have exactly 1 learned MAC, no existing neighbor, and no identity the
+    /// LLDP/CDP ladder could resolve (FDB is lower-priority than protocol-based discovery).
+    ///
+    /// The "no identity" half is the negation of `InterfaceBase::has_resolvable_identity`, which
+    /// is what keeps this filter and `Interface::port_bound_by_mac` — the test for whether a
+    /// binding *came* from this tier — asking the same question of the same row.
     pub fn unresolved_fdb_in_network(mut self, network_id: Uuid) -> Self {
         let network_col = self.qualify_column("network_id");
         let fdb_col = self.qualify_column("fdb_macs");
         let neighbor_if_entry_col = self.qualify_column("neighbor_interface_id");
         let neighbor_host_col = self.qualify_column("neighbor_host_id");
-        let lldp_chassis_col = self.qualify_column("lldp_chassis_id");
-        let cdp_device_col = self.qualify_column("cdp_device_id");
+        let no_identity = sql_has_no_resolvable_identity(|c| self.qualify_column(c));
 
         self.conditions
             .push(format!("{} = ${}", network_col, self.values.len() + 1));
         self.values.push(SqlValue::Uuid(network_id));
 
-        // Has single-MAC FDB data, no neighbor, no LLDP/CDP
+        // Has single-MAC FDB data, no neighbor, nothing for the protocol ladder to resolve
         self.conditions.push(format!(
             "{} IS NOT NULL AND jsonb_array_length({}) = 1",
             fdb_col, fdb_col
@@ -198,9 +205,7 @@ impl<T: Storable> StorableFilter<T> {
             .push(format!("{} IS NULL", neighbor_if_entry_col));
         self.conditions
             .push(format!("{} IS NULL", neighbor_host_col));
-        self.conditions
-            .push(format!("{} IS NULL", lldp_chassis_col));
-        self.conditions.push(format!("{} IS NULL", cdp_device_col));
+        self.conditions.push(no_identity);
 
         self.live()
     }

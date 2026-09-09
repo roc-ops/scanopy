@@ -546,19 +546,18 @@ impl Interface {
 
     /// Whether this row carries evidence that *something* is adjacent to this port.
     ///
-    /// The three sources L2 resolution actually consumes: an LLDP chassis id, a CDP device id, and
-    /// a bridge-FDB port that learned exactly one address. Deliberately narrower than
+    /// The two sources L2 resolution actually consumes: an identity the ladder can look up, and a
+    /// bridge-FDB port that learned exactly one address. Deliberately narrower than
     /// [`Self::has_neighbor_discovery_data`] — a port id or a port description names a port on a
     /// device this row cannot identify, so on its own it is not evidence that anything is there,
     /// and the resolution filter would skip the row anyway.
+    ///
+    /// Defers to [`InterfaceBase::has_resolvable_identity`] rather than restating it: this used to
+    /// be a sixth hand-written copy of the same column list, and "carries evidence" and "is worth
+    /// resolving" answering differently for one row is how a link goes stale while the resolution
+    /// pass still believes in it.
     pub fn has_neighbor_evidence(&self) -> bool {
-        self.base.lldp_chassis_id.is_some()
-            || self.base.cdp_device_id.is_some()
-            || self
-                .base
-                .fdb_macs
-                .as_ref()
-                .is_some_and(|macs| macs.len() == 1)
+        self.base.has_resolvable_identity() || self.base.has_single_fdb_mac()
     }
 
     /// Record the last scan that actually saw a neighbour on this port.
@@ -659,16 +658,11 @@ impl Interface {
             return true;
         }
 
-        // FDB resolution only runs on rows with no LLDP/CDP data and exactly one learned MAC —
-        // mirror that condition rather than assuming, so a row that has since gained LLDP data is
-        // judged by the tier that actually placed it.
-        self.base.lldp_chassis_id.is_none()
-            && self.base.cdp_device_id.is_none()
-            && self
-                .base
-                .fdb_macs
-                .as_ref()
-                .is_some_and(|macs| macs.len() == 1)
+        // FDB resolution only claims rows with no identity to resolve and exactly one learned MAC.
+        // Stated as the negation of the shared predicate rather than as its own column list, which
+        // is what it used to be — and it was already a column short of the two sites that spelled
+        // the same rule out with `cdp_address` in it.
+        !self.base.has_resolvable_identity() && self.base.has_single_fdb_mac()
     }
 }
 
@@ -750,6 +744,36 @@ mod tests {
             b.fdb_macs = Some(vec!["00:ad:24:af:4e:00".into(), "00:ad:24:af:4e:01".into()])
         });
         assert!(!several.port_bound_by_mac());
+    }
+
+    /// A chassis id the ladder cannot look up does not make a row an LLDP row. The FDB filter
+    /// selects this row — `has_resolvable_identity` is false for it — so the FDB tier is what
+    /// places it, and `port_bound_by_mac` has to say so or the binding is never re-examined.
+    /// Before the shared predicate these two disagreed: the filter saw an empty chassis id and
+    /// this test saw a present one.
+    #[test]
+    fn a_blank_chassis_id_leaves_the_row_to_the_fdb_tier() {
+        let blank = interface(|b| {
+            b.lldp_chassis_id = Some(LldpChassisId::LocallyAssigned(String::new()));
+            b.fdb_macs = Some(vec!["00:ad:24:af:4e:00".into()]);
+        });
+        assert!(blank.port_bound_by_mac());
+    }
+
+    /// An identifier with nothing in it is not evidence that anything is attached, so it must not
+    /// keep `neighbor_seen_at` advancing on a port whose neighbour has actually gone.
+    #[test]
+    fn a_blank_identifier_is_not_evidence_of_a_neighbour() {
+        let blank = interface(|b| {
+            b.lldp_chassis_id = Some(LldpChassisId::LocallyAssigned("  ".into()));
+            b.cdp_device_id = Some(String::new());
+        });
+        assert!(!blank.has_neighbor_evidence());
+
+        let real = interface(|b| {
+            b.lldp_chassis_id = Some(LldpChassisId::MacAddress("00:ad:24:af:4e:00".into()));
+        });
+        assert!(real.has_neighbor_evidence());
     }
 
     /// FDB resolution only claims rows with no LLDP/CDP data, so a row carrying both is judged by

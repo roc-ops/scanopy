@@ -215,9 +215,12 @@ pub struct LldpResolutionStats {
     pub ports_resolved_reciprocal: usize,
     /// Neighbor advertised no identifier any strategy can look up.
     ///
-    /// The only failure counter left, because it is the only one with no warning behind it: it
-    /// counts the `cdp_address`-only rows there was never anything to resolve in, and a warning
-    /// per one of those would bury the ones that mean something.
+    /// The only failure counter left, because it is the only one with no warning behind it: an
+    /// `interfaceAlias` or `portComponent` chassis subtype with no `sysName` beside it carries
+    /// nothing to look up, and a warning apiece for those would bury the ones that mean
+    /// something. It used to also count rows admitted on `cdp_address` alone; the shared
+    /// resolvable-identity predicate no longer admits those, so they neither reach this counter
+    /// nor consume a resolution pass.
     pub host_no_strategy: usize,
 }
 
