@@ -271,15 +271,20 @@
 	);
 
 	let showFiltersEmptyState = $derived(viewIsEmpty && emptyingFilters.length > 0);
-	// Not while the bundle is being refetched. Clearing a server-side filter empties the hide-set
-	// at once but the entities it restores arrive a round trip later, so for that window the view
-	// is empty with no filter to name — and the setup prompt would claim discovery found nothing,
-	// which is the exact misdirection this state exists to prevent.
+	// Not while the bundle on screen still carries server-dropped entities. Clearing a server-side
+	// filter empties the hide-set at once, but the entities it restores arrive a round trip later —
+	// a 500ms debounced PUT, then the rebuild and refetch — so for that window the view is empty
+	// with no filter left to name. The bundle in hand is the stale one and says so: its
+	// `filtered_out` still counts what the old filter removed. Showing the setup prompt there would
+	// claim discovery found nothing, which is the exact misdirection this state exists to prevent.
+	//
+	// A data signal rather than `isFetching`: nothing is fetching during the debounce, so a timing
+	// gate let the prompt flash for most of a second on every clear. Measured live, not assumed.
 	let showL2EmptyState = $derived(
 		viewIsEmpty &&
 			emptyingFilters.length === 0 &&
 			$activeView === 'L2Physical' &&
-			!topologyDataQuery.isFetching
+			Object.keys(currentTopology?.filtered_out ?? {}).length === 0
 	);
 
 	// Update tag filter stores when topology or options change
