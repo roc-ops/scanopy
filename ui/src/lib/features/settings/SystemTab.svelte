@@ -1,18 +1,13 @@
 <script lang="ts">
 	import { Monitor, Sun, Moon } from 'lucide-svelte';
 	import { themeStore } from '$lib/shared/stores/theme.svelte';
-	import { VERSION } from '$lib/version';
-	import InfoCard from '$lib/shared/components/data/InfoCard.svelte';
-	import InfoRow from '$lib/shared/components/data/InfoRow.svelte';
 	import DocsHint from '$lib/shared/components/feedback/DocsHint.svelte';
 	import {
-		common_about,
 		common_system,
 		common_theme,
 		common_light,
 		common_dark,
 		common_source,
-		common_version,
 		settings_system_copyright,
 		settings_system_license,
 		settings_system_licenseLinkText,
@@ -29,7 +24,7 @@
 	const copyrightYear = new Date().getFullYear();
 </script>
 
-<div class="flex flex-col gap-6 overflow-y-auto p-6">
+<div class="flex h-full flex-col gap-6 overflow-y-auto p-6">
 	<div>
 		<h3 class="text-primary text-sm font-semibold">{common_theme()}</h3>
 		<p class="text-tertiary mt-1 text-sm">{settings_system_themeDesc()}</p>
@@ -50,8 +45,7 @@
 		</div>
 	</div>
 
-	<InfoCard title={common_about()}>
-		<InfoRow label={common_version()}>{VERSION}</InfoRow>
+	<div class="mt-auto flex flex-col gap-1">
 		<p class="text-tertiary text-xs">{settings_system_copyright({ year: copyrightYear })}</p>
 		<DocsHint
 			text={settings_system_license()}
@@ -63,5 +57,5 @@
 			href="https://commons.wikimedia.org/wiki/File:Tux.svg"
 			linkText={common_source()}
 		/>
-	</InfoCard>
+	</div>
 </div>

@@ -143,7 +143,6 @@
 	"billing_welcomeBannerBody": "Welcome to {planName} — your subscription is now active.",
 	"billing_welcomeBannerBodyTrialSecured": "Payment method added — your {planName} subscription will continue after the trial ends.",
 	"billing_yourCurrentPlan": "Your current plan",
-	"common_about": "About",
 	"common_account": "Account",
 	"common_actions": "Actions",
 	"common_active": "Active",
