@@ -143,8 +143,40 @@ export const hoveredEdgeType = writable<HoveredEdgeType | null>(null);
  * Written by the pipeline immediately *before* the node store, so a node can never gain an edge
  * ahead of the handle it needs — that ordering is what stops "Couldn't create edge for source
  * handle id", which is how SvelteFlow reports a handle it cannot find.
+ *
+ * Real edges only. Node components read it with `previewEdgeHandlesByNode` merged over it.
  */
 export const edgeHandlesByNode = writable<Map<string, Set<string>>>(new Map());
+
+/**
+ * The same map for the dependency editor's preview edges.
+ *
+ * A new dependency's preview picks its sides by geometry, so it usually names a handle no real edge
+ * on that node uses, and the node never rendered it. Kept apart from `edgeHandlesByNode` so the
+ * pipeline's map stays a pure function of the real edges. A preview only touches selected nodes, so
+ * this adds at most two handles to each of a handful of nodes.
+ */
+export const previewEdgeHandlesByNode = writable<Map<string, Set<string>>>(new Map());
+
+/**
+ * `real` with `extra` unioned in.
+ *
+ * Only the node ids `extra` names get a new set. Every other entry keeps its original `Set`, and an
+ * empty `extra` returns `real` itself, so a node the preview does not touch renders exactly what it
+ * did without one.
+ */
+export function mergeEdgeHandles(
+	real: Map<string, Set<string>>,
+	extra: Map<string, Set<string>>
+): Map<string, Set<string>> {
+	if (extra.size === 0) return real;
+	const merged = new Map(real);
+	for (const [nodeId, handles] of extra) {
+		const existing = real.get(nodeId);
+		merged.set(nodeId, existing ? new Set([...existing, ...handles]) : handles);
+	}
+	return merged;
+}
 
 /**
  * Build that map from the edges about to be drawn.
