@@ -1784,7 +1784,7 @@
 	"meta_warning_codes_MalformedNeighboursWalkCutShort_name": "Neighbour identifiers cut short",
 	"meta_warning_codes_NeighbourResolutionIncomplete_description": "Matching LLDP/CDP neighbours to the devices and ports they name was stopped after {budget_seconds}s, with {neighbours} interface(s) advertising a neighbour on this network. Physical Topology is missing links this scan would otherwise have drawn; the next scan retries from scratch. Narrow what the scan covers, or split the network across daemons, if it keeps happening.",
 	"meta_warning_codes_NeighbourResolutionIncomplete_name": "Link resolution did not finish",
-	"meta_warning_codes_OutdatedDaemonFormat_description": "The daemon that ran this scan (version {daemon_version}) sent it in a format newer daemons no longer use. Scanopy read it in full and nothing was lost, but that translation is removed once this version stops being supported. Upgrade the daemon.",
+	"meta_warning_codes_OutdatedDaemonFormat_description": "The daemon that ran this scan is on {daemon_version}. Upgrade it.",
 	"meta_warning_codes_OutdatedDaemonFormat_name": "Daemon sent an outdated format",
 	"meta_warning_codes_ProvisionalSubnetInferred_description": "{count} subnet(s) on this network have a range Scanopy assumed rather than read, because devices reported addresses in them that nothing scanned holds. Nothing advertises a netmask, so the range around an address is a convention — confirm or correct it on the subnet. No daemon has an interface on these ranges, and they are reported on every scan until confirmed.",
 	"meta_warning_codes_ProvisionalSubnetInferred_name": "Address range assumed, please confirm",
