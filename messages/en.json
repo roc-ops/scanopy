@@ -806,7 +806,7 @@
 	"dependencies_editDependency": "Edit Dependency",
 	"dependencies_editEdgeStyle": "Edit Edge Style",
 	"dependencies_noOpenPortsError": "{serviceName} doesn't have any open ports. Move it to the first position, remove it, switch to \"Services only\", or rerun discovery on {hostName} to discover open ports.",
-	"dependencies_noServicesError": "{name} has no discovered services. Run a discovery scan first.",
+	"dependencies_noServicesError": "{name} has no services.",
 	"dependencies_selectPort": "Select a port...",
 	"dependencies_servicesOnly": "Services only",
 	"dependencies_servicesOnlyL3Hint": "This dependency won't appear in the L3 view — switch to \"With ports\" to map it to a specific binding.",
