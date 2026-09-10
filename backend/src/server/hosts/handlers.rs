@@ -28,6 +28,7 @@ use crate::server::shared::services::{csv::build_csv, traits::CrudService};
 use crate::server::shared::storage::traits::Entity;
 use crate::server::shared::storage::{filter::StorableFilter, traits::Storable};
 use crate::server::shared::types::api::{ApiErrorResponse, EmptyApiResponse};
+use crate::server::shared::types::entities::EntitySourceDiscriminants;
 use crate::server::shared::types::error_codes::ErrorCode;
 use crate::server::shared::validation::{validate_network_access, validate_read_access};
 use crate::server::{
@@ -132,6 +133,9 @@ pub struct HostFilterQuery {
     pub include_unvirtualized: Option<bool>,
     /// Filter to hosts running a service with one of these names.
     pub service_names: Option<Vec<String>>,
+    /// Filter by how the host came to exist (`source.type`). Repeat for several;
+    /// `Inferred` alone lists the hosts only a neighbour advertised.
+    pub sources: Option<Vec<EntitySourceDiscriminants>>,
     /// Filter by tag IDs (returns hosts that have ANY of the specified tags)
     pub tag_ids: Option<Vec<Uuid>>,
     /// Free-text search. Case-insensitive substring match against the host's
@@ -204,8 +208,13 @@ impl HostFilterQuery {
             filter
         };
 
-        match &self.service_names {
+        let filter = match &self.service_names {
             Some(names) if !names.is_empty() => filter.has_service_named(names),
+            _ => filter,
+        };
+
+        match &self.sources {
+            Some(sources) if !sources.is_empty() => filter.source_type_in(sources),
             _ => filter,
         }
     }

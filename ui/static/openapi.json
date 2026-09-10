@@ -6256,6 +6256,21 @@
             }
           },
           {
+            "name": "sources",
+            "in": "query",
+            "description": "Filter by how the host came to exist (`source.type`). Repeat for several;\n`Inferred` alone lists the hosts only a neighbour advertised.",
+            "required": false,
+            "schema": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/components/schemas/EntitySourceDiscriminants"
+              }
+            }
+          },
+          {
             "name": "tag_ids",
             "in": "query",
             "description": "Filter by tag IDs (returns hosts that have ANY of the specified tags)",
@@ -6684,6 +6699,21 @@
             }
           },
           {
+            "name": "sources",
+            "in": "query",
+            "description": "Filter by how the host came to exist (`source.type`). Repeat for several;\n`Inferred` alone lists the hosts only a neighbour advertised.",
+            "required": false,
+            "schema": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/components/schemas/EntitySourceDiscriminants"
+              }
+            }
+          },
+          {
             "name": "tag_ids",
             "in": "query",
             "description": "Filter by tag IDs (returns hosts that have ANY of the specified tags)",
@@ -6944,6 +6974,21 @@
               ],
               "items": {
                 "type": "string"
+              }
+            }
+          },
+          {
+            "name": "sources",
+            "in": "query",
+            "description": "Filter by how the host came to exist (`source.type`). Repeat for several;\n`Inferred` alone lists the hosts only a neighbour advertised.",
+            "required": false,
+            "schema": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/components/schemas/EntitySourceDiscriminants"
               }
             }
           },
@@ -24656,6 +24701,17 @@
               }
             }
           }
+        ]
+      },
+      "EntitySourceDiscriminants": {
+        "type": "string",
+        "enum": [
+          "Manual",
+          "System",
+          "Discovery",
+          "DiscoveryWithMatch",
+          "Inferred",
+          "Unknown"
         ]
       },
       "EsxiVirtualization": {

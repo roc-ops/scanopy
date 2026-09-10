@@ -7193,6 +7193,15 @@ export interface components {
             interfaces: number;
         } | {
             /** @enum {string} */
+            code: "OutdatedDaemonFormat";
+            /**
+             * @description The submitting daemon's version, so the reader knows which one to upgrade. `None` for
+             *     a daemon too old to report one at all.
+             * @example 0.17.14
+             */
+            daemon_version?: string | null;
+        } | {
+            /** @enum {string} */
             code: "WarningsTruncated";
             /**
              * Format: int32
@@ -7534,6 +7543,8 @@ export interface components {
             /** @enum {string} */
             type: "Unknown";
         };
+        /** @enum {string} */
+        EntitySourceDiscriminants: "Manual" | "System" | "Discovery" | "DiscoveryWithMatch" | "Inferred" | "Unknown";
         EsxiVirtualization: {
             /** @description ESXi identifier of the guest. */
             vm_id?: string | null;
@@ -15470,6 +15481,11 @@ export interface operations {
                 include_unvirtualized?: boolean | null;
                 /** @description Filter to hosts running a service with one of these names. */
                 service_names?: string[] | null;
+                /**
+                 * @description Filter by how the host came to exist (`source.type`). Repeat for several;
+                 *     `Inferred` alone lists the hosts only a neighbour advertised.
+                 */
+                sources?: components["schemas"]["EntitySourceDiscriminants"][] | null;
                 /** @description Filter by tag IDs (returns hosts that have ANY of the specified tags) */
                 tag_ids?: string[] | null;
                 /**
@@ -15658,6 +15674,11 @@ export interface operations {
                 include_unvirtualized?: boolean | null;
                 /** @description Filter to hosts running a service with one of these names. */
                 service_names?: string[] | null;
+                /**
+                 * @description Filter by how the host came to exist (`source.type`). Repeat for several;
+                 *     `Inferred` alone lists the hosts only a neighbour advertised.
+                 */
+                sources?: components["schemas"]["EntitySourceDiscriminants"][] | null;
                 /** @description Filter by tag IDs (returns hosts that have ANY of the specified tags) */
                 tag_ids?: string[] | null;
                 /**
@@ -15737,6 +15758,11 @@ export interface operations {
                 include_unvirtualized?: boolean | null;
                 /** @description Filter to hosts running a service with one of these names. */
                 service_names?: string[] | null;
+                /**
+                 * @description Filter by how the host came to exist (`source.type`). Repeat for several;
+                 *     `Inferred` alone lists the hosts only a neighbour advertised.
+                 */
+                sources?: components["schemas"]["EntitySourceDiscriminants"][] | null;
                 /** @description Filter by tag IDs (returns hosts that have ANY of the specified tags) */
                 tag_ids?: string[] | null;
                 /**

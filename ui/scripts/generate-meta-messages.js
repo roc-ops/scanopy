@@ -62,6 +62,9 @@ export const COVERED_FIXTURES = [
 	// Provenance tiers. The `metadata.sources` list under each is data the UI looks values up in,
 	// not copy — only the name and description are translated.
 	{ file: 'attribute-methods.json', key: 'attribute_methods', kind: 'typeMetadata' },
+	// How an entity came to exist, keyed by its `source.type`. The descriptions are operator-facing
+	// explanations (the Inferred one is the notice on an inferred host), not internal notes.
+	{ file: 'entity-sources.json', key: 'entity_sources', kind: 'typeMetadata' },
 	// Scan warnings. Descriptions here are templates with `{named}` slots, unlike every other
 	// entry above: the values are copied through verbatim, paraglide compiles them into functions
 	// that take an inputs object, and `metaDescriptionWith` in src/lib/i18n/metadata.ts is what
