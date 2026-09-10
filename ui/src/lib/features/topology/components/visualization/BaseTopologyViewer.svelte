@@ -638,7 +638,8 @@
 			hiddenEdgeTypes: (get(topologyOptions).local.hide_edge_types ?? []).join(','),
 			tagHidden: get(tagHiddenNodeIds),
 			hiddenEntities: get(hiddenEntityIds),
-			hiddenMetadata: hiddenMetadataKey(get(activeView))
+			hiddenMetadata: hiddenMetadataKey(get(activeView)),
+			topology
 		};
 	}
 	function triggerLoad(source = 'unknown') {

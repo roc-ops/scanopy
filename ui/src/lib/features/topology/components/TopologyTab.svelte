@@ -271,8 +271,15 @@
 	);
 
 	let showFiltersEmptyState = $derived(viewIsEmpty && emptyingFilters.length > 0);
+	// Not while the bundle is being refetched. Clearing a server-side filter empties the hide-set
+	// at once but the entities it restores arrive a round trip later, so for that window the view
+	// is empty with no filter to name — and the setup prompt would claim discovery found nothing,
+	// which is the exact misdirection this state exists to prevent.
 	let showL2EmptyState = $derived(
-		viewIsEmpty && emptyingFilters.length === 0 && $activeView === 'L2Physical'
+		viewIsEmpty &&
+			emptyingFilters.length === 0 &&
+			$activeView === 'L2Physical' &&
+			!topologyDataQuery.isFetching
 	);
 
 	// Update tag filter stores when topology or options change
