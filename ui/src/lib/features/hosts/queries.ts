@@ -169,6 +169,8 @@ export interface HostQueryOptions {
 	include_unvirtualized?: boolean;
 	/** Filter to hosts running a service with one of these names. */
 	service_names?: string[];
+	/** Filter by how the host came to exist (`source.type`). */
+	sources?: components['schemas']['EntitySourceDiscriminants'][];
 	/** Primary ordering field (used for grouping). Always sorts ASC to keep groups together. */
 	group_by?: components['schemas']['HostOrderField'];
 	/** Secondary ordering field (sorting within groups or standalone sort). */
@@ -236,7 +238,8 @@ export function useHostsQuery(optionsOrGetter: HostQueryOptions | (() => HostQue
 							hidden: options.hidden,
 							virtualization_service_ids: options.virtualization_service_ids,
 							include_unvirtualized: options.include_unvirtualized,
-							service_names: options.service_names
+							service_names: options.service_names,
+							sources: options.sources
 						}
 					}
 				});

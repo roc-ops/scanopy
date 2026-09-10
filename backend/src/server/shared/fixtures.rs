@@ -21,6 +21,7 @@ use crate::server::services::r#impl::definitions::ServiceDefinition;
 use crate::server::shared::attribution::AttributeMethod;
 use crate::server::shared::concepts::Concept;
 use crate::server::shared::entities::EntityDiscriminants;
+use crate::server::shared::types::entities::EntitySourceDiscriminants;
 use crate::server::shared::types::metadata::{EntityMetadata, MetadataProvider, TypeMetadata};
 use crate::server::subnets::r#impl::types::SubnetType;
 use crate::server::topology::types::edges::EdgeType;
@@ -145,6 +146,13 @@ pub fn generate_ui_data_fixtures(output_dir: &Path) {
         })
         .collect();
     write_fixture(&entities, output_dir, "entities.json");
+
+    // How an entity came to exist. Keyed by the `source.type` tag every entity carries, so the
+    // UI labels, colours and filters on it without restating the variants.
+    let entity_sources: Vec<TypeMetadata> = EntitySourceDiscriminants::iter()
+        .map(|s| s.to_metadata())
+        .collect();
+    write_fixture(&entity_sources, output_dir, "entity-sources.json");
 
     let concepts: Vec<EntityMetadata> = Concept::iter().map(|e| e.to_metadata()).collect();
     write_fixture(&concepts, output_dir, "concepts.json");

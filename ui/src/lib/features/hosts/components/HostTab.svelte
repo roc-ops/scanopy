@@ -19,7 +19,12 @@
 	import { tagNames } from '$lib/features/tags/columns';
 	import { networkItems } from '$lib/features/networks/columns';
 	import { credentialItems } from '$lib/features/credentials/columns';
-	import { entities, concepts, serviceDefinitions } from '$lib/shared/stores/metadata';
+	import {
+		entities,
+		entitySources,
+		concepts,
+		serviceDefinitions
+	} from '$lib/shared/stores/metadata';
 	import { Plus, Trash2, RefreshCw, Replace, Eye, Edit } from 'lucide-svelte';
 	import { useTagsQuery } from '$lib/features/tags/queries';
 	import { useOrganizationQuery } from '$lib/features/organizations/queries';
@@ -49,6 +54,7 @@
 		common_noEntityYet,
 		common_rescan,
 		common_serialNumber,
+		common_source,
 		common_firmwareRevision,
 		common_softwareRevision,
 		common_service,
@@ -90,6 +96,7 @@
 	type OnboardingOperation = components['schemas']['OnboardingOperationDiscriminants'];
 	type HostOrderField = components['schemas']['HostOrderField'];
 	type OrderDirection = components['schemas']['OrderDirection'];
+	type EntitySourceType = components['schemas']['EntitySourceDiscriminants'];
 
 	// Pagination state
 	let pageSize = $state(20);
@@ -115,6 +122,7 @@
 	let filterVirtualizationServiceIds = $state<string[]>([]);
 	let filterIncludeUnvirtualized = $state(false);
 	let filterServiceNames = $state<string[]>([]);
+	let filterSources = $state<EntitySourceType[]>([]);
 
 	// Queries
 	const organizationQuery = useOrganizationQuery();
@@ -151,7 +159,8 @@
 			virtualization_service_ids:
 				filterVirtualizationServiceIds.length > 0 ? filterVirtualizationServiceIds : undefined,
 			include_unvirtualized: filterIncludeUnvirtualized || undefined,
-			service_names: filterServiceNames.length > 0 ? filterServiceNames : undefined
+			service_names: filterServiceNames.length > 0 ? filterServiceNames : undefined,
+			sources: filterSources.length > 0 ? filterSources : undefined
 		})
 	);
 	const networksQuery = useNetworksQuery();
@@ -267,6 +276,14 @@
 			case 'services':
 				filterServiceNames = values;
 				break;
+			case 'source':
+				// Fixture ids are the backend's `EntitySourceDiscriminants` names, emitted from
+				// that same enum, so an id is a valid filter value by construction.
+				filterSources = entitySources
+					.getItems()
+					.filter((source) => values.includes(entitySources.getName(source.id)))
+					.map((source) => source.id as EntitySourceType);
+				break;
 			default:
 				throw new Error(
 					`HostTab: no server-side filter handles "${fieldKey}". A serverFiltered field ` +
@@ -295,7 +312,8 @@
 		virtualization_service_ids:
 			filterVirtualizationServiceIds.length > 0 ? filterVirtualizationServiceIds : undefined,
 		include_unvirtualized: filterIncludeUnvirtualized || undefined,
-		service_names: filterServiceNames.length > 0 ? filterServiceNames : undefined
+		service_names: filterServiceNames.length > 0 ? filterServiceNames : undefined,
+		sources: filterSources.length > 0 ? filterSources : undefined
 	});
 
 	let showHostEditor = $state(false);
@@ -485,6 +503,32 @@
 				}
 			},
 			[
+				// How the host came to exist, read from `source.type`. An inferred host (one a
+				// neighbour advertised and nothing scanned) looks the same as a down device by its
+				// ports and services, so the chip and filter read the stamped source, never those.
+				{
+					key: 'source',
+					label: common_source(),
+					type: 'string',
+					filterable: true,
+					serverFiltered: true,
+					// Every source the backend can stamp, from the fixture rather than the loaded
+					// page, which would only offer the sources that happen to appear on it.
+					filterOptions: entitySources.getItems().map((source) => entitySources.getName(source.id)),
+					getValue: (host) => entitySources.getName(host.source.type),
+					display: {
+						order: 1,
+						getItems: (host) => [
+							{
+								id: host.source.type,
+								label: entitySources.getName(host.source.type),
+								color: entitySources.getColorHelper(host.source.type).color,
+								icon: entitySources.getIconComponent(host.source.type),
+								title: entitySources.getDescription(host.source.type)
+							}
+						]
+					}
+				},
 				{
 					key: 'description',
 					label: common_description(),
