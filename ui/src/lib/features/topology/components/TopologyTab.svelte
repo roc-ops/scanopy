@@ -63,7 +63,7 @@
 	import { trackEvent } from '$lib/shared/utils/analytics';
 	import { useTagsQuery } from '$lib/features/tags/queries';
 	import { useActiveSessionsQuery } from '$lib/features/discovery/queries';
-	import { toRenderableTopology } from '$lib/features/topology/enriched';
+	import { entityBundleFrom, toRenderableTopology } from '$lib/features/topology/enriched';
 	import type { RenderableTopology } from '$lib/features/topology/types/base';
 	import { formatTimestamp, formatDate } from '$lib/shared/utils/formatting';
 	import ApplicationSetupWizard from './application-wizard/ApplicationSetupWizard.svelte';
@@ -226,21 +226,7 @@
 		if (!bundle) return null;
 		return toRenderableTopology(
 			currentTopologyRow,
-			{
-				hosts: bundle.hosts,
-				services: bundle.services,
-				subnets: bundle.subnets,
-				ip_addresses: bundle.ip_addresses,
-				ports: bundle.ports,
-				bindings: bundle.bindings,
-				interfaces: bundle.interfaces,
-				dependencies: bundle.dependencies,
-				vlans: bundle.vlans,
-				entity_tags: bundle.tags,
-				// Per-view graph built on request by the backend (snapshot-aware).
-				nodes: bundle.nodes,
-				edges: bundle.edges
-			},
+			entityBundleFrom(bundle),
 			currentTopologyName,
 			$activeView
 		);

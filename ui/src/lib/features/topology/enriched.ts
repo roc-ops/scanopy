@@ -23,6 +23,7 @@ import type {
 	FilteredOutCounts
 } from './types/base';
 import type { TopologyView } from './queries';
+import type { components } from '$lib/api/schema';
 import type {
 	Host,
 	IPAddress,
@@ -36,6 +37,8 @@ import type { Subnet } from '$lib/features/subnets/types/base';
 import type { Dependency } from '$lib/features/dependencies/types/base';
 import type { Tag } from '$lib/features/tags/types/base';
 
+type TopologyData = components['schemas']['TopologyData'];
+
 export interface EntityBundle {
 	hosts: Host[];
 	services: Service[];
@@ -46,13 +49,18 @@ export interface EntityBundle {
 	interfaces: Interface[];
 	/**
 	 * GH #701: resolved adjacencies + their raw evidence, built on request alongside `nodes`/`edges`
-	 * — see `TopologyData.neighbours`/`.candidates`. Optional for the same reason those are: a
-	 * caller that never asked for them (or an older cached response) simply has none to flatten.
+	 * — see `TopologyData.neighbours`/`.candidates`.
+	 *
+	 * Required, not optional. These were optional "for a caller that never asked for them", and
+	 * that is exactly how the topology tab came to build its bundle without them: the literal
+	 * compiled, every interface then classified `Unlinked` for want of a single neighbour row, and
+	 * hiding `Unlinked` emptied every host container in L2. Build a bundle with
+	 * `entityBundleFrom` rather than by hand.
 	 */
-	neighbours?: InterfaceNeighborRow[];
-	candidates?: InterfaceNeighborCandidate[];
+	neighbours: InterfaceNeighborRow[];
+	candidates: InterfaceNeighborCandidate[];
 	/** Server-side filter drop tally — see `RenderableTopology.filtered_out`. */
-	filtered_out?: FilteredOutCounts;
+	filtered_out: FilteredOutCounts;
 	dependencies: Dependency[];
 	vlans: Vlan[];
 	entity_tags: Tag[];
@@ -76,6 +84,27 @@ export const EMPTY_ENTITY_BUNDLE: EntityBundle = {
 	vlans: [],
 	entity_tags: []
 };
+
+/**
+ * The entity bundle for a `TopologyData` response — the one place that response is mapped.
+ *
+ * The app tab and the share viewer each used to spell the mapping out field by field, and the two
+ * copies drifted: the share viewer passed `neighbours` through and the tab did not. A spread
+ * carries every field the backend adds without anyone having to remember to list it; the only
+ * real translation is `tags` → `entity_tags`.
+ */
+export function entityBundleFrom(data: TopologyData): EntityBundle {
+	const { tags, neighbours, candidates, filtered_out, ...rest } = data;
+	return {
+		...rest,
+		// Absent only on a response from a backend older than the field — `#[serde(default)]`
+		// makes them optional in the generated schema, not in what a current server sends.
+		neighbours: neighbours ?? [],
+		candidates: candidates ?? [],
+		filtered_out: filtered_out ?? {},
+		entity_tags: tags
+	};
+}
 
 /**
  * Combine a slim `Topology` row with the entity arrays + built graph from the
