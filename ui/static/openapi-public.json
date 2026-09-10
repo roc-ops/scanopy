@@ -12643,19 +12643,19 @@
             ],
             "description": "Association between a service and a port / interface that the service is listening on",
             "example": {
-              "created_at": "2026-09-09T18:01:02.683780Z",
+              "created_at": "2026-09-10T15:31:30.180942Z",
               "first_discovery_id": null,
-              "id": "8b92dadf-d503-4803-b08c-3724a5c19641",
+              "id": "90716e8d-ac22-4abe-ac40-ed5c9ee4235a",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-09-09T18:01:02.683780Z",
+              "last_seen_at": "2026-09-10T15:31:30.180942Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-09-09T18:01:02.683780Z",
-              "valid_from": "2026-09-09T18:01:02.683780Z",
+              "updated_at": "2026-09-10T15:31:30.180942Z",
+              "valid_from": "2026-09-10T15:31:30.180942Z",
               "valid_to": null
             }
           },
@@ -13998,6 +13998,7 @@
                   "lineage_id": null,
                   "mac_address": "DE:AD:BE:EF:CA:FE",
                   "mac_address_source": "ArpReply",
+                  "neighbor_candidates": [],
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "oper_status": "Up",
                   "speed_bps": 1000000000,
@@ -14057,19 +14058,19 @@
                 {
                   "bindings": [
                     {
-                      "created_at": "2026-09-09T18:01:02.658705Z",
+                      "created_at": "2026-09-10T15:31:30.160855Z",
                       "first_discovery_id": null,
-                      "id": "78594763-9d26-41bb-921e-10d9c8330bb8",
+                      "id": "f185bf37-9dc9-4ea6-a20c-3e78306e37ae",
                       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                       "last_discovery_id": null,
-                      "last_seen_at": "2026-09-09T18:01:02.658705Z",
+                      "last_seen_at": "2026-09-10T15:31:30.160855Z",
                       "lineage_id": null,
                       "network_id": "550e8400-e29b-41d4-a716-446655440002",
                       "port_id": "550e8400-e29b-41d4-a716-446655440006",
                       "service_id": "550e8400-e29b-41d4-a716-446655440007",
                       "type": "Port",
-                      "updated_at": "2026-09-09T18:01:02.658705Z",
-                      "valid_from": "2026-09-09T18:01:02.658705Z",
+                      "updated_at": "2026-09-10T15:31:30.160855Z",
+                      "valid_from": "2026-09-10T15:31:30.160855Z",
                       "valid_to": null
                     }
                   ],
@@ -14083,7 +14084,7 @@
                   "name": "nginx",
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "position": 0,
-                  "service_definition": "Paperless-NGX",
+                  "service_definition": "Syncthing",
                   "source": {
                     "type": "Manual"
                   },
@@ -14328,10 +14329,6 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/InterfaceBase"
-              },
-              {
-                "$ref": "#/components/schemas/InterfaceNeighborEvidence",
-                "description": "Wire-compat only: the old scalar LLDP/CDP shape a pre-migration daemon still submits.\n\nGH #701 replaced these twelve columns with `interface_neighbor_candidates`, but a daemon\npredating that has no way to know (see the `<0.17.5 deprecated at v1.0` convention — old\ndaemons are supported for a whole deprecation window). This codebase never sets\n`deny_unknown_fields`, so simply removing the fields from `InterfaceBase` would silently\nswallow an old daemon's submission rather than erroring or translating it — flattening this\nalongside `base` is what makes the old JSON shape still deserialize. Reuses\n`InterfaceNeighborEvidence`'s field names/shape exactly, since that *is* the old scalar\nshape.\n\nDrained into `base.neighbor_candidates` by `Interface::drain_legacy_neighbor_evidence`\non the discovery ingest path and never read anywhere else — keep it that way; nothing\noutside that one function should reference this field. Never serialized: a new server\nresponse or a current daemon's own submission never emits this shape."
               },
               {
                 "type": "object",
@@ -15306,19 +15303,19 @@
             "example": {
               "bindings": [
                 {
-                  "created_at": "2026-09-09T18:01:02.678177Z",
+                  "created_at": "2026-09-10T15:31:30.176024Z",
                   "first_discovery_id": null,
-                  "id": "dfda26b9-9a82-4793-a1cc-a5089e625c74",
+                  "id": "4510b9b1-1154-47cb-82f2-fed310621f51",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-09-09T18:01:02.678177Z",
+                  "last_seen_at": "2026-09-10T15:31:30.176024Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-09-09T18:01:02.678177Z",
-                  "valid_from": "2026-09-09T18:01:02.678177Z",
+                  "updated_at": "2026-09-10T15:31:30.176024Z",
+                  "valid_from": "2026-09-10T15:31:30.176024Z",
                   "valid_to": null
                 }
               ],
@@ -15332,7 +15329,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Paperless-NGX",
+              "service_definition": "Syncthing",
               "source": {
                 "type": "Manual"
               },
@@ -16033,6 +16030,55 @@
                     "L3Logical",
                     "Workloads",
                     "Application"
+                  ]
+                }
+              },
+              "filtered_out": {
+                "type": "object",
+                "description": "How many entities of each type a server-side metadata filter removed, by the filter that\nremoved them.\n\nServer-filtered entities never reach the browser, so this is the only way the frontend can\nsay \"171 interfaces hidden by By link\" rather than presenting an empty view as an empty\nnetwork. Keyed by entity and filter only, with no view: the hide-set is per view but a drop\nis not — an entity is removed from the one shared bundle only when *every* view that could\nrender it hides it (see `metadata_filter`).\n\nEmpty when nothing was filtered, which is the common case.",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "propertyNames": {
+                    "type": "string",
+                    "description": "The kind of metadata filter. One variant per conceptually-distinct filter\nacross the app — Category (on Service), Virtualization (on Host), and so\non. Kept narrow on purpose: adding a new filter means adding a variant\nhere + a `HasFilterValues` impl on the relevant entity.",
+                    "enum": [
+                      "Category",
+                      "Virtualization",
+                      "LinkState",
+                      "Staleness"
+                    ]
+                  }
+                },
+                "propertyNames": {
+                  "type": "string",
+                  "enum": [
+                    "Organization",
+                    "Invite",
+                    "Share",
+                    "Network",
+                    "DaemonApiKey",
+                    "UserApiKey",
+                    "User",
+                    "Tag",
+                    "Discovery",
+                    "Daemon",
+                    "Host",
+                    "Service",
+                    "Port",
+                    "Binding",
+                    "IPAddress",
+                    "Interface",
+                    "Credential",
+                    "Subnet",
+                    "Vlan",
+                    "Dependency",
+                    "Topology",
+                    "Snapshot",
+                    "Unknown"
                   ]
                 }
               },
@@ -17531,19 +17577,19 @@
         ],
         "description": "Association between a service and a port / interface that the service is listening on",
         "example": {
-          "created_at": "2026-09-09T18:01:02.659271Z",
+          "created_at": "2026-09-10T15:31:30.161258Z",
           "first_discovery_id": null,
-          "id": "67888ea9-84fa-41b6-8465-95deccfe9446",
+          "id": "14d242ff-ded4-4074-a3e9-db42cbdf8fd5",
           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
           "last_discovery_id": null,
-          "last_seen_at": "2026-09-09T18:01:02.659271Z",
+          "last_seen_at": "2026-09-10T15:31:30.161258Z",
           "lineage_id": null,
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "port_id": "550e8400-e29b-41d4-a716-446655440006",
           "service_id": "550e8400-e29b-41d4-a716-446655440007",
           "type": "Port",
-          "updated_at": "2026-09-09T18:01:02.659271Z",
-          "valid_from": "2026-09-09T18:01:02.659271Z",
+          "updated_at": "2026-09-10T15:31:30.161258Z",
+          "valid_from": "2026-09-10T15:31:30.161258Z",
           "valid_to": null
         }
       },
@@ -18238,7 +18284,7 @@
               "id": "550e8400-e29b-41d4-a716-446655440007",
               "name": "nginx",
               "position": 0,
-              "service_definition": "Paperless-NGX",
+              "service_definition": "Syncthing",
               "tags": [],
               "virtualization_metadata": null,
               "virtualization_service_id": null
@@ -21598,6 +21644,31 @@
           },
           {
             "type": "object",
+            "title": "OutdatedDaemonFormat",
+            "description": "The daemon submitted this scan in a wire format a current daemon no longer produces.\n\nServer-side finding, raised where the raw request body is read. The server translates the\nold format, so nothing was lost — this says the translation happened, which is the only\nevidence an operator ever gets that a daemon is behind. Which superseded format it was is\ndeliberately not carried, and neither is the fact that the translation worked: the reader\nneeds one thing from this, which is that the daemon is out of date.\n\nThe daemon to upgrade is the session's own — the UI reads `daemon_id` off the payload this\nrides on rather than repeating it here, which is what lets the row deep-link to that\ndaemon's upgrade modal.\n\nEnds with the compatibility window. When the enforced floor rises past the last release\nthat sends an old format, the translations go and this goes with them.",
+            "required": [
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "OutdatedDaemonFormat"
+                ]
+              },
+              "daemon_version": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The submitting daemon's version, so the reader knows which one to upgrade. `None` for\na daemon too old to report one at all.",
+                "example": "0.17.14",
+                "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+              }
+            }
+          },
+          {
+            "type": "object",
             "title": "WarningsTruncated",
             "description": "The run produced more warnings than the scan record holds. Emitted rather than dropping\nthe tail silently — a list that simply stops reads as though that was all of them.",
             "required": [
@@ -23323,6 +23394,7 @@
               "lineage_id": null,
               "mac_address": "DE:AD:BE:EF:CA:FE",
               "mac_address_source": "ArpReply",
+              "neighbor_candidates": [],
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "oper_status": "Up",
               "speed_bps": 1000000000,
@@ -23382,19 +23454,19 @@
             {
               "bindings": [
                 {
-                  "created_at": "2026-09-09T18:01:02.658054Z",
+                  "created_at": "2026-09-10T15:31:30.160388Z",
                   "first_discovery_id": null,
-                  "id": "48d70eec-3272-42f6-98e5-abfb0a6a9080",
+                  "id": "f3727dc8-e988-429b-b349-f139a9adad2c",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-09-09T18:01:02.658054Z",
+                  "last_seen_at": "2026-09-10T15:31:30.160388Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-09-09T18:01:02.658054Z",
-                  "valid_from": "2026-09-09T18:01:02.658054Z",
+                  "updated_at": "2026-09-10T15:31:30.160388Z",
+                  "valid_from": "2026-09-10T15:31:30.160388Z",
                   "valid_to": null
                 }
               ],
@@ -23408,7 +23480,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Paperless-NGX",
+              "service_definition": "Syncthing",
               "source": {
                 "type": "Manual"
               },
@@ -24190,10 +24262,6 @@
             "$ref": "#/components/schemas/InterfaceBase"
           },
           {
-            "$ref": "#/components/schemas/InterfaceNeighborEvidence",
-            "description": "Wire-compat only: the old scalar LLDP/CDP shape a pre-migration daemon still submits.\n\nGH #701 replaced these twelve columns with `interface_neighbor_candidates`, but a daemon\npredating that has no way to know (see the `<0.17.5 deprecated at v1.0` convention — old\ndaemons are supported for a whole deprecation window). This codebase never sets\n`deny_unknown_fields`, so simply removing the fields from `InterfaceBase` would silently\nswallow an old daemon's submission rather than erroring or translating it — flattening this\nalongside `base` is what makes the old JSON shape still deserialize. Reuses\n`InterfaceNeighborEvidence`'s field names/shape exactly, since that *is* the old scalar\nshape.\n\nDrained into `base.neighbor_candidates` by `Interface::drain_legacy_neighbor_evidence`\non the discovery ingest path and never read anywhere else — keep it that way; nothing\noutside that one function should reference this field. Never serialized: a new server\nresponse or a current daemon's own submission never emits this shape."
-          },
-          {
             "type": "object",
             "required": [
               "id",
@@ -24374,6 +24442,13 @@
                 ],
                 "format": "uuid",
                 "description": "Native/untagged VLAN entity ID on this port (resolved from Q-BRIDGE dot1qPvid)"
+              },
+              "neighbor_candidates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/InterfaceNeighborEvidence"
+                },
+                "description": "Raw LLDP/CDP evidence this scan heard on the port — the wire shape a **current** daemon\nsubmits, one entry per distinct LLDP or CDP record. Drained into `interface_neighbor_\ncandidates` by the discovery ingest path (`InterfaceService::create_or_update_from_\ndiscovery`); never read anywhere else. Not `skip_serializing`: this field is the daemon's\n*outgoing* discovery payload as much as it is the server's read model, and that attribute\nhas no notion of direction — it silently dropped every daemon's submitted evidence before\nthe request ever left the process (found investigating the GH #701 candidate-persistence\nregression; nothing downstream of the wire was ever at fault). Harmless for API responses:\n`create_or_update_from_discovery` takes this field via `mem::take` before returning or\npersisting `Interface`, and it is not a stored column, so nothing read back from the\ndatabase or echoed in a response ever has it populated."
               },
               "network_id": {
                 "type": "string",
@@ -26690,6 +26765,7 @@
                     "lineage_id": null,
                     "mac_address": "DE:AD:BE:EF:CA:FE",
                     "mac_address_source": "ArpReply",
+                    "neighbor_candidates": [],
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "oper_status": "Up",
                     "speed_bps": 1000000000,
@@ -26749,19 +26825,19 @@
                   {
                     "bindings": [
                       {
-                        "created_at": "2026-09-09T18:01:02.645154Z",
+                        "created_at": "2026-09-10T15:31:30.151930Z",
                         "first_discovery_id": null,
-                        "id": "85e8002d-ed86-48b5-aca7-f0edc7eba1c6",
+                        "id": "ea5b5a40-a0a2-4360-92b8-6ea337888108",
                         "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                         "last_discovery_id": null,
-                        "last_seen_at": "2026-09-09T18:01:02.645154Z",
+                        "last_seen_at": "2026-09-10T15:31:30.151930Z",
                         "lineage_id": null,
                         "network_id": "550e8400-e29b-41d4-a716-446655440002",
                         "port_id": "550e8400-e29b-41d4-a716-446655440006",
                         "service_id": "550e8400-e29b-41d4-a716-446655440007",
                         "type": "Port",
-                        "updated_at": "2026-09-09T18:01:02.645154Z",
-                        "valid_from": "2026-09-09T18:01:02.645154Z",
+                        "updated_at": "2026-09-10T15:31:30.151930Z",
+                        "valid_from": "2026-09-10T15:31:30.151930Z",
                         "valid_to": null
                       }
                     ],
@@ -26775,7 +26851,7 @@
                     "name": "nginx",
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "position": 0,
-                    "service_definition": "Paperless-NGX",
+                    "service_definition": "Syncthing",
                     "source": {
                       "type": "Manual"
                     },
@@ -26918,19 +26994,19 @@
               "example": {
                 "bindings": [
                   {
-                    "created_at": "2026-09-09T18:01:02.677124Z",
+                    "created_at": "2026-09-10T15:31:30.175163Z",
                     "first_discovery_id": null,
-                    "id": "b1827e0e-71af-43be-b074-65140546adef",
+                    "id": "d588f46d-ed49-4142-886f-44c947bbec68",
                     "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                     "last_discovery_id": null,
-                    "last_seen_at": "2026-09-09T18:01:02.677124Z",
+                    "last_seen_at": "2026-09-10T15:31:30.175163Z",
                     "lineage_id": null,
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "port_id": "550e8400-e29b-41d4-a716-446655440006",
                     "service_id": "550e8400-e29b-41d4-a716-446655440007",
                     "type": "Port",
-                    "updated_at": "2026-09-09T18:01:02.677124Z",
-                    "valid_from": "2026-09-09T18:01:02.677124Z",
+                    "updated_at": "2026-09-10T15:31:30.175163Z",
+                    "valid_from": "2026-09-10T15:31:30.175163Z",
                     "valid_to": null
                   }
                 ],
@@ -26944,7 +27020,7 @@
                 "name": "nginx",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
                 "position": 0,
-                "service_definition": "Paperless-NGX",
+                "service_definition": "Syncthing",
                 "source": {
                   "type": "Manual"
                 },
@@ -29001,19 +29077,19 @@
         "example": {
           "bindings": [
             {
-              "created_at": "2026-09-09T18:01:02.659104Z",
+              "created_at": "2026-09-10T15:31:30.161136Z",
               "first_discovery_id": null,
-              "id": "1523e8c2-5eb2-4166-9488-938f2068e4d6",
+              "id": "3df454db-4eac-4995-a3be-06e5e7e79f7c",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-09-09T18:01:02.659104Z",
+              "last_seen_at": "2026-09-10T15:31:30.161136Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-09-09T18:01:02.659104Z",
-              "valid_from": "2026-09-09T18:01:02.659104Z",
+              "updated_at": "2026-09-10T15:31:30.161136Z",
+              "valid_from": "2026-09-10T15:31:30.161136Z",
               "valid_to": null
             }
           ],
@@ -29027,7 +29103,7 @@
           "name": "nginx",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "position": 0,
-          "service_definition": "Paperless-NGX",
+          "service_definition": "Syncthing",
           "source": {
             "type": "Manual"
           },
@@ -30124,6 +30200,55 @@
               ]
             }
           },
+          "filtered_out": {
+            "type": "object",
+            "description": "How many entities of each type a server-side metadata filter removed, by the filter that\nremoved them.\n\nServer-filtered entities never reach the browser, so this is the only way the frontend can\nsay \"171 interfaces hidden by By link\" rather than presenting an empty view as an empty\nnetwork. Keyed by entity and filter only, with no view: the hide-set is per view but a drop\nis not — an entity is removed from the one shared bundle only when *every* view that could\nrender it hides it (see `metadata_filter`).\n\nEmpty when nothing was filtered, which is the common case.",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "propertyNames": {
+                "type": "string",
+                "description": "The kind of metadata filter. One variant per conceptually-distinct filter\nacross the app — Category (on Service), Virtualization (on Host), and so\non. Kept narrow on purpose: adding a new filter means adding a variant\nhere + a `HasFilterValues` impl on the relevant entity.",
+                "enum": [
+                  "Category",
+                  "Virtualization",
+                  "LinkState",
+                  "Staleness"
+                ]
+              }
+            },
+            "propertyNames": {
+              "type": "string",
+              "enum": [
+                "Organization",
+                "Invite",
+                "Share",
+                "Network",
+                "DaemonApiKey",
+                "UserApiKey",
+                "User",
+                "Tag",
+                "Discovery",
+                "Daemon",
+                "Host",
+                "Service",
+                "Port",
+                "Binding",
+                "IPAddress",
+                "Interface",
+                "Credential",
+                "Subnet",
+                "Vlan",
+                "Dependency",
+                "Topology",
+                "Snapshot",
+                "Unknown"
+              ]
+            }
+          },
           "hosts": {
             "type": "array",
             "items": {
@@ -30299,7 +30424,7 @@
             "default": {
               "Application": [
                 {
-                  "id": "026385c8-564d-4a8e-a325-8f2ba77c0581",
+                  "id": "3b7a441c-2a56-4fc9-b476-eba1dab599a0",
                   "rule": {
                     "ByApplication": {
                       "tag_ids": []
@@ -30309,23 +30434,23 @@
               ],
               "L2Physical": [
                 {
-                  "id": "61509c75-4886-45ae-a002-f46d8aa95156",
+                  "id": "4237c571-dbcc-4e7a-b53f-356ebdea9c4f",
                   "rule": "ByHost"
                 }
               ],
               "L3Logical": [
                 {
-                  "id": "53ee7800-3171-4aec-8f75-85588bf4de2e",
+                  "id": "4f874b6c-d5d5-4356-a53d-bdef96aaba04",
                   "rule": "BySubnet"
                 },
                 {
-                  "id": "1292c618-0ee6-45f2-86e2-6b14528c68e8",
+                  "id": "cc104f9d-0bc9-49bc-9719-a18d9841e259",
                   "rule": "MergeContainerBridges"
                 }
               ],
               "Workloads": [
                 {
-                  "id": "61509c75-4886-45ae-a002-f46d8aa95156",
+                  "id": "4237c571-dbcc-4e7a-b53f-356ebdea9c4f",
                   "rule": "ByHost"
                 }
               ]
@@ -30355,19 +30480,19 @@
             "description": "Rules deciding how entities are placed and inlined within containers.",
             "default": [
               {
-                "id": "fa1050f6-72c1-4f8c-ba1d-84147ac17fdc",
+                "id": "56cdedae-a70f-4ce1-9f04-b1a83efb296b",
                 "rule": "ByTrunkPort"
               },
               {
-                "id": "e01f971d-650b-4f05-87c1-71381c6c6be7",
+                "id": "33752687-ea3e-41bc-b047-1528357f196a",
                 "rule": "ByVLAN"
               },
               {
-                "id": "53326bf9-d28d-4096-aaf2-5b1a1a49defe",
+                "id": "25a0a5c6-a825-437a-b889-3aeb3c261361",
                 "rule": "ByPortOpStatus"
               },
               {
-                "id": "26533f3f-c808-4265-9014-364eb23b586f",
+                "id": "fb632c8d-fde3-4bc5-affa-2d66153f59f4",
                 "rule": {
                   "ByServiceCategory": {
                     "categories": [
@@ -30385,7 +30510,7 @@
                 }
               },
               {
-                "id": "36cde346-ea38-4c23-9373-b831a12fa7ae",
+                "id": "79a16e34-2b22-424c-b6c2-9bf76cf969d7",
                 "rule": {
                   "ByTag": {
                     "tag_ids": [],
@@ -30394,15 +30519,15 @@
                 }
               },
               {
-                "id": "9d2b1f51-148f-40ae-9bdd-222b49d1d6c9",
+                "id": "81fe589d-2f58-46d1-a770-1551076f3cee",
                 "rule": "ByHypervisor"
               },
               {
-                "id": "dd408a66-bbd0-4d0b-8134-bc0f9ffadfef",
+                "id": "230bbcf1-24fd-42d5-85ed-e33b2ef79071",
                 "rule": "ByContainerRuntime"
               },
               {
-                "id": "9cd3ed95-5100-402b-9ca1-6f9cc5bc69d4",
+                "id": "3c85adbc-cd17-419a-b11c-b39dca8b95d1",
                 "rule": "ByStack"
               }
             ]

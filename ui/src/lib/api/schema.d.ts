@@ -3226,19 +3226,19 @@ export interface components {
             /**
              * @description Association between a service and a port / interface that the service is listening on
              * @example {
-             *       "created_at": "2026-09-09T18:01:02.683772Z",
+             *       "created_at": "2026-09-10T15:31:30.180939Z",
              *       "first_discovery_id": null,
-             *       "id": "425fcb51-df19-41e1-ac4b-7b7273fcdfd8",
+             *       "id": "3c51edcb-a6d0-4a10-8aab-85bff8e7a926",
              *       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *       "last_discovery_id": null,
-             *       "last_seen_at": "2026-09-09T18:01:02.683772Z",
+             *       "last_seen_at": "2026-09-10T15:31:30.180939Z",
              *       "lineage_id": null,
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *       "type": "Port",
-             *       "updated_at": "2026-09-09T18:01:02.683772Z",
-             *       "valid_from": "2026-09-09T18:01:02.683772Z",
+             *       "updated_at": "2026-09-10T15:31:30.180939Z",
+             *       "valid_from": "2026-09-10T15:31:30.180939Z",
              *       "valid_to": null
              *     }
              */
@@ -3794,6 +3794,7 @@ export interface components {
              *           "lineage_id": null,
              *           "mac_address": "DE:AD:BE:EF:CA:FE",
              *           "mac_address_source": "ArpReply",
+             *           "neighbor_candidates": [],
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "oper_status": "Up",
              *           "speed_bps": 1000000000,
@@ -3853,19 +3854,19 @@ export interface components {
              *         {
              *           "bindings": [
              *             {
-             *               "created_at": "2026-09-09T18:01:02.658729Z",
+             *               "created_at": "2026-09-10T15:31:30.160867Z",
              *               "first_discovery_id": null,
-             *               "id": "1bac1380-df89-415f-a242-3e0087714a86",
+             *               "id": "78ba8cf6-06df-45ef-aeeb-4c812c854ba2",
              *               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *               "last_discovery_id": null,
-             *               "last_seen_at": "2026-09-09T18:01:02.658729Z",
+             *               "last_seen_at": "2026-09-10T15:31:30.160867Z",
              *               "lineage_id": null,
              *               "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *               "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *               "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *               "type": "Port",
-             *               "updated_at": "2026-09-09T18:01:02.658729Z",
-             *               "valid_from": "2026-09-09T18:01:02.658729Z",
+             *               "updated_at": "2026-09-10T15:31:30.160867Z",
+             *               "valid_from": "2026-09-10T15:31:30.160867Z",
              *               "valid_to": null
              *             }
              *           ],
@@ -3879,7 +3880,7 @@ export interface components {
              *           "name": "nginx",
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "position": 0,
-             *           "service_definition": "Paperless-NGX",
+             *           "service_definition": "Syncthing",
              *           "source": {
              *             "type": "Manual"
              *           },
@@ -4145,7 +4146,7 @@ export interface components {
         };
         ApiResponse_Interface: {
             /** @description The result payload. Omitted on failure. */
-            data?: components["schemas"]["InterfaceBase"] & components["schemas"]["InterfaceNeighborEvidence"] & {
+            data?: components["schemas"]["InterfaceBase"] & {
                 /**
                  * Format: date-time
                  * @description When this record was first created.
@@ -4605,19 +4606,19 @@ export interface components {
              * @example {
              *       "bindings": [
              *         {
-             *           "created_at": "2026-09-09T18:01:02.678157Z",
+             *           "created_at": "2026-09-10T15:31:30.176025Z",
              *           "first_discovery_id": null,
-             *           "id": "1965b7c3-c8ce-4fb4-8beb-7e3e59e1a8a0",
+             *           "id": "1f963c8a-02c4-4042-a6ba-cafdf691dd11",
              *           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *           "last_discovery_id": null,
-             *           "last_seen_at": "2026-09-09T18:01:02.678157Z",
+             *           "last_seen_at": "2026-09-10T15:31:30.176025Z",
              *           "lineage_id": null,
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *           "type": "Port",
-             *           "updated_at": "2026-09-09T18:01:02.678157Z",
-             *           "valid_from": "2026-09-09T18:01:02.678157Z",
+             *           "updated_at": "2026-09-10T15:31:30.176025Z",
+             *           "valid_from": "2026-09-10T15:31:30.176025Z",
              *           "valid_to": null
              *         }
              *       ],
@@ -4631,7 +4632,7 @@ export interface components {
              *       "name": "nginx",
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "position": 0,
-             *       "service_definition": "Paperless-NGX",
+             *       "service_definition": "Syncthing",
              *       "source": {
              *         "type": "Manual"
              *       },
@@ -5028,6 +5029,23 @@ export interface components {
                 /** @description Connections between the nodes of the built graph. */
                 edges?: {
                     [key: string]: components["schemas"]["Edge"][];
+                };
+                /**
+                 * @description How many entities of each type a server-side metadata filter removed, by the filter that
+                 *     removed them.
+                 *
+                 *     Server-filtered entities never reach the browser, so this is the only way the frontend can
+                 *     say "171 interfaces hidden by By link" rather than presenting an empty view as an empty
+                 *     network. Keyed by entity and filter only, with no view: the hide-set is per view but a drop
+                 *     is not — an entity is removed from the one shared bundle only when *every* view that could
+                 *     render it hides it (see `metadata_filter`).
+                 *
+                 *     Empty when nothing was filtered, which is the common case.
+                 */
+                filtered_out?: {
+                    [key: string]: {
+                        [key: string]: number;
+                    };
                 };
                 /** @description Hosts included in this topology, each carrying the title the map and the host list share. */
                 hosts: components["schemas"]["TopologyHost"][];
@@ -5479,19 +5497,19 @@ export interface components {
         /**
          * @description Association between a service and a port / interface that the service is listening on
          * @example {
-         *       "created_at": "2026-09-09T18:01:02.659305Z",
+         *       "created_at": "2026-09-10T15:31:30.161296Z",
          *       "first_discovery_id": null,
-         *       "id": "722dba7e-a245-429d-9526-b8968b9c660f",
+         *       "id": "fb8cbeb5-10c9-4619-a07e-c19a06aac04d",
          *       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *       "last_discovery_id": null,
-         *       "last_seen_at": "2026-09-09T18:01:02.659305Z",
+         *       "last_seen_at": "2026-09-10T15:31:30.161296Z",
          *       "lineage_id": null,
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *       "type": "Port",
-         *       "updated_at": "2026-09-09T18:01:02.659305Z",
-         *       "valid_from": "2026-09-09T18:01:02.659305Z",
+         *       "updated_at": "2026-09-10T15:31:30.161296Z",
+         *       "valid_from": "2026-09-10T15:31:30.161296Z",
          *       "valid_to": null
          *     }
          */
@@ -5805,7 +5823,7 @@ export interface components {
          *           "id": "550e8400-e29b-41d4-a716-446655440007",
          *           "name": "nginx",
          *           "position": 0,
-         *           "service_definition": "Paperless-NGX",
+         *           "service_definition": "Syncthing",
          *           "tags": [],
          *           "virtualization_metadata": null,
          *           "virtualization_service_id": null
@@ -7821,6 +7839,7 @@ export interface components {
          *           "lineage_id": null,
          *           "mac_address": "DE:AD:BE:EF:CA:FE",
          *           "mac_address_source": "ArpReply",
+         *           "neighbor_candidates": [],
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "oper_status": "Up",
          *           "speed_bps": 1000000000,
@@ -7880,19 +7899,19 @@ export interface components {
          *         {
          *           "bindings": [
          *             {
-         *               "created_at": "2026-09-09T18:01:02.658065Z",
+         *               "created_at": "2026-09-10T15:31:30.160393Z",
          *               "first_discovery_id": null,
-         *               "id": "c8e3e5e5-59ce-454a-bbca-f2751d94f699",
+         *               "id": "2092ccb8-8612-4f6e-be32-9a9ebdb5fb38",
          *               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *               "last_discovery_id": null,
-         *               "last_seen_at": "2026-09-09T18:01:02.658065Z",
+         *               "last_seen_at": "2026-09-10T15:31:30.160393Z",
          *               "lineage_id": null,
          *               "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *               "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *               "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *               "type": "Port",
-         *               "updated_at": "2026-09-09T18:01:02.658065Z",
-         *               "valid_from": "2026-09-09T18:01:02.658065Z",
+         *               "updated_at": "2026-09-10T15:31:30.160393Z",
+         *               "valid_from": "2026-09-10T15:31:30.160393Z",
          *               "valid_to": null
          *             }
          *           ],
@@ -7906,7 +7925,7 @@ export interface components {
          *           "name": "nginx",
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "position": 0,
-         *           "service_definition": "Paperless-NGX",
+         *           "service_definition": "Syncthing",
          *           "source": {
          *             "type": "Manual"
          *           },
@@ -8409,7 +8428,7 @@ export interface components {
             /** @enum {string} */
             scope: "Hosts";
         };
-        Interface: components["schemas"]["InterfaceBase"] & components["schemas"]["InterfaceNeighborEvidence"] & {
+        Interface: components["schemas"]["InterfaceBase"] & {
             /**
              * Format: date-time
              * @description When this record was first created.
@@ -8539,6 +8558,20 @@ export interface components {
              * @description Native/untagged VLAN entity ID on this port (resolved from Q-BRIDGE dot1qPvid)
              */
             native_vlan_id?: string | null;
+            /**
+             * @description Raw LLDP/CDP evidence this scan heard on the port — the wire shape a **current** daemon
+             *     submits, one entry per distinct LLDP or CDP record. Drained into `interface_neighbor_
+             *     candidates` by the discovery ingest path (`InterfaceService::create_or_update_from_
+             *     discovery`); never read anywhere else. Not `skip_serializing`: this field is the daemon's
+             *     *outgoing* discovery payload as much as it is the server's read model, and that attribute
+             *     has no notion of direction — it silently dropped every daemon's submitted evidence before
+             *     the request ever left the process (found investigating the GH #701 candidate-persistence
+             *     regression; nothing downstream of the wire was ever at fault). Harmless for API responses:
+             *     `create_or_update_from_discovery` takes this field via `mem::take` before returning or
+             *     persisting `Interface`, and it is not a stored column, so nothing read back from the
+             *     database or echoed in a response ever has it populated.
+             */
+            neighbor_candidates?: components["schemas"]["InterfaceNeighborEvidence"][];
             /**
              * Format: uuid
              * @description The network this entity belongs to.
@@ -10671,19 +10704,19 @@ export interface components {
          * @example {
          *       "bindings": [
          *         {
-         *           "created_at": "2026-09-09T18:01:02.659137Z",
+         *           "created_at": "2026-09-10T15:31:30.161153Z",
          *           "first_discovery_id": null,
-         *           "id": "6b333808-c8c4-47cf-91a4-463a1b0735de",
+         *           "id": "8276c5c8-a0ed-4f72-ad1e-94b59f3f6f4f",
          *           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *           "last_discovery_id": null,
-         *           "last_seen_at": "2026-09-09T18:01:02.659137Z",
+         *           "last_seen_at": "2026-09-10T15:31:30.161153Z",
          *           "lineage_id": null,
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *           "type": "Port",
-         *           "updated_at": "2026-09-09T18:01:02.659137Z",
-         *           "valid_from": "2026-09-09T18:01:02.659137Z",
+         *           "updated_at": "2026-09-10T15:31:30.161153Z",
+         *           "valid_from": "2026-09-10T15:31:30.161153Z",
          *           "valid_to": null
          *         }
          *       ],
@@ -10697,7 +10730,7 @@ export interface components {
          *       "name": "nginx",
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "position": 0,
-         *       "service_definition": "Paperless-NGX",
+         *       "service_definition": "Syncthing",
          *       "source": {
          *         "type": "Manual"
          *       },
@@ -11282,6 +11315,23 @@ export interface components {
             edges?: {
                 [key: string]: components["schemas"]["Edge"][];
             };
+            /**
+             * @description How many entities of each type a server-side metadata filter removed, by the filter that
+             *     removed them.
+             *
+             *     Server-filtered entities never reach the browser, so this is the only way the frontend can
+             *     say "171 interfaces hidden by By link" rather than presenting an empty view as an empty
+             *     network. Keyed by entity and filter only, with no view: the hide-set is per view but a drop
+             *     is not — an entity is removed from the one shared bundle only when *every* view that could
+             *     render it hides it (see `metadata_filter`).
+             *
+             *     Empty when nothing was filtered, which is the common case.
+             */
+            filtered_out?: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
             /** @description Hosts included in this topology, each carrying the title the map and the host list share. */
             hosts: components["schemas"]["TopologyHost"][];
             /** @description Interfaces included in this topology. */
@@ -11382,7 +11432,7 @@ export interface components {
              * @default {
              *       "Application": [
              *         {
-             *           "id": "ed5e0eb9-fa18-467d-8bbc-8db1c7c19c8a",
+             *           "id": "9954c8db-4537-4f87-b1f5-22349f459ee2",
              *           "rule": {
              *             "ByApplication": {
              *               "tag_ids": []
@@ -11392,23 +11442,23 @@ export interface components {
              *       ],
              *       "L2Physical": [
              *         {
-             *           "id": "cbdcc001-a14c-46e3-9ee7-be568f12b0ea",
+             *           "id": "68b5f311-7972-4613-8364-e7430eb5703b",
              *           "rule": "ByHost"
              *         }
              *       ],
              *       "L3Logical": [
              *         {
-             *           "id": "c3d392fd-0d39-41be-9f03-075be260af06",
+             *           "id": "d46664b9-6189-4e3c-8cb8-700ecf55c553",
              *           "rule": "BySubnet"
              *         },
              *         {
-             *           "id": "7796cbaf-dadc-42af-b753-6d7dbbde85b5",
+             *           "id": "05aef747-0990-40f9-9eb4-176c1001dd80",
              *           "rule": "MergeContainerBridges"
              *         }
              *       ],
              *       "Workloads": [
              *         {
-             *           "id": "cbdcc001-a14c-46e3-9ee7-be568f12b0ea",
+             *           "id": "68b5f311-7972-4613-8364-e7430eb5703b",
              *           "rule": "ByHost"
              *         }
              *       ]
@@ -11421,19 +11471,19 @@ export interface components {
              * @description Rules deciding how entities are placed and inlined within containers.
              * @default [
              *       {
-             *         "id": "7161c32a-8c8b-4754-8611-3f6a97e17c95",
+             *         "id": "d3101466-c7e8-452d-a852-df18eea38beb",
              *         "rule": "ByTrunkPort"
              *       },
              *       {
-             *         "id": "ebe9caec-1ca5-42e2-b613-9896f51f16f8",
+             *         "id": "a9015115-ce26-44dd-a69c-4d358d72beb3",
              *         "rule": "ByVLAN"
              *       },
              *       {
-             *         "id": "b6507671-c9f2-424d-8786-5b7fdf8e6d90",
+             *         "id": "22b795b8-a3d8-4c89-9770-af3cf12b89cc",
              *         "rule": "ByPortOpStatus"
              *       },
              *       {
-             *         "id": "0ce6643a-7233-4efd-bfce-423b8689aa2a",
+             *         "id": "b9316951-7250-48cc-bd19-4b4931b9987a",
              *         "rule": {
              *           "ByServiceCategory": {
              *             "categories": [
@@ -11451,7 +11501,7 @@ export interface components {
              *         }
              *       },
              *       {
-             *         "id": "a23dcf54-d63f-4b31-83a1-ea00ce3a38f7",
+             *         "id": "6af7ef07-c832-4ca6-b617-03fb6f29c94c",
              *         "rule": {
              *           "ByTag": {
              *             "tag_ids": [],
@@ -11460,15 +11510,15 @@ export interface components {
              *         }
              *       },
              *       {
-             *         "id": "14c4d02f-18da-4f39-89d2-677f9cbc3834",
+             *         "id": "3d219c0a-67bc-4efe-96fd-60ef3b2a31eb",
              *         "rule": "ByHypervisor"
              *       },
              *       {
-             *         "id": "d7097055-c2b9-4bad-9d5b-8d646713fe6e",
+             *         "id": "3b881717-a3b2-40b1-b078-8020fdefe926",
              *         "rule": "ByContainerRuntime"
              *       },
              *       {
-             *         "id": "c108171a-ccc7-476d-8800-c76890b87aa0",
+             *         "id": "0368420e-60e7-4c85-8504-39c43adf7cf0",
              *         "rule": "ByStack"
              *       }
              *     ]
