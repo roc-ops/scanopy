@@ -210,7 +210,7 @@ impl TypeMetadataProvider for EntitySourceDiscriminants {
                 "Found by a scan that contacted it directly, and matched to a known definition."
             }
             Self::Inferred => {
-                "A neighbouring device advertised this over LLDP or CDP, but no scan has contacted it. That is why it has no ports or services yet. Rescan it to fill them in."
+                "A neighbouring device advertised this over LLDP or CDP, but no scan has contacted it."
             }
             Self::Unknown => "Created by a newer version of Scanopy than this one.",
         }

@@ -1450,7 +1450,7 @@
 	"meta_entity_sources_DiscoveryWithMatch_name": "Scanned and matched",
 	"meta_entity_sources_Discovery_description": "Found by a scan that contacted it directly.",
 	"meta_entity_sources_Discovery_name": "Scanned",
-	"meta_entity_sources_Inferred_description": "A neighbouring device advertised this over LLDP or CDP, but no scan has contacted it. That is why it has no ports or services yet. Rescan it to fill them in.",
+	"meta_entity_sources_Inferred_description": "A neighbouring device advertised this over LLDP or CDP, but no scan has contacted it.",
 	"meta_entity_sources_Inferred_name": "Inferred",
 	"meta_entity_sources_Manual_description": "Created by a person in Scanopy.",
 	"meta_entity_sources_Manual_name": "Manual",
