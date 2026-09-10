@@ -431,7 +431,7 @@ impl TypeMetadataProvider for DiscoveryWarningCode {
             Self::ProvisionalSubnetInferred => "Address range assumed, please confirm",
             Self::NeighbourResolutionIncomplete => "Link resolution did not finish",
             Self::FdbResolutionIncomplete => "FDB link resolution did not finish",
-            Self::OutdatedDaemonFormat => "Daemon sent an outdated format",
+            Self::OutdatedDaemonFormat => "Daemon is outdated",
             Self::WarningsTruncated => "Some warnings not recorded",
             Self::Unknown => "Warning from another version",
         }
