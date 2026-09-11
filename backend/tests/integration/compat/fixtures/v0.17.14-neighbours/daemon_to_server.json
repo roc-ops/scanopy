@@ -3,6 +3,62 @@
   "exchanges": [
     {
       "method": "POST",
+      "path": "/api/v1/subnets",
+      "request_body": {
+        "cidr": "127.0.0.0/8",
+        "cidr_source": "DaemonSelfReport",
+        "created_at": "2026-09-03T17:55:43.564750186Z",
+        "description": null,
+        "first_discovery_id": null,
+        "id": "1905a4f3-30a1-4208-b770-087cf1e22ebe",
+        "last_discovery_id": null,
+        "last_seen_at": "2026-09-03T17:55:43.564750186Z",
+        "lineage_id": null,
+        "name": "127.0.0.0/8",
+        "network_id": "d558305a-dc8b-423b-88d6-3cb138d8c51d",
+        "source": {
+          "type": "Discovery"
+        },
+        "subnet_type": "Loopback",
+        "tags": [],
+        "updated_at": "2026-09-03T17:55:43.564750186Z",
+        "valid_from": "2026-09-03T17:55:43.564750186Z",
+        "valid_to": null,
+        "virtualization_service_id": null
+      },
+      "response_status": 200,
+      "response_body": {
+        "data": {
+          "cidr": "127.0.0.0/8",
+          "cidr_source": "DaemonSelfReport",
+          "created_at": "2026-09-03T17:55:33.491824Z",
+          "description": null,
+          "first_discovery_id": null,
+          "id": "76bb5e02-a0d0-45a7-b1fe-60935e1d8df2",
+          "last_discovery_id": null,
+          "last_seen_at": "2026-09-03T17:55:43.564750186Z",
+          "lineage_id": null,
+          "name": "127.0.0.0/8",
+          "network_id": "d558305a-dc8b-423b-88d6-3cb138d8c51d",
+          "source": {
+            "type": "Discovery"
+          },
+          "subnet_type": "Loopback",
+          "tags": [],
+          "updated_at": "2026-09-03T17:55:33.491824Z",
+          "valid_from": "2026-09-03T17:55:33.491824Z",
+          "valid_to": null,
+          "virtualization_service_id": null
+        },
+        "meta": {
+          "api_version": 1,
+          "server_version": "0.17.14"
+        },
+        "success": true
+      }
+    },
+    {
+      "method": "POST",
       "path": "/api/v1/hosts/discovery",
       "request_body": {
         "host": {
@@ -113,7 +169,25 @@
           }
         ],
         "interfaces_complete": true,
-        "ip_addresses": [],
+        "ip_addresses": [
+          {
+            "created_at": "2026-09-03T17:55:43.582912959Z",
+            "first_discovery_id": null,
+            "host_id": "00000000-0000-0000-0000-000000000000",
+            "id": "cf3f57fa-da53-42d5-b51b-0e59047e4b6b",
+            "ip_address": "127.0.0.1",
+            "last_discovery_id": null,
+            "last_seen_at": "2026-09-03T17:55:43.582912959Z",
+            "lineage_id": null,
+            "name": "lo",
+            "network_id": "d558305a-dc8b-423b-88d6-3cb138d8c51d",
+            "position": 0,
+            "subnet_id": "76bb5e02-a0d0-45a7-b1fe-60935e1d8df2",
+            "updated_at": "2026-09-03T17:55:43.582912959Z",
+            "valid_from": "2026-09-03T17:55:43.582912959Z",
+            "valid_to": null
+          }
+        ],
         "ports": [],
         "services": [],
         "subnets": []

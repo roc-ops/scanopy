@@ -267,7 +267,9 @@ mod evidence_tests {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct InterfaceNeighborCandidateBase {
+    /// The network the reporting interface belongs to.
     pub network_id: Uuid,
+    /// The local interface that heard this neighbour advertisement.
     pub interface_id: Uuid,
     pub evidence: InterfaceNeighborEvidence,
 }
@@ -284,7 +286,11 @@ impl InterfaceNeighborCandidateBase {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct InterfaceNeighborCandidate {
+    /// This candidate row's own id. Candidates are replaced wholesale on every scan, so the id
+    /// does not survive from one scan to the next.
     pub id: Uuid,
+    /// When a scan last reported this evidence. Resolution reads it as the evidence's freshness,
+    /// so a group a scan could not finish reading keeps its previous value.
     pub created_at: DateTime<Utc>,
     pub base: InterfaceNeighborCandidateBase,
 }
@@ -491,8 +497,11 @@ pub struct InterfaceNeighborRow {
     /// row can be told apart from another row naming the same pair (not possible today, since the
     /// natural key is unique per table, but keeps the type honest about which row backs it).
     pub id: Uuid,
+    /// The local interface this adjacency belongs to.
     pub interface_id: Uuid,
     pub neighbor: Neighbor,
+    /// When a scan last saw the evidence behind this adjacency. Absent when no scan has recorded
+    /// a time for it.
     pub neighbor_seen_at: Option<DateTime<Utc>>,
 }
 
