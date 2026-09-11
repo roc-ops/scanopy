@@ -150,6 +150,21 @@ impl SimDevice {
             .unwrap_or_default()
     }
 
+    /// Subtrees this device answers nothing for, as `snmp-bulk-refuser.py --silence` is configured.
+    pub fn silenced(&self) -> Vec<Vec<u64>> {
+        self.tables
+            .lldp
+            .as_ref()
+            .and_then(|table| table.silent_column.map(|column| column(&table.mib.remote)))
+            .map(|oid| vec![oid_parts(oid)])
+            .unwrap_or_default()
+    }
+
+    /// Whether `snmp-bulk-refuser.py` sits in front of this device's agent.
+    pub fn needs_shim(&self) -> bool {
+        !self.refuses_getbulk().is_empty() || !self.silenced().is_empty()
+    }
+
     /// The `pass` data files this device serves, in a fixed order that the registrations index
     /// into.
     pub fn data_files(&self) -> Vec<DataFile> {
@@ -454,7 +469,8 @@ impl SimDevice {
     /// SNMPv1 has no getbulk, so the v1 agent forces every column through getnext.
     pub fn agent(&self) -> SimAgent {
         let agent = SimAgent::new(&self.data_files(), self.registrations())
-            .refusing_getbulk(self.refuses_getbulk());
+            .refusing_getbulk(self.refuses_getbulk())
+            .silent_on(self.silenced());
         match self.credential {
             CredentialType::SnmpV1 { .. } => agent.without_getbulk(),
             _ => agent,

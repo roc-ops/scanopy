@@ -1489,7 +1489,7 @@ fn cdp_candidates_for_port(
 /// Convert SNMP ifTable entry to Interface entity with LLDP/CDP/FDB neighbor data.
 /// Uses Uuid::nil() for host_id as placeholder - server will set correct host_id.
 #[allow(clippy::too_many_arguments)]
-fn convert_snmp_if_entry(
+pub(crate) fn convert_snmp_if_entry(
     entry: &IfTableEntry,
     network_id: Uuid,
     lldp_neighbors: &[LldpNeighbor],

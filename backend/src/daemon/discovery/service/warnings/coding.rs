@@ -530,8 +530,12 @@ mod tests {
     /// answered (GH #685).
     #[test]
     fn a_partial_read_that_is_kept_is_a_different_code_from_one_that_is_discarded() {
-        let discarded =
-            warn_incomplete_snmp_walks(&[walk("10.0.0.1", SnmpWalkGroup::Lldp, true, None)]);
+        let discarded = warn_incomplete_snmp_walks(&[walk(
+            "10.0.0.1",
+            SnmpWalkGroup::BridgeForwarding,
+            true,
+            None,
+        )]);
         let recorded =
             warn_incomplete_snmp_walks(&[walk("10.0.0.1", SnmpWalkGroup::ArpTable, true, None)]);
 

@@ -96,6 +96,13 @@ pub struct SimAgent {
     /// because that is what the shim knows: it reads the PDU type and the first OID off the wire
     /// and has no idea which `pass` line would have served it.
     refuses_getbulk: Vec<Vec<u64>>,
+    /// Subtrees this device answers nothing at all for, getbulk or getnext.
+    ///
+    /// The same shim with its `--silence` list: a request whose first varbind falls under one of
+    /// these is dropped whatever its PDU type, so every retry the walk has on that column times
+    /// out and the column ends having read nothing. The rest of the table answers normally, which
+    /// is what makes the walk stop part way rather than never start.
+    silent_on: Vec<Vec<u64>>,
     /// Set once a walk has fallen back to getnext, and read by every walk after it.
     ///
     /// One `SimAgent` serves a whole collection, exactly as one session serves one host, so this
@@ -122,8 +129,19 @@ impl SimAgent {
             registrations,
             bulk_unsupported: false,
             refuses_getbulk: Vec::new(),
+            silent_on: Vec::new(),
             getbulk_unusable: false,
         }
+    }
+
+    /// An agent behind a shim that drops every request for these subtrees.
+    pub fn silent_on(mut self, subtrees: Vec<Vec<u64>>) -> Self {
+        self.silent_on = subtrees;
+        self
+    }
+
+    fn is_silent(&self, from: &[u64]) -> bool {
+        self.silent_on.iter().any(|prefix| from.starts_with(prefix))
     }
 
     /// An agent behind a shim that drops GETBULK for these subtrees and forwards everything else.
@@ -237,6 +255,9 @@ impl SnmpWalkTransport for SimAgent {
         from: &[u64],
         max_repetitions: u32,
     ) -> Result<WalkPage<'a>> {
+        if self.is_silent(from) {
+            return Err(anyhow::anyhow!("getbulk timed out"));
+        }
         if self.bulk_unsupported {
             return Ok(WalkPage::BulkUnsupported);
         }
@@ -256,6 +277,9 @@ impl SnmpWalkTransport for SimAgent {
     }
 
     async fn walk_getnext<'a>(&'a mut self, from: &[u64]) -> Result<Varbinds<'a>> {
+        if self.is_silent(from) {
+            return Err(anyhow::anyhow!("getnext timed out"));
+        }
         Ok(self.page(from, 1))
     }
 }

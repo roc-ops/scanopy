@@ -11,14 +11,20 @@
 //! that stops reporting the identifiers a neighbour is matched on breaks the test that depends on
 //! it. Collection-side behaviour is covered without a database in each device's own module.
 
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 
 use mac_address::MacAddress;
 use uuid::Uuid;
 
+use crate::daemon::discovery::integration::snmp::convert_snmp_if_entry;
 use crate::daemon::discovery::integration::snmp::sim::harness::{self, Collected};
 use crate::daemon::discovery::integration::snmp::types::{IfTableEntry, LldpNeighbor};
+use crate::server::auth::middleware::auth::AuthenticatedEntity;
 use crate::server::hosts::r#impl::name::{HostName, HostNameSources};
+use crate::server::interface_neighbors::service::InterfaceNeighborService;
+use crate::server::interfaces::r#impl::base::InterfaceDataComplete;
+use crate::server::interfaces::r#impl::wire::DiscoveryInterface;
 use crate::server::{
     hosts::r#impl::base::Host,
     interfaces::r#impl::base::{IfAdminStatus, IfOperStatus, Interface, InterfaceBase},
@@ -43,6 +49,8 @@ const SNMP_READ: AttributeSource = AttributeSource::Probe(ClientProbe::Snmp);
 /// database.
 struct Lab {
     resolver: LldpResolverImpl,
+    interfaces: std::sync::Arc<crate::server::interfaces::service::InterfaceService>,
+    neighbours: std::sync::Arc<InterfaceNeighborService>,
     storage: crate::server::shared::storage::factory::StorageFactory,
     network_id: Uuid,
     _subnet_id: Uuid,
@@ -68,6 +76,8 @@ impl Lab {
 
         Self {
             resolver,
+            interfaces: services.interface_service.clone(),
+            neighbours: services.interface_neighbor_service.clone(),
             network_id: network.id,
             _subnet_id: subnet.id,
             storage,
@@ -202,6 +212,86 @@ impl Scanned {
             neighbour.remote_port_id_bytes.as_ref().expect("a value"),
         )
         .expect("a port id")
+    }
+}
+
+/// GH #685: a neighbour walk that stopped part way keeps every row it read.
+///
+/// The reporter's switch lost its whole neighbour set to a walk that did not finish, and the
+/// warning said so. Driven end to end: the daemon's collection of a device whose walk stops, the
+/// interfaces it would submit, the JSON they cross the wire as, and the server's ingest with LLDP
+/// marked not authoritative — each step one that dropped the rows at some point.
+#[tokio::test]
+async fn a_neighbour_walk_that_stopped_part_way_keeps_every_row_it_read() {
+    let lab = Lab::new().await;
+    let device = crate::daemon::discovery::integration::snmp::sim::device("switch-quietcol-01");
+    let collected = harness::collect(&device).await;
+    assert!(
+        !collected.neighbours.complete && !collected.neighbours.records.is_empty(),
+        "the fixture has to stop part way having read something, or this proves nothing"
+    );
+
+    let mut record = host(&lab.network_id);
+    record.base.name = HostName::manual(device.name.to_string());
+    lab.storage.hosts.create(&record).await.unwrap();
+
+    // What `execute` submits: neighbours on the interfaces they sit on, and LLDP marked
+    // authoritative only when the walk finished.
+    let collected_groups = InterfaceDataComplete {
+        lldp: collected.neighbours.complete && !collected.neighbours.unsupported,
+        ..Default::default()
+    };
+    assert!(!collected_groups.lldp);
+
+    let mut claimed = HashSet::new();
+    let mut persisted = HashMap::new();
+    for entry in &collected.if_table.entries {
+        let submitted = convert_snmp_if_entry(
+            entry,
+            lab.network_id,
+            &collected.neighbours.records,
+            &collected.cdp.records,
+            &[],
+            &[],
+            &HashMap::new(),
+            &HashSet::new(),
+        );
+        let wire = serde_json::to_value(&submitted).unwrap();
+        let mut received: Interface = serde_json::from_value::<DiscoveryInterface>(wire)
+            .unwrap()
+            .into();
+        received.base.host_id = record.id;
+
+        let stored = lab
+            .interfaces
+            .create_or_update_from_discovery(
+                received,
+                &claimed,
+                collected_groups,
+                AuthenticatedEntity::System,
+            )
+            .await
+            .unwrap();
+        claimed.insert(stored.id);
+        persisted.insert(entry.if_index, stored.id);
+    }
+
+    for neighbour in &collected.neighbours.records {
+        let interface_id = persisted[&neighbour.local_port_index];
+        let chassis: Vec<LldpChassisId> = lab
+            .neighbours
+            .candidates_for_interface(&interface_id)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter_map(|c| c.base.evidence.lldp_chassis_id)
+            .collect();
+        assert_eq!(
+            chassis,
+            vec![Scanned::advertised_chassis(neighbour)],
+            "the neighbour read on local port {} was not recorded",
+            neighbour.local_port_index
+        );
     }
 }
 

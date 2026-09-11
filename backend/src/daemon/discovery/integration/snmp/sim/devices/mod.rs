@@ -33,6 +33,7 @@ pub mod switch_mute_01;
 pub mod switch_netgear_01;
 pub mod switch_offsite_01;
 pub mod switch_omada_01;
+pub mod switch_quietcol_01;
 pub mod switch_segment_gw_01;
 pub mod switch_shortports_01;
 pub mod switch_slowbulk_01;
@@ -90,5 +91,7 @@ pub fn all() -> Vec<SimDevice> {
         switch_mcast_rcv_01::device(),
         switch_mcast_src_01::device(),
         switch_segment_gw_01::device(),
+        // GH #685: one neighbour column never answers, so the walk stops part way.
+        switch_quietcol_01::device(),
     ]
 }

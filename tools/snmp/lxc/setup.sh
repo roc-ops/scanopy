@@ -456,16 +456,19 @@ for i in "${!UNITS[@]}"; do
 done
 
 # Devices with a GETBULK refuser in front of them. SHIMS is generated alongside the configs: each
-# entry is "unit|listen-ip|upstream-port|refused-oid[,refused-oid...]", empty for every device that
-# does not need one. The agent binds loopback and this owns the address the scanner talks to, so it
-# comes up behind a ready agent rather than in front of a port nothing is listening on yet.
+# entry is "unit|listen-ip|upstream-port|refused-oid[,...]|silenced-oid[,...]", either list possibly
+# empty, and the entry empty for every device that does not need one. The agent binds loopback and
+# this owns the address the scanner talks to, so it comes up behind a ready agent rather than in
+# front of a port nothing is listening on yet.
 SHIM_UNITS=()
 for entry in "${SHIMS[@]:-}"; do
     [ -n "$entry" ] || continue
-    IFS='|' read -r sname slisten sport srefuse <<< "$entry"
+    IFS='|' read -r sname slisten sport srefuse ssilence <<< "$entry"
     refuse_args=""
     IFS=',' read -ra oids <<< "$srefuse"
     for oid in "${oids[@]}"; do refuse_args="$refuse_args --refuse $oid"; done
+    IFS=',' read -ra oids <<< "$ssilence"
+    for oid in "${oids[@]}"; do refuse_args="$refuse_args --silence $oid"; done
     cat > "/etc/systemd/system/snmp-bulk-refuser-${sname}.service" << UNIT
 [Unit]
 Description=SNMP GETBULK refuser — ${sname} (${slisten}:161 → 127.0.0.1:${sport})

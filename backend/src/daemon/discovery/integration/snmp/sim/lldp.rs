@@ -452,6 +452,12 @@ pub struct LldpTable {
     /// so a handler slow enough to fail a bulk page occupies the agent long enough to fail the
     /// getnext queued behind it, and the device fails both ways instead of one.
     pub neighbours_refuse_getbulk: bool,
+    /// One `lldpRemEntry` column the device answers nothing for, by either PDU type.
+    ///
+    /// A selector rather than an OID so it names the column in whichever MIB the table is served
+    /// under. Like the bulk refusal this is the shim's doing, not a handler's, and for the same
+    /// reason: a handler slow enough to fail one column stalls the agent for every column after it.
+    pub silent_column: Option<fn(&SimLldpRemoteColumns) -> &'static str>,
 }
 
 impl LldpTable {
@@ -476,7 +482,14 @@ impl LldpTable {
             neighbours: Vec::new(),
             local_port_handler: Handler::Normal,
             neighbours_refuse_getbulk: false,
+            silent_column: None,
         }
+    }
+
+    /// Answer nothing for one neighbour column, while every other column reads normally.
+    pub fn column_goes_silent(mut self, column: fn(&SimLldpRemoteColumns) -> &'static str) -> Self {
+        self.silent_column = Some(column);
+        self
     }
 
     /// Serve `lldpLocPortTable` through a handler of its own.
