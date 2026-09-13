@@ -19,6 +19,8 @@ impl HostResponse {
             name,
             // Derived from the fields below on the way out; nothing to carry back in.
             display_name: _,
+            display_name_rung: _,
+            name_ladder: _,
             name_source,
             network_id,
             hostname,
@@ -136,7 +138,14 @@ impl HostResponse {
         // Before the destructure below consumes `host`. The same ladder topology titles a host
         // container with, so the two surfaces cannot disagree about what a nameless device is
         // called.
-        let display_name = host.display_name(ip_addresses.iter());
+        // The title, the rung it came from and the rungs it beat are read off one ladder, so the
+        // editor's explanation of a title cannot disagree with the title.
+        let name_ladder = host.name_ladder(ip_addresses.iter());
+        let (display_name, display_name_rung) =
+            match crate::server::hosts::r#impl::name_ladder::resolve_name_ladder(&name_ladder) {
+                Some((value, rung)) => (Some(value), Some(rung)),
+                None => (None, None),
+            };
 
         // Same reasoning, one level down: an interface's `display_name` is computed here rather
         // than walked again in the frontend, so a port cannot be labelled one thing in a list and
@@ -203,6 +212,8 @@ impl HostResponse {
             updated_at,
             last_seen_at,
             display_name,
+            display_name_rung,
+            name_ladder: name_ladder.to_vec(),
             name_source: name.source(),
             name: name.value().to_string(),
             network_id,

@@ -9,12 +9,15 @@ import type { components } from '$lib/api/schema';
  * `TopologyHost`) rather than on `Host`, because it is derived, not stored. But every list, picker,
  * table and topology consumer holds a `Host`, and `toHostPrimitive` already carries the field
  * through at runtime — so without this it is present in the payload and invisible to the compiler.
+ * The rung it came from and the ladder behind it ride along the same way, for the host editor.
  *
  * Both halves come from the generated schema. Read it with `hostDisplayName()`, never directly, and
  * never read `name` for display.
  */
 export type Host = components['schemas']['Host'] &
-	Pick<components['schemas']['HostResponse'], 'display_name'>;
+	Pick<components['schemas']['HostResponse'], 'display_name' | 'display_name_rung' | 'name_ladder'>;
+export type HostNameRung = components['schemas']['HostNameRung'];
+export type HostNameLadderEntry = components['schemas']['HostNameLadderEntry'];
 export type HostVirtualization = components['schemas']['HostVirtualization'];
 export type ProxmoxVirtualization = components['schemas']['ProxmoxVirtualization'];
 export type IPAddress = components['schemas']['IPAddress'];
@@ -58,9 +61,18 @@ export interface CredentialAssignment {
 	ip_address_ids: string[] | null;
 }
 
+/** Every `*_source` key the host response carries, derived rather than listed. */
+type HostSourceKeys = Extract<keyof HostResponse, `${string}_source`>;
+
 // Form state type for creating/editing hosts
 // Includes children arrays for form editing - distinct from HostResponse (API response type)
-export interface HostFormData {
+//
+// The read-only naming and provenance fields are partial: a host being created has none of them
+// yet, and an edited one carries them from `hydrateHostToFormData`'s spread of the host.
+export interface HostFormData
+	extends Partial<
+		Pick<HostResponse, 'display_name' | 'display_name_rung' | 'name_ladder' | HostSourceKeys>
+	> {
 	// Host primitive fields
 	id: string;
 	created_at: string;

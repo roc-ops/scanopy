@@ -16,6 +16,7 @@ use crate::server::auth::middleware::auth::AuthenticatedEntity;
 use crate::server::hosts::r#impl::api::{HostResponse, UpdateHostRequest};
 use crate::server::hosts::r#impl::base::{Host, HostBase};
 use crate::server::hosts::r#impl::name::{HostName, HostNameSources};
+use crate::server::hosts::r#impl::name_ladder::HostNameRung;
 use crate::server::services::r#impl::patterns::ClientProbe;
 use crate::server::subnets::r#impl::base::{SubnetCidr, SubnetCidrValue};
 
@@ -408,4 +409,40 @@ async fn an_address_derived_name_follows_the_host_to_a_new_address() {
         "an address-derived name must follow the address it was derived from"
     );
     assert_eq!(moved.name_source, AttributeSource::OwnAddress);
+}
+
+/// Clearing the name in the editor hands naming back to discovery: the host is titled by the next
+/// rung at once, and the next sync can name it again. The applier reads a blank candidate as "no
+/// name to offer", so without an explicit clear the typed name used to survive the save.
+#[tokio::test]
+async fn clearing_a_typed_name_hands_naming_back_to_discovery() {
+    harness!(services, network_id, _container);
+
+    let discovered = submit(
+        &services,
+        submission(network_id, HostName::from_ip(DEVICE_IP), Some("switch.lan")),
+    )
+    .await;
+    let typed = save_from_ui(&services, &discovered, "Rack 3 Top Switch", false).await;
+    assert_eq!(typed.name_source, AttributeSource::Manual);
+
+    let cleared = save_from_ui(&services, &typed, "", false).await;
+    assert_eq!(cleared.name, "");
+    assert_eq!(cleared.name_source, AttributeSource::Unspecified);
+    assert_eq!(cleared.display_name.as_deref(), Some("switch.lan"));
+    assert_eq!(cleared.display_name_rung, Some(HostNameRung::Hostname));
+
+    let resynced = submit(
+        &services,
+        submission(
+            network_id,
+            controller_name("Core Switch".to_string()),
+            Some("switch.lan"),
+        ),
+    )
+    .await;
+    assert_eq!(
+        resynced.name, "Core Switch",
+        "with the typed name gone, discovery names the host again"
+    );
 }

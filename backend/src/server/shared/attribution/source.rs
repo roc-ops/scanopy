@@ -405,6 +405,148 @@ impl<'de> Visitor<'de> for SourceVisitor {
     }
 }
 
+impl HasId for AttributeSourceDiscriminants {
+    fn id(&self) -> &'static str {
+        self.into()
+    }
+}
+
+/// Neutral on purpose. A source is labelled, not coloured: the colour an operator reads is the
+/// tier's, from [`AttributeMethod`]'s metadata, and `Probe` and `Authored` do not have one tier
+/// until their probe is known.
+impl EntityMetadataProvider for AttributeSourceDiscriminants {
+    fn color(&self) -> Color {
+        Color::Gray
+    }
+
+    fn icon(&self) -> Icon {
+        Icon::Info
+    }
+}
+
+/// Per-source labels, for showing where one value came from.
+///
+/// Keyed by the discriminant rather than by every expanded source, because the probe variants
+/// would otherwise need one entry per probe. `Probe` and `Authored` are templates with a `{probe}`
+/// slot, filled from `ClientProbe`'s own metadata.
+impl TypeMetadataProvider for AttributeSourceDiscriminants {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "Unattributed",
+            Self::OwnAddress => "The host's own address",
+            Self::ServiceMatch => "A detected service",
+            Self::LldpNeighbourAddress => "An LLDP neighbour's address",
+            Self::CipVendorId => "A CIP vendor ID",
+            Self::DnsSdInstanceName => "mDNS",
+            Self::LldpChassisId => "LLDP",
+            Self::ReverseDns => "Reverse DNS",
+            Self::ForwardingTable => "Another device's ARP or forwarding table",
+            Self::ArpReply => "ARP",
+            Self::DaemonSelfReport => "The daemon on this host",
+            Self::ProfinetDcp => "PROFINET DCP",
+            Self::Probe => "{probe}",
+            Self::Authored => "{probe}, set by a person",
+            Self::Manual => "Entered in Scanopy",
+        }
+    }
+
+    fn description(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "Recorded before Scanopy tracked where values came from.",
+            Self::OwnAddress => "Scanopy used the host's address because it had nothing better.",
+            Self::ServiceMatch => "Scanopy derived this from a service it detected on the host.",
+            Self::LldpNeighbourAddress => {
+                "Scanopy assumed this range around an address a neighbour advertised over LLDP."
+            }
+            Self::CipVendorId => {
+                "Scanopy built this from the numeric vendor ID the device reported over CIP."
+            }
+            Self::DnsSdInstanceName => {
+                "The device announced this name over mDNS. A person usually sets it during setup."
+            }
+            Self::LldpChassisId => "The device advertised this about itself over LLDP.",
+            Self::ReverseDns => "A DNS server supplied this for the host's address.",
+            Self::ForwardingTable => {
+                "A router or switch supplied this from its ARP cache or forwarding table."
+            }
+            Self::ArpReply => "The host answered an ARP request for its address.",
+            Self::DaemonSelfReport => "The Scanopy daemon running on this host read it locally.",
+            Self::ProfinetDcp => "The device answered a PROFINET DCP identify request.",
+            Self::Probe => "The device reported this about itself over {probe}.",
+            Self::Authored => {
+                "A person set this on the device or its controller, and Scanopy read it over {probe}."
+            }
+            Self::Manual => "Someone entered this in Scanopy. Discovery never overwrites it.",
+        }
+    }
+}
+
+impl HasId for ClientProbe {
+    fn id(&self) -> &'static str {
+        self.into()
+    }
+}
+
+impl EntityMetadataProvider for ClientProbe {
+    fn color(&self) -> Color {
+        Color::Gray
+    }
+
+    fn icon(&self) -> Icon {
+        Icon::Info
+    }
+}
+
+/// The probe's name as an operator knows the protocol or product. Here rather than beside
+/// [`ClientProbe`] because it exists to fill the `{probe}` slot in the labels above.
+impl TypeMetadataProvider for ClientProbe {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Docker => "Docker",
+            Self::Gnmi => "gNMI",
+            Self::Podman => "Podman",
+            Self::Snmp => "SNMP",
+            Self::UnifiController => "UniFi controller",
+            Self::InstantOn => "HPE Instant On",
+            Self::ModbusTcp => "Modbus TCP",
+            Self::OpcUa => "OPC UA",
+            Self::EtherNetIp => "EtherNet/IP",
+            Self::Sip => "SIP",
+            Self::Ssh => "SSH",
+            Self::Ftp => "FTP",
+            Self::Telnet => "Telnet",
+            Self::Rtsp => "RTSP",
+            Self::Nut => "NUT",
+            Self::ZabbixAgent => "Zabbix agent",
+            Self::CheckMkAgent => "Checkmk agent",
+            Self::Smb => "SMB",
+            Self::Ldap => "LDAP",
+            Self::Kerberos => "Kerberos",
+            Self::MySql => "MySQL",
+            Self::PostgreSql => "PostgreSQL",
+            Self::MsSql => "Microsoft SQL Server",
+            Self::MongoDb => "MongoDB",
+            Self::Redis => "Redis",
+            Self::Cassandra => "Cassandra",
+            Self::Kafka => "Kafka",
+            Self::Amqp => "AMQP",
+            Self::Mqtt => "MQTT",
+            Self::OracleTns => "Oracle TNS",
+            Self::Rdp => "RDP",
+            Self::Nfs => "NFS",
+            Self::DnsTcp => "DNS over TCP",
+            Self::DockerSwarm => "Docker Swarm",
+            Self::Tls => "TLS",
+            Self::Ike => "IKE",
+            Self::OpenVpn => "OpenVPN",
+            Self::Zmtp => "ZeroMQ",
+            Self::Bacula => "Bacula",
+            Self::BeszelAgent => "Beszel agent",
+            Self::H323 => "H.323",
+        }
+    }
+}
+
 impl HasId for AttributeMethod {
     fn id(&self) -> &'static str {
         self.into()

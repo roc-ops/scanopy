@@ -26,10 +26,12 @@ pub(super) fn generate_interfaces(
     let mut interfaces = Vec::new();
     let mut neighbor_updates = Vec::new();
 
+    // By title rather than by stored name: the annex uplink has no name and is titled by the
+    // chassis ID its neighbour advertised.
     let find_host = |name: &str| {
         hosts
             .iter()
-            .find(|h| h.base.name.value().as_str() == name)
+            .find(|h| h.display_name(&[]).as_deref() == Some(name))
             .copied()
     };
     let find_ip_address = |host_id: Uuid| {

@@ -3226,19 +3226,19 @@ export interface components {
             /**
              * @description Association between a service and a port / interface that the service is listening on
              * @example {
-             *       "created_at": "2026-09-10T15:31:30.180939Z",
+             *       "created_at": "2026-09-13T18:34:24.392067Z",
              *       "first_discovery_id": null,
-             *       "id": "3c51edcb-a6d0-4a10-8aab-85bff8e7a926",
+             *       "id": "43785de5-c057-4d02-bdd8-29b09d803a90",
              *       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *       "last_discovery_id": null,
-             *       "last_seen_at": "2026-09-10T15:31:30.180939Z",
+             *       "last_seen_at": "2026-09-13T18:34:24.392067Z",
              *       "lineage_id": null,
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *       "type": "Port",
-             *       "updated_at": "2026-09-10T15:31:30.180939Z",
-             *       "valid_from": "2026-09-10T15:31:30.180939Z",
+             *       "updated_at": "2026-09-13T18:34:24.392067Z",
+             *       "valid_from": "2026-09-13T18:34:24.392067Z",
              *       "valid_to": null
              *     }
              */
@@ -3769,6 +3769,7 @@ export interface components {
              *       "credential_assignments": [],
              *       "description": "Primary web server",
              *       "display_name": "web-server-01",
+             *       "display_name_rung": "Name",
              *       "firmware_revision": null,
              *       "firmware_revision_source": "Unspecified",
              *       "hidden": false,
@@ -3829,6 +3830,33 @@ export interface components {
              *       "manufacturer_source": "Unspecified",
              *       "model_source": "Unspecified",
              *       "name": "web-server-01",
+             *       "name_ladder": [
+             *         {
+             *           "rung": "Name",
+             *           "source": "Manual",
+             *           "value": "web-server-01"
+             *         },
+             *         {
+             *           "rung": "Hostname",
+             *           "source": null,
+             *           "value": "web-server-01.local"
+             *         },
+             *         {
+             *           "rung": "SysName",
+             *           "source": null,
+             *           "value": null
+             *         },
+             *         {
+             *           "rung": "ChassisId",
+             *           "source": null,
+             *           "value": null
+             *         },
+             *         {
+             *           "rung": "Address",
+             *           "source": null,
+             *           "value": "192.168.1.100"
+             *         }
+             *       ],
              *       "name_source": "Manual",
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "ports": [
@@ -3854,19 +3882,19 @@ export interface components {
              *         {
              *           "bindings": [
              *             {
-             *               "created_at": "2026-09-10T15:31:30.160867Z",
+             *               "created_at": "2026-09-13T18:34:24.363592Z",
              *               "first_discovery_id": null,
-             *               "id": "78ba8cf6-06df-45ef-aeeb-4c812c854ba2",
+             *               "id": "527be3cc-fc79-41fb-839c-ebfca452bd81",
              *               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *               "last_discovery_id": null,
-             *               "last_seen_at": "2026-09-10T15:31:30.160867Z",
+             *               "last_seen_at": "2026-09-13T18:34:24.363592Z",
              *               "lineage_id": null,
              *               "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *               "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *               "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *               "type": "Port",
-             *               "updated_at": "2026-09-10T15:31:30.160867Z",
-             *               "valid_from": "2026-09-10T15:31:30.160867Z",
+             *               "updated_at": "2026-09-13T18:34:24.363592Z",
+             *               "valid_from": "2026-09-13T18:34:24.363592Z",
              *               "valid_to": null
              *             }
              *           ],
@@ -3880,7 +3908,7 @@ export interface components {
              *           "name": "nginx",
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "position": 0,
-             *           "service_definition": "Syncthing",
+             *           "service_definition": "Open WebUI",
              *           "source": {
              *             "type": "Manual"
              *           },
@@ -3933,6 +3961,7 @@ export interface components {
                  *     list and another on the map.
                  */
                 readonly display_name?: string | null;
+                display_name_rung?: null | components["schemas"]["HostNameRung"];
                 /** @description ENTITY-MIB entPhysicalFirmwareRev — firmware revision of the device. Read-only, as above. */
                 readonly firmware_revision: string | null;
                 /** @description What produced the firmware revision. Read-only: decided by whichever source read it. */
@@ -3971,6 +4000,8 @@ export interface components {
                 model_source?: components["schemas"]["AttributeSource"];
                 /** @description Human-facing name for the host. */
                 name: string;
+                /** @description Every rung of the display-name ladder for this host, highest first, with what each holds. */
+                name_ladder?: components["schemas"]["HostNameLadderEntry"][];
                 /**
                  * @description What produced `name`. Read-only: it is decided by whoever supplied the name, not by the
                  *     caller.
@@ -4606,19 +4637,19 @@ export interface components {
              * @example {
              *       "bindings": [
              *         {
-             *           "created_at": "2026-09-10T15:31:30.176025Z",
+             *           "created_at": "2026-09-13T18:34:24.386073Z",
              *           "first_discovery_id": null,
-             *           "id": "1f963c8a-02c4-4042-a6ba-cafdf691dd11",
+             *           "id": "48799d6d-83b9-4796-942f-b1fc0c74c625",
              *           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *           "last_discovery_id": null,
-             *           "last_seen_at": "2026-09-10T15:31:30.176025Z",
+             *           "last_seen_at": "2026-09-13T18:34:24.386073Z",
              *           "lineage_id": null,
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *           "type": "Port",
-             *           "updated_at": "2026-09-10T15:31:30.176025Z",
-             *           "valid_from": "2026-09-10T15:31:30.176025Z",
+             *           "updated_at": "2026-09-13T18:34:24.386073Z",
+             *           "valid_from": "2026-09-13T18:34:24.386073Z",
              *           "valid_to": null
              *         }
              *       ],
@@ -4632,7 +4663,7 @@ export interface components {
              *       "name": "nginx",
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "position": 0,
-             *       "service_definition": "Syncthing",
+             *       "service_definition": "Open WebUI",
              *       "source": {
              *         "type": "Manual"
              *       },
@@ -5497,19 +5528,19 @@ export interface components {
         /**
          * @description Association between a service and a port / interface that the service is listening on
          * @example {
-         *       "created_at": "2026-09-10T15:31:30.161296Z",
+         *       "created_at": "2026-09-13T18:34:24.364231Z",
          *       "first_discovery_id": null,
-         *       "id": "fb8cbeb5-10c9-4619-a07e-c19a06aac04d",
+         *       "id": "f91a209d-d8bd-446d-95b8-b81d0bceac65",
          *       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *       "last_discovery_id": null,
-         *       "last_seen_at": "2026-09-10T15:31:30.161296Z",
+         *       "last_seen_at": "2026-09-13T18:34:24.364231Z",
          *       "lineage_id": null,
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *       "type": "Port",
-         *       "updated_at": "2026-09-10T15:31:30.161296Z",
-         *       "valid_from": "2026-09-10T15:31:30.161296Z",
+         *       "updated_at": "2026-09-13T18:34:24.364231Z",
+         *       "valid_from": "2026-09-13T18:34:24.364231Z",
          *       "valid_to": null
          *     }
          */
@@ -5823,7 +5854,7 @@ export interface components {
          *           "id": "550e8400-e29b-41d4-a716-446655440007",
          *           "name": "nginx",
          *           "position": 0,
-         *           "service_definition": "Syncthing",
+         *           "service_definition": "Open WebUI",
          *           "tags": [],
          *           "virtualization_metadata": null,
          *           "virtualization_service_id": null
@@ -7798,6 +7829,21 @@ export interface components {
             name: string;
             name_source?: components["schemas"]["AttributeSource"];
         };
+        /** @description What one rung of the ladder holds for a particular host. */
+        HostNameLadderEntry: {
+            rung: components["schemas"]["HostNameRung"];
+            source: null | components["schemas"]["AttributeSource"];
+            /**
+             * @description The rung's value, or `None` when the host has nothing there. A value holding only
+             *     whitespace counts as nothing.
+             */
+            value: string | null;
+        };
+        /**
+         * @description One rung of the display-name ladder, highest first.
+         * @enum {string}
+         */
+        HostNameRung: "Name" | "Hostname" | "SysName" | "ChassisId" | "Address";
         /** @enum {string} */
         HostNamingFallback: "Ip" | "BestService";
         /**
@@ -7814,6 +7860,7 @@ export interface components {
          *       "credential_assignments": [],
          *       "description": "Primary web server",
          *       "display_name": "web-server-01",
+         *       "display_name_rung": "Name",
          *       "firmware_revision": null,
          *       "firmware_revision_source": "Unspecified",
          *       "hidden": false,
@@ -7874,6 +7921,33 @@ export interface components {
          *       "manufacturer_source": "Unspecified",
          *       "model_source": "Unspecified",
          *       "name": "web-server-01",
+         *       "name_ladder": [
+         *         {
+         *           "rung": "Name",
+         *           "source": "Manual",
+         *           "value": "web-server-01"
+         *         },
+         *         {
+         *           "rung": "Hostname",
+         *           "source": null,
+         *           "value": "web-server-01.local"
+         *         },
+         *         {
+         *           "rung": "SysName",
+         *           "source": null,
+         *           "value": null
+         *         },
+         *         {
+         *           "rung": "ChassisId",
+         *           "source": null,
+         *           "value": null
+         *         },
+         *         {
+         *           "rung": "Address",
+         *           "source": null,
+         *           "value": "192.168.1.100"
+         *         }
+         *       ],
          *       "name_source": "Manual",
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "ports": [
@@ -7899,19 +7973,19 @@ export interface components {
          *         {
          *           "bindings": [
          *             {
-         *               "created_at": "2026-09-10T15:31:30.160393Z",
+         *               "created_at": "2026-09-13T18:34:24.362658Z",
          *               "first_discovery_id": null,
-         *               "id": "2092ccb8-8612-4f6e-be32-9a9ebdb5fb38",
+         *               "id": "f2ea5f76-4e0e-43ce-b694-fd103973c122",
          *               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *               "last_discovery_id": null,
-         *               "last_seen_at": "2026-09-10T15:31:30.160393Z",
+         *               "last_seen_at": "2026-09-13T18:34:24.362658Z",
          *               "lineage_id": null,
          *               "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *               "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *               "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *               "type": "Port",
-         *               "updated_at": "2026-09-10T15:31:30.160393Z",
-         *               "valid_from": "2026-09-10T15:31:30.160393Z",
+         *               "updated_at": "2026-09-13T18:34:24.362658Z",
+         *               "valid_from": "2026-09-13T18:34:24.362658Z",
          *               "valid_to": null
          *             }
          *           ],
@@ -7925,7 +7999,7 @@ export interface components {
          *           "name": "nginx",
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "position": 0,
-         *           "service_definition": "Syncthing",
+         *           "service_definition": "Open WebUI",
          *           "source": {
          *             "type": "Manual"
          *           },
@@ -7978,6 +8052,7 @@ export interface components {
              *     list and another on the map.
              */
             readonly display_name?: string | null;
+            display_name_rung?: null | components["schemas"]["HostNameRung"];
             /** @description ENTITY-MIB entPhysicalFirmwareRev — firmware revision of the device. Read-only, as above. */
             readonly firmware_revision: string | null;
             /** @description What produced the firmware revision. Read-only: decided by whichever source read it. */
@@ -8016,6 +8091,8 @@ export interface components {
             model_source?: components["schemas"]["AttributeSource"];
             /** @description Human-facing name for the host. */
             name: string;
+            /** @description Every rung of the display-name ladder for this host, highest first, with what each holds. */
+            name_ladder?: components["schemas"]["HostNameLadderEntry"][];
             /**
              * @description What produced `name`. Read-only: it is decided by whoever supplied the name, not by the
              *     caller.
@@ -8657,16 +8734,30 @@ export interface components {
         };
         InterfaceNeighborCandidate: {
             base: components["schemas"]["InterfaceNeighborCandidateBase"];
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description When a scan last reported this evidence. Resolution reads it as the evidence's freshness,
+             *     so a group a scan could not finish reading keeps its previous value.
+             */
             created_at: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description This candidate row's own id. Candidates are replaced wholesale on every scan, so the id
+             *     does not survive from one scan to the next.
+             */
             id: string;
         };
         InterfaceNeighborCandidateBase: {
             evidence: components["schemas"]["InterfaceNeighborEvidence"];
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description The local interface that heard this neighbour advertisement.
+             */
             interface_id: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description The network the reporting interface belongs to.
+             */
             network_id: string;
         };
         /**
@@ -8723,10 +8814,17 @@ export interface components {
              *     natural key is unique per table, but keeps the type honest about which row backs it).
              */
             id: string;
-            /** Format: uuid */
+            /**
+             * Format: uuid
+             * @description The local interface this adjacency belongs to.
+             */
             interface_id: string;
             neighbor: components["schemas"]["Neighbor"];
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description When a scan last saw the evidence behind this adjacency. Absent when no scan has recorded
+             *     a time for it.
+             */
             neighbor_seen_at?: string | null;
         };
         Invite: components["schemas"]["InviteBase"] & {
@@ -9494,6 +9592,7 @@ export interface components {
                  *     list and another on the map.
                  */
                 readonly display_name?: string | null;
+                display_name_rung?: null | components["schemas"]["HostNameRung"];
                 /** @description ENTITY-MIB entPhysicalFirmwareRev — firmware revision of the device. Read-only, as above. */
                 readonly firmware_revision: string | null;
                 /** @description What produced the firmware revision. Read-only: decided by whichever source read it. */
@@ -9532,6 +9631,8 @@ export interface components {
                 model_source?: components["schemas"]["AttributeSource"];
                 /** @description Human-facing name for the host. */
                 name: string;
+                /** @description Every rung of the display-name ladder for this host, highest first, with what each holds. */
+                name_ladder?: components["schemas"]["HostNameLadderEntry"][];
                 /**
                  * @description What produced `name`. Read-only: it is decided by whoever supplied the name, not by the
                  *     caller.
@@ -10704,19 +10805,19 @@ export interface components {
          * @example {
          *       "bindings": [
          *         {
-         *           "created_at": "2026-09-10T15:31:30.161153Z",
+         *           "created_at": "2026-09-13T18:34:24.364044Z",
          *           "first_discovery_id": null,
-         *           "id": "8276c5c8-a0ed-4f72-ad1e-94b59f3f6f4f",
+         *           "id": "1655b0a7-5f8b-43d6-b227-bbf799b84d8a",
          *           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *           "last_discovery_id": null,
-         *           "last_seen_at": "2026-09-10T15:31:30.161153Z",
+         *           "last_seen_at": "2026-09-13T18:34:24.364044Z",
          *           "lineage_id": null,
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *           "type": "Port",
-         *           "updated_at": "2026-09-10T15:31:30.161153Z",
-         *           "valid_from": "2026-09-10T15:31:30.161153Z",
+         *           "updated_at": "2026-09-13T18:34:24.364044Z",
+         *           "valid_from": "2026-09-13T18:34:24.364044Z",
          *           "valid_to": null
          *         }
          *       ],
@@ -10730,7 +10831,7 @@ export interface components {
          *       "name": "nginx",
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "position": 0,
-         *       "service_definition": "Syncthing",
+         *       "service_definition": "Open WebUI",
          *       "source": {
          *         "type": "Manual"
          *       },
@@ -11432,7 +11533,7 @@ export interface components {
              * @default {
              *       "Application": [
              *         {
-             *           "id": "9954c8db-4537-4f87-b1f5-22349f459ee2",
+             *           "id": "1f95a929-5b01-4dee-888a-944225d8b7da",
              *           "rule": {
              *             "ByApplication": {
              *               "tag_ids": []
@@ -11442,23 +11543,23 @@ export interface components {
              *       ],
              *       "L2Physical": [
              *         {
-             *           "id": "68b5f311-7972-4613-8364-e7430eb5703b",
+             *           "id": "5439a12d-99c5-4caa-8975-2e310eb21d2b",
              *           "rule": "ByHost"
              *         }
              *       ],
              *       "L3Logical": [
              *         {
-             *           "id": "d46664b9-6189-4e3c-8cb8-700ecf55c553",
+             *           "id": "6edac51c-6afd-4bae-878c-46173e450306",
              *           "rule": "BySubnet"
              *         },
              *         {
-             *           "id": "05aef747-0990-40f9-9eb4-176c1001dd80",
+             *           "id": "5f92583a-ecfb-49e7-a1a9-09cd2c0dc0ea",
              *           "rule": "MergeContainerBridges"
              *         }
              *       ],
              *       "Workloads": [
              *         {
-             *           "id": "68b5f311-7972-4613-8364-e7430eb5703b",
+             *           "id": "5439a12d-99c5-4caa-8975-2e310eb21d2b",
              *           "rule": "ByHost"
              *         }
              *       ]
@@ -11471,19 +11572,19 @@ export interface components {
              * @description Rules deciding how entities are placed and inlined within containers.
              * @default [
              *       {
-             *         "id": "d3101466-c7e8-452d-a852-df18eea38beb",
+             *         "id": "9d96737b-20dd-47be-a83f-3ca099c11f33",
              *         "rule": "ByTrunkPort"
              *       },
              *       {
-             *         "id": "a9015115-ce26-44dd-a69c-4d358d72beb3",
+             *         "id": "94db2bea-ba2c-4a2c-973e-bc3205a37ccb",
              *         "rule": "ByVLAN"
              *       },
              *       {
-             *         "id": "22b795b8-a3d8-4c89-9770-af3cf12b89cc",
+             *         "id": "1a22f1c9-c78e-41df-89c1-6874c7e9408d",
              *         "rule": "ByPortOpStatus"
              *       },
              *       {
-             *         "id": "b9316951-7250-48cc-bd19-4b4931b9987a",
+             *         "id": "c988393f-06d8-417b-957e-1547932129ff",
              *         "rule": {
              *           "ByServiceCategory": {
              *             "categories": [
@@ -11501,7 +11602,7 @@ export interface components {
              *         }
              *       },
              *       {
-             *         "id": "6af7ef07-c832-4ca6-b617-03fb6f29c94c",
+             *         "id": "0ef329f9-b3e0-42df-b8a8-1b7731e0be94",
              *         "rule": {
              *           "ByTag": {
              *             "tag_ids": [],
@@ -11510,15 +11611,15 @@ export interface components {
              *         }
              *       },
              *       {
-             *         "id": "3d219c0a-67bc-4efe-96fd-60ef3b2a31eb",
+             *         "id": "cfe86d89-3a47-45a5-80a2-dc6a5fb6a9b4",
              *         "rule": "ByHypervisor"
              *       },
              *       {
-             *         "id": "3b881717-a3b2-40b1-b078-8020fdefe926",
+             *         "id": "d29fc1c2-d2c8-49a6-b7d3-c46fb39c3a77",
              *         "rule": "ByContainerRuntime"
              *       },
              *       {
-             *         "id": "0368420e-60e7-4c85-8504-39c43adf7cf0",
+             *         "id": "e4ed4573-1240-4ebe-b2a0-92b27ffcad16",
              *         "rule": "ByStack"
              *       }
              *     ]

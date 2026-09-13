@@ -821,6 +821,17 @@ pub struct HostResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(read_only)]
     pub display_name: Option<String>,
+    /// Which rung of the ladder produced `display_name`. `None` exactly when `display_name` is.
+    ///
+    /// Resolved from the same [`Host::name_ladder`] call as `display_name`, so the UI can say
+    /// where a host's title came from without walking the rungs itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(read_only)]
+    pub display_name_rung: Option<crate::server::hosts::r#impl::name_ladder::HostNameRung>,
+    /// Every rung of the display-name ladder for this host, highest first, with what each holds.
+    #[serde(default)]
+    #[schema(read_only)]
+    pub name_ladder: Vec<crate::server::hosts::r#impl::name_ladder::HostNameLadderEntry>,
     /// What produced `name`. Read-only: it is decided by whoever supplied the name, not by the
     /// caller.
     #[serde(default)]

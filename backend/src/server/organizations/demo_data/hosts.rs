@@ -1259,9 +1259,9 @@ pub(super) fn generate_hosts_and_services(
         ),
     ));
 
-    // 26. HP Printer
+    // 26. HP Printer. Never named in Scanopy, so it is titled by the sysName it reports.
     result.push(host_with_services!(
-        with_snmp(
+        unnamed(with_snmp(
             with_mac(
                 create_host(
                     "printer-hp-main",
@@ -1285,7 +1285,7 @@ pub(super) fn generate_hosts_and_services(
             Some("HP"),
             Some("LaserJet Pro MFP M428fdw"),
             Some("CNBRK1F0X8"),
-        ),
+        )),
         now,
         (
             "HP Printer",
@@ -1321,11 +1321,11 @@ pub(super) fn generate_hosts_and_services(
         ),
     ));
 
-    // 28. Camera Parking
+    // 28. Camera Parking. No name, no hostname and no SNMP, so it is titled by its address.
     result.push(host_with_services!(
-        with_mac(
+        unnamed(with_mac(
             create_host(
-                "cam-parking",
+                "",
                 None,
                 Some("Parking lot security camera"),
                 hq,
@@ -1337,7 +1337,7 @@ pub(super) fn generate_hosts_and_services(
                 now
             ),
             [0xc0, 0x56, 0xe3, 0x30, 0x28, 0x01],
-        ),
+        )),
         now,
         (
             "RTSP Camera",
@@ -1504,10 +1504,9 @@ pub(super) fn generate_hosts_and_services(
             created_at: now,
             updated_at: now,
             base: HostBase {
-                name: host_name_from_parts(
-                    "hq-annex-uplink".to_string(),
-                    AttributeSource::LldpChassisId,
-                ),
+                // An LLDP far end arrives nameless. It is titled by the chassis ID it advertised,
+                // which here is a locally assigned string rather than a MAC.
+                name: HostName::unnamed(),
                 network_id: hq.id,
                 hostname: None,
                 description: Some(
@@ -1523,7 +1522,10 @@ pub(super) fn generate_hosts_and_services(
                 sys_location: None,
                 sys_contact: None,
                 management_url: None,
-                chassis_id: None,
+                chassis_id: Some(Attributed::new(
+                    HostChassisIdValue("hq-annex-uplink".to_string()),
+                    AttributeSource::LldpChassisId,
+                )),
                 sys_name: None,
                 manufacturer: None,
                 model: None,
