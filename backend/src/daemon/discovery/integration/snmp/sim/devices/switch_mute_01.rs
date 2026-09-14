@@ -45,6 +45,7 @@ pub fn device() -> SimDevice {
             arp::entry::IP_NET_TO_MEDIA_NET_ADDRESS,
             arp::entry::IP_NET_TO_MEDIA_TYPE,
         ],
+        rejects_getbulk: None,
     }
 }
 

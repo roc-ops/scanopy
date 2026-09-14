@@ -20,7 +20,7 @@ pub mod wire;
 
 use std::net::Ipv4Addr;
 
-use transport::{Handler, Registration, SimAgent};
+use transport::{BulkRejection, Handler, Registration, SimAgent};
 use wire::{DataFile, Ordering};
 
 use crate::daemon::discovery::integration::snmp::oids::{
@@ -89,6 +89,10 @@ pub struct SimDevice {
     /// and `ipNetToMediaTable` cannot be — without these overrides a device that is supposed to
     /// serve nothing would report the host's own addresses and ARP cache and would not be mute.
     pub suppresses: Vec<&'static str>,
+    /// A GETBULK above a repetition count answered with an error status, by
+    /// `snmp-bulk-refuser.py --reject-above` in front of the agent. `None` for every device but
+    /// `switch-hikvision-01` (GH #710).
+    pub rejects_getbulk: Option<BulkRejection>,
 }
 
 /// The file suffixes, kept here so the deployment and the registrations cannot disagree about
@@ -454,7 +458,8 @@ impl SimDevice {
     /// SNMPv1 has no getbulk, so the v1 agent forces every column through getnext.
     pub fn agent(&self) -> SimAgent {
         let agent = SimAgent::new(&self.data_files(), self.registrations())
-            .refusing_getbulk(self.refuses_getbulk());
+            .refusing_getbulk(self.refuses_getbulk())
+            .rejecting_getbulk_above(self.rejects_getbulk);
         match self.credential {
             CredentialType::SnmpV1 { .. } => agent.without_getbulk(),
             _ => agent,

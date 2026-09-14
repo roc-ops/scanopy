@@ -26,6 +26,7 @@ pub mod switch_dlink_02;
 pub mod switch_exos_01;
 pub mod switch_fdb_only_01;
 pub mod switch_flaky_01;
+pub mod switch_hikvision_01;
 pub mod switch_macport_01;
 pub mod switch_mcast_rcv_01;
 pub mod switch_mcast_src_01;
@@ -90,5 +91,7 @@ pub fn all() -> Vec<SimDevice> {
         switch_mcast_rcv_01::device(),
         switch_mcast_src_01::device(),
         switch_segment_gw_01::device(),
+        // GH #710: getbulk above ten repetitions answered with genErr.
+        switch_hikvision_01::device(),
     ]
 }

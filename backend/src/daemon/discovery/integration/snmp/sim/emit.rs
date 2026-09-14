@@ -145,14 +145,31 @@ pub fn upstream_port(device: &SimDevice) -> u16 {
     16000 + u16::from(device.ip.octets()[3])
 }
 
+/// The arguments `snmp-bulk-refuser.py` runs with in front of this device, or `None` where nothing
+/// sits in front of it and the agent binds its own address.
+pub fn shim_args(device: &SimDevice) -> Option<String> {
+    let mut args: Vec<String> = device
+        .refuses_getbulk()
+        .iter()
+        .map(|oid| format!("--refuse {}", dotted(oid)))
+        .collect();
+    if let Some(rejection) = device.rejects_getbulk {
+        args.push(format!(
+            "--reject-above {} --error-status {}",
+            rejection.above_repetitions, rejection.error_status
+        ));
+    }
+    (!args.is_empty()).then(|| args.join(" "))
+}
+
 /// One device's `snmpd.conf`.
 pub fn snmpd_conf(device: &SimDevice) -> String {
     let files: Vec<String> = device.data_files().into_iter().map(|f| f.name).collect();
     let system = &device.system;
-    // A device that refuses getbulk has `snmp-bulk-refuser.py` on its own address, so the agent
+    // A device with a GETBULK shim has `snmp-bulk-refuser.py` on its own address, so the agent
     // binds loopback and is reachable only through it. Without this the two would contend for
     // `<ip>:161` and whichever started second would fail to bind.
-    let mut lines = vec![if device.refuses_getbulk().is_empty() {
+    let mut lines = vec![if shim_args(device).is_none() {
         format!("agentAddress udp:{}:161", device.ip)
     } else {
         format!("agentAddress udp:127.0.0.1:{}", upstream_port(device))
@@ -274,24 +291,16 @@ pub fn lab_env(devices: &[SimDevice]) -> String {
         })
     ));
     // One entry per device needing a GETBULK refuser in front of it, empty for the rest:
-    // `unit|listen-ip|upstream-port|refused-oid[,refused-oid…]`. Everything the unit needs is here
-    // rather than in the deploy script, for the same reason the rest of this file exists — a
-    // second copy of the device list is a second thing that can disagree with the structs.
+    // `unit|listen-ip|upstream-port|shim-args`. Everything the unit needs is here rather than in
+    // the deploy script, for the same reason the rest of this file exists — a second copy of the
+    // device list is a second thing that can disagree with the structs.
     out.push_str(&format!(
         "SHIMS=({})\n",
         field(&|d| {
-            let refused = d.refuses_getbulk();
-            if refused.is_empty() {
+            let Some(args) = shim_args(d) else {
                 return "\"\"".to_string();
-            }
-            let oids: Vec<String> = refused.iter().map(|oid| dotted(oid)).collect();
-            format!(
-                "\"{}|{}|{}|{}\"",
-                d.name,
-                d.ip,
-                upstream_port(d),
-                oids.join(",")
-            )
+            };
+            format!("\"{}|{}|{}|{}\"", d.name, d.ip, upstream_port(d), args)
         })
     ));
     // Addresses a device serves *beyond* its own — empty for every device but the one guest-
@@ -541,37 +550,40 @@ mod tests {
         assert!(conf.contains("pass .1.3.6.1.2.1.2.2 "));
     }
 
-    /// A device behind a GETBULK refuser hands its public address to the shim and takes loopback.
+    /// A device behind a GETBULK shim hands its public address to the shim and takes loopback.
     ///
     /// Both halves matter and neither is visible from the other file: if the agent kept
     /// `<ip>:161` the two would contend for it and whichever started second would fail to bind,
     /// and if `lab.env` named a different port the shim would forward into nothing. They are
-    /// generated from one place so they cannot drift, and this is what says so.
+    /// generated from one place so they cannot drift, and this is what says so. One device per
+    /// shim mode: GH #668's drop, and GH #710's error-status answer.
     #[test]
-    fn a_bulk_refusing_device_moves_its_agent_behind_the_shim() {
-        let device = super::super::device("switch-slowbulk-01");
-        let port = upstream_port(&device);
+    fn a_device_behind_a_bulk_shim_moves_its_agent_behind_it() {
+        for (name, args) in [
+            ("switch-slowbulk-01", "--refuse .1.0.8802.1.1.2.1.4"),
+            ("switch-hikvision-01", "--reject-above 10 --error-status 5"),
+        ] {
+            let device = super::super::device(name);
+            let port = upstream_port(&device);
 
-        assert!(
-            snmpd_conf(&device).starts_with(&format!("agentAddress udp:127.0.0.1:{port}\n")),
-            "the agent has to leave the address the shim listens on"
-        );
+            assert!(
+                snmpd_conf(&device).starts_with(&format!("agentAddress udp:127.0.0.1:{port}\n")),
+                "{name}: the agent has to leave the address the shim listens on"
+            );
 
-        let entry = format!(
-            "\"switch-slowbulk-01|{}|{port}|.1.0.8802.1.1.2.1.4\"",
-            device.ip
-        );
-        assert!(
-            lab_env(&super::super::lab()).contains(&entry),
-            "lab.env must carry the shim's whole invocation; expected {entry}"
-        );
+            let entry = format!("\"{name}|{}|{port}|{args}\"", device.ip);
+            assert!(
+                lab_env(&super::super::lab()).contains(&entry),
+                "lab.env must carry the shim's whole invocation; expected {entry}"
+            );
+        }
     }
 
     /// Every other device is untouched: no shim, no loopback, no second process in front of it.
     #[test]
     fn a_device_that_serves_bulk_normally_keeps_its_own_address() {
         for device in super::super::lab() {
-            if !device.refuses_getbulk().is_empty() {
+            if shim_args(&device).is_some() {
                 continue;
             }
             assert!(
