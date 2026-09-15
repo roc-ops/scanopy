@@ -6,11 +6,13 @@
     "LldpNeighbourAddress",
     "CipVendorId",
     "DnsSdInstanceName",
+    "DnsSdHostname",
     "LldpChassisId",
     "ReverseDns",
     "ForwardingTable",
     "ArpReply",
     "DaemonSelfReport",
+    "ProfinetDcp",
     "Probe",
     "Authored",
     "Manual"
@@ -183,7 +185,9 @@
     "LldpLocalPortDroppedReadCutShort",
     "ConnectionsWithoutProtocolResponse",
     "ProvisionalSubnetInferred",
-    "NeighbourResolutionIncomplete"
+    "NeighbourResolutionIncomplete",
+    "FdbResolutionIncomplete",
+    "OutdatedDaemonFormat"
   ],
   "EdgeStyle": [
     "Straight",
