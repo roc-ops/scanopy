@@ -733,6 +733,49 @@ async fn a_far_end_nobody_scanned_resolves_to_nothing() {
     );
 }
 
+/// GH #685: the neighbours `switch-quietcol-01` reads before its walk stops reach the ports they
+/// name, so the partial read it exists to exercise draws port-level links in the lab.
+///
+/// Its first fixture borrowed identifiers from another device: one chassis id belonged to
+/// `router-gw-01` and two far-end ports did not exist, so a scan drew host-level links, one of them
+/// to the wrong device, and nothing failed.
+#[tokio::test]
+async fn the_quietcol_neighbours_reach_the_ports_they_name() {
+    let lab = Lab::new().await;
+    let quietcol = lab.scan("switch-quietcol-01").await;
+    let mut far_ends = std::collections::HashMap::new();
+    for name in ["switch-voss-01", "switch-dell-01", "switch-exos-01"] {
+        far_ends.insert(name, lab.scan(name).await.host.id);
+    }
+
+    assert_eq!(quietcol.collected.neighbours.records.len(), 3);
+    for neighbour in &quietcol.collected.neighbours.records {
+        let name = neighbour.remote_sys_name.as_deref().expect("a sysName");
+        let expected = *far_ends.get(name).unwrap_or_else(|| {
+            panic!("{name} is not one of the far ends this device is cabled to")
+        });
+
+        let host = Scanned::advertised_chassis(neighbour)
+            .resolve_host_id(&lab.resolver, lab.network_id, AdvertisedIdentity::default())
+            .await;
+        assert_eq!(
+            host,
+            IdentityResolution::Resolved(expected),
+            "the chassis id advertised for {name} must identify {name}"
+        );
+
+        assert!(
+            matches!(
+                Scanned::advertised_port(neighbour)
+                    .resolve_if_entry_id(&lab.resolver, expected)
+                    .await,
+                IdentityResolution::Resolved(_)
+            ),
+            "the port advertised for {name} must be a port {name} has"
+        );
+    }
+}
+
 /// A sanity check on the seeding itself: the far ends really are in the database with the
 /// identifiers the neighbours name them by.
 ///

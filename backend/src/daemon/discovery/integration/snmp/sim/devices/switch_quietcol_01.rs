@@ -89,31 +89,33 @@ pub fn lldp_table() -> LldpTable {
             Advertised::octets(LldpPortId::InterfaceName("Gi0/3".into())),
         ),
     ])
+    // Each far end's own chassis id and a port nothing else in the lab is cabled to, so every
+    // neighbour lands on a port and no other device's link shares it.
     .neighbours(vec![
         RemoteNeighbour::new(
             1,
-            Advertised::octets(LldpChassisId::MacAddress("00:1a:2b:00:10:00".into())),
-            Advertised::octets(LldpPortId::InterfaceName("Gi0/13".into())),
-        )
-        .port_desc("GigabitEthernet0/13")
-        .sys_name("switch-core-01")
-        .sys_desc("Cisco IOS Software, C2960"),
-        RemoteNeighbour::new(
-            2,
-            Advertised::octets(LldpChassisId::MacAddress("00:1a:2b:00:11:00".into())),
-            Advertised::octets(LldpPortId::InterfaceName("Gi0/13".into())),
-        )
-        .port_desc("GigabitEthernet0/13")
-        .sys_name("switch-access-01")
-        .sys_desc("Cisco IOS Software, C2960"),
-        RemoteNeighbour::new(
-            3,
-            Advertised::octets(LldpChassisId::MacAddress("00:1a:2b:00:12:00".into())),
+            Advertised::octets(LldpChassisId::MacAddress("00:04:38:02:e0:00".into())),
             Advertised::octets(LldpPortId::InterfaceName("1/2".into())),
         )
         .port_desc("1/2")
         .sys_name("switch-voss-01")
         .sys_desc("Extreme Networks VSP-7400, VOSS 8.10"),
+        RemoteNeighbour::new(
+            2,
+            Advertised::octets(LldpChassisId::MacAddress("14:18:77:aa:bb:00".into())),
+            Advertised::octets(LldpPortId::InterfaceName("ethernet1/1/1".into())),
+        )
+        .port_desc("ethernet1/1/1")
+        .sys_name("switch-dell-01")
+        .sys_desc("Dell EMC Networking OS10 Enterprise. Dell EMC Networking S4112T-ON. OS Version 10.4.3.4"),
+        RemoteNeighbour::new(
+            3,
+            Advertised::octets(LldpChassisId::MacAddress("00:04:96:01:e0:00".into())),
+            Advertised::octets(LldpPortId::InterfaceName("1:2".into())),
+        )
+        .port_desc("1:2")
+        .sys_name("switch-exos-01")
+        .sys_desc("ExtremeXOS version 31.7 X435-24P"),
     ])
 }
 
