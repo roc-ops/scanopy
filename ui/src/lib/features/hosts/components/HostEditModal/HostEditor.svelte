@@ -3,6 +3,7 @@
 	import { validateForm, clearStaleFieldInfo } from '$lib/shared/components/forms/form-context';
 	import { Info, ArrowRight } from 'lucide-svelte';
 	import { hostDisplayName } from '../../host-display-name';
+	import { nameToSubmit, overrideOf } from '../../host-identity';
 	import type {
 		Host,
 		HostFormData,
@@ -119,7 +120,12 @@
 
 	// Sync form field values to formData structure
 	function syncFormValuesToFormData(values: typeof form.state.values) {
-		formData.name = values.name;
+		// The Name field edits only the override; map it back to the stored name the API takes.
+		formData.name = nameToSubmit({
+			override: values.name,
+			savedName: host?.name ?? '',
+			nameSource: host?.name_source
+		});
 		formData.hostname = values.hostname;
 		formData.description = values.description;
 
@@ -202,7 +208,7 @@
 	// Fields unmount when modal closes ({#if isOpen} in GenericModal) and re-register on open.
 	let form = createForm(() => ({
 		defaultValues: {
-			name: formData.name,
+			name: overrideOf(formData.name, formData.name_source),
 			hostname: formData.hostname || '',
 			description: formData.description || '',
 			ip_addresses: formData.ip_addresses || [],
@@ -376,7 +382,7 @@
 
 		// Reset TanStack form
 		form.reset({
-			name: formData.name,
+			name: overrideOf(formData.name, formData.name_source),
 			hostname: formData.hostname || '',
 			description: formData.description || '',
 			ip_addresses: formData.ip_addresses || [],

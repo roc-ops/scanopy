@@ -6,6 +6,7 @@
 		common_contact,
 		common_firmwareRevision,
 		common_hardware,
+		common_hostname,
 		common_location,
 		common_manufacturer,
 		common_model,
@@ -13,9 +14,12 @@
 		common_softwareRevision,
 		hosts_deviceFacts_firmwareGroup,
 		hosts_deviceFacts_heading,
+		hosts_deviceFacts_identityGroup,
 		hosts_deviceFacts_locationGroup,
+		hosts_snmp_chassisId,
 		hosts_snmp_managementUrl,
 		hosts_snmp_sysDescr,
+		hosts_snmp_sysName,
 		hosts_snmp_sysObjectId
 	} from '$lib/paraglide/messages';
 
@@ -24,15 +28,29 @@
 	interface Fact {
 		label: string;
 		value: string | null | undefined;
-		source: AttributeSource | undefined;
+		/** `null` for a field that records no provenance, which the tag then says. */
+		source: AttributeSource | null | undefined;
 		mono?: boolean;
 		link?: boolean;
 	}
 
 	// Grouped by what each value describes, not by the protocol that carried it. A model arrives
 	// from ENTITY-MIB, a controller or an industrial probe, and each value's own tag says which.
-	let groups = $derived(
+	let sections = $derived(
 		[
+			{
+				title: hosts_deviceFacts_identityGroup(),
+				facts: [
+					{ label: common_hostname(), value: host.hostname, source: null, mono: true },
+					{ label: hosts_snmp_sysName(), value: host.sys_name, source: host.sys_name_source },
+					{
+						label: hosts_snmp_chassisId(),
+						value: host.chassis_id,
+						source: host.chassis_id_source,
+						mono: true
+					}
+				] satisfies Fact[]
+			},
 			{
 				title: common_hardware(),
 				facts: [
@@ -88,27 +106,30 @@
 				] satisfies Fact[]
 			}
 		]
-			.map((group) => ({
-				...group,
-				facts: (group.facts as Fact[]).filter((fact) => fact.value?.trim())
+			.map((section) => ({
+				...section,
+				facts: (section.facts as Fact[]).filter((fact) => fact.value?.trim())
 			}))
-			.filter((group) => group.facts.length > 0)
+			.filter((section) => section.facts.length > 0)
 	);
 </script>
 
-{#if groups.length > 0}
-	<section class="space-y-4">
+{#if sections.length > 0}
+	<div class="card card-static space-y-4">
 		<h3 class="text-primary text-sm font-semibold">{hosts_deviceFacts_heading()}</h3>
-		<div class="grid gap-4 md:grid-cols-3">
-			{#each groups as group (group.title)}
-				<div class="card card-static space-y-4">
+		<div class="divide-y divide-gray-200 dark:divide-gray-700">
+			{#each sections as section (section.title)}
+				<div class="space-y-2 py-3 first:pt-0 last:pb-0">
 					<h4 class="text-secondary text-xs font-semibold uppercase tracking-wide">
-						{group.title}
+						{section.title}
 					</h4>
-					{#each group.facts as fact (fact.label)}
-						<div class="space-y-1">
-							<div class="text-secondary text-xs">{fact.label}</div>
-							<div class="text-primary break-words text-sm" class:font-mono={fact.mono}>
+					{#each section.facts as fact (fact.label)}
+						<div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+							<span class="text-secondary w-40 shrink-0 text-sm">{fact.label}</span>
+							<span
+								class="text-primary min-w-0 flex-1 break-words text-sm"
+								class:font-mono={fact.mono}
+							>
 								{#if fact.link}
 									<!-- eslint-disable svelte/no-navigation-without-resolve -->
 									<a
@@ -123,12 +144,12 @@
 								{:else}
 									{fact.value}
 								{/if}
-							</div>
-							<AttributeSourceTag source={fact.source} />
+							</span>
+							<span class="shrink-0"><AttributeSourceTag source={fact.source} /></span>
 						</div>
 					{/each}
 				</div>
 			{/each}
 		</div>
-	</section>
+	</div>
 {/if}
