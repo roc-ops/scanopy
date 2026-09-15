@@ -860,6 +860,8 @@ fn openconfig_normalisation_is_the_identity() {
         leaf_from("lldp/interfaces/interface[name=swp1]/neighbors/neighbor[id=1]/state/port-id");
     let before: Vec<&str> = leaf.elems.iter().map(|e| e.name.as_str()).collect();
     assert_eq!(normalised_names(&OPENCONFIG_LLDP, &leaf), before);
+}
+
 /// GH #88, on the other transport: a leaf that arrived as a gNMI string is valid UTF-8 by
 /// construction, which is exactly why "it decoded" was mistaken for "it is a name". The type
 /// the device declares does not make a control-character payload an interface name, so it is
