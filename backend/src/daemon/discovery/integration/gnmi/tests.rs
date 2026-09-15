@@ -344,7 +344,8 @@ async fn arcos_rows_join_interfaces_and_lldp() {
 
 /// A device whose LLDP read fails, refused or timed out, still yields its rows but not an
 /// authoritative neighbour set, so the server keeps the neighbours it holds instead of
-/// clearing them on one bad read.
+/// clearing them on one bad read. Both LLDP models get this: openconfig's dedicated neighbours
+/// subtree refusing or timing out, and DriveNets' single combined subtree doing the same.
 #[tokio::test]
 async fn failed_lldp_read_keeps_rows_and_is_not_authoritative() {
     let refused = ScriptedDevice::default()
@@ -357,7 +358,15 @@ async fn failed_lldp_read_keeps_rows_and_is_not_authoritative() {
             OPENCONFIG_LLDP.subtrees[1],
             "gNMI Subscribe stream timed out",
         );
-    for (case, mut device) in [("refused", refused), ("timed out", timed_out)] {
+    let native_failed = ScriptedDevice::default()
+        .serve(Subtree::INTERFACE_STATE, CDNOS_INTERFACE_STATE)
+        .fail(DN_LLDP.subtrees[0], "gNMI Subscribe stream timed out")
+        .advertising(&["openconfig-interfaces", "dn-lldp"]);
+    for (case, mut device, expected_rows) in [
+        ("refused", refused, 7),
+        ("timed out", timed_out, 7),
+        ("native tree failed", native_failed, 2),
+    ] {
         let (coll, rows) = rows(&mut device).await;
         assert!(
             !coll.data_complete().lldp,
@@ -365,7 +374,7 @@ async fn failed_lldp_read_keeps_rows_and_is_not_authoritative() {
         );
         assert_eq!(
             rows.len(),
-            7,
+            expected_rows,
             "{case}: interface rows come through without LLDP"
         );
         assert!(
@@ -745,6 +754,21 @@ fn advertising_both_reads_openconfig() {
 fn advertising_no_known_lldp_model_selects_nothing() {
     let models = vec!["openconfig-interfaces".to_string()];
     assert!(LldpModelProfile::select(&models).is_none());
+}
+
+/// `neighbors` names a path that must also be in `subtrees` -- two literals that have to agree,
+/// with nothing but this test making them. A profile whose `neighbors` matches none of the
+/// subtrees it reads never sets `is_lldp`, so `lldp_complete` keeps its `true` initialiser and
+/// the device claims authority over a neighbour set it may never have read.
+#[test]
+fn every_profile_names_a_neighbours_subtree_it_actually_reads() {
+    for p in LldpModelProfile::KNOWN {
+        assert!(
+            p.subtrees.contains(&p.neighbors),
+            "{} names a neighbors subtree it does not read",
+            p.module
+        );
+    }
 }
 
 /// Parse a gnmic-style path into a `Leaf` with no value, reusing the same path-parsing the

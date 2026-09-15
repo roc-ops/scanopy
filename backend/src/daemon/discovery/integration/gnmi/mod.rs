@@ -312,6 +312,19 @@ pub struct LldpModelProfile {
     /// its neighbours never ageing out. DriveNets serves identity and neighbours together in one
     /// subtree, so for that profile this IS that subtree; a field rather than an index because
     /// which one it is, is the model's business.
+    ///
+    /// The separation this buys is clean for openconfig, where identity and neighbours are two
+    /// Subscribes — not for DriveNets, whose one subtree carries both. A DriveNets device whose
+    /// `oper-items/chassis-id` or `system-name` leaves fail to parse is marked non-authoritative
+    /// too, even though only its own identity was at fault, not its neighbour list. That errs
+    /// conservative — a false "not authoritative" costs nothing but a scan's worth of pruning,
+    /// where the reverse silently drops real neighbours — so it is left as is.
+    ///
+    /// INVARIANT, unenforced by the type: `subtrees.contains(&neighbors)` must hold. Nothing
+    /// checks the two literals agree; see `every_profile_names_a_neighbours_subtree_it_actually_reads`
+    /// in `tests.rs`, and note the failure mode if they drift apart — `is_lldp` is never true,
+    /// `lldp_complete` keeps its `true` initialiser in [`collect`], and a device whose neighbours
+    /// read was refused or garbled is reported authoritative anyway.
     pub neighbors: Subtree,
 }
 
