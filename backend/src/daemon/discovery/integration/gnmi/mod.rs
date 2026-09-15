@@ -336,10 +336,11 @@ impl DiscoveryIntegration for GnmiIntegration {
                 ConnectError::Tls(m) => ProbeFailure::tls_failed(m),
                 ConnectError::Dial(m) => ProbeFailure::unreachable(m),
             })?;
-        transport
+        let models = transport
             .capabilities()
             .await
             .map_err(|e| ProbeFailure::rejected(e.to_string()))?;
+        let _ = models;
         Ok(ProbeSuccess {
             client_probe: ClientProbe::Gnmi,
             ports: vec![PortType::new_tcp(cred.port)],

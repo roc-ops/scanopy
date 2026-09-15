@@ -13,6 +13,7 @@ struct ScriptedDevice {
     served: BTreeMap<&'static str, &'static str>,
     /// Subtrees whose Subscribe fails with this error rather than a refusal.
     failures: BTreeMap<&'static str, &'static str>,
+    models: Vec<String>,
 }
 
 impl ScriptedDevice {
@@ -23,6 +24,12 @@ impl ScriptedDevice {
 
     fn fail(mut self, subtree: Subtree, error: &'static str) -> Self {
         self.failures.insert(subtree_key(subtree), error);
+        self
+    }
+
+    /// The YANG modules this device names in its `Capabilities` reply.
+    fn advertising(mut self, models: &[&str]) -> Self {
+        self.models = models.iter().map(|m| m.to_string()).collect();
         self
     }
 }
@@ -119,8 +126,8 @@ fn script_to_notifications(script: &str) -> Vec<Notification> {
 
 #[async_trait]
 impl GnmiTransport for ScriptedDevice {
-    async fn capabilities(&mut self) -> anyhow::Result<()> {
-        Ok(())
+    async fn capabilities(&mut self) -> anyhow::Result<Vec<String>> {
+        Ok(self.models.clone())
     }
     async fn subscribe_once(&mut self, paths: Vec<Path>) -> anyhow::Result<Vec<Notification>> {
         let [path] = paths.as_slice() else {
@@ -603,4 +610,11 @@ async fn dnos_interfaces_without_any_lldp_model() {
     assert_eq!(row(&rows, "irb100").if_type, Some(if_type::OTHER));
     assert_eq!(row(&rows, "mgmt-ncc-0/0").if_type, Some(if_type::OTHER));
     assert_eq!(row(&rows, "lo0").if_alias.as_deref(), Some("loopback"));
+}
+
+#[tokio::test]
+async fn capabilities_reports_the_models_the_device_advertises() {
+    let mut device = ScriptedDevice::default().advertising(&["openconfig-interfaces", "dn-lldp"]);
+    let models = device.capabilities().await.expect("capabilities");
+    assert_eq!(models, vec!["openconfig-interfaces", "dn-lldp"]);
 }
