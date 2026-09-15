@@ -149,10 +149,10 @@ pub fn upstream_port(device: &SimDevice) -> u16 {
 pub fn snmpd_conf(device: &SimDevice) -> String {
     let files: Vec<String> = device.data_files().into_iter().map(|f| f.name).collect();
     let system = &device.system;
-    // A device that refuses getbulk has `snmp-bulk-refuser.py` on its own address, so the agent
-    // binds loopback and is reachable only through it. Without this the two would contend for
+    // A device behind `snmp-bulk-refuser.py` has the shim on its own address, so the agent binds
+    // loopback and is reachable only through it. Without this the two would contend for
     // `<ip>:161` and whichever started second would fail to bind.
-    let mut lines = vec![if device.refuses_getbulk().is_empty() {
+    let mut lines = vec![if !device.needs_shim() {
         format!("agentAddress udp:{}:161", device.ip)
     } else {
         format!("agentAddress udp:127.0.0.1:{}", upstream_port(device))
@@ -273,24 +273,31 @@ pub fn lab_env(devices: &[SimDevice]) -> String {
             _ => "\"\"".to_string(),
         })
     ));
-    // One entry per device needing a GETBULK refuser in front of it, empty for the rest:
-    // `unit|listen-ip|upstream-port|refused-oid[,refused-oid…]`. Everything the unit needs is here
-    // rather than in the deploy script, for the same reason the rest of this file exists — a
-    // second copy of the device list is a second thing that can disagree with the structs.
+    // One entry per device needing the shim in front of it, empty for the rest:
+    // `unit|listen-ip|upstream-port|refused-oid[,…]|silenced-oid[,…]`, either list possibly empty.
+    // Everything the unit needs is here rather than in the deploy script, for the same reason the
+    // rest of this file exists — a second copy of the device list is a second thing that can
+    // disagree with the structs.
     out.push_str(&format!(
         "SHIMS=({})\n",
         field(&|d| {
-            let refused = d.refuses_getbulk();
-            if refused.is_empty() {
+            if !d.needs_shim() {
                 return "\"\"".to_string();
             }
-            let oids: Vec<String> = refused.iter().map(|oid| dotted(oid)).collect();
+            let joined = |subtrees: Vec<Vec<u64>>| -> String {
+                subtrees
+                    .iter()
+                    .map(|oid| dotted(oid))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            };
             format!(
-                "\"{}|{}|{}|{}\"",
+                "\"{}|{}|{}|{}|{}\"",
                 d.name,
                 d.ip,
                 upstream_port(d),
-                oids.join(",")
+                joined(d.refuses_getbulk()),
+                joined(d.silenced())
             )
         })
     ));
@@ -558,7 +565,29 @@ mod tests {
         );
 
         let entry = format!(
-            "\"switch-slowbulk-01|{}|{port}|.1.0.8802.1.1.2.1.4\"",
+            "\"switch-slowbulk-01|{}|{port}|.1.0.8802.1.1.2.1.4|\"",
+            device.ip
+        );
+        assert!(
+            lab_env(&super::super::lab()).contains(&entry),
+            "lab.env must carry the shim's whole invocation; expected {entry}"
+        );
+    }
+
+    /// A device with a silent column sits behind the same shim, with nothing refused and the
+    /// column in the list the shim drops every PDU type for.
+    #[test]
+    fn a_device_with_a_silent_column_moves_its_agent_behind_the_shim() {
+        let device = super::super::device("switch-quietcol-01");
+        let port = upstream_port(&device);
+
+        assert!(
+            snmpd_conf(&device).starts_with(&format!("agentAddress udp:127.0.0.1:{port}\n")),
+            "the agent has to leave the address the shim listens on"
+        );
+
+        let entry = format!(
+            "\"switch-quietcol-01|{}|{port}||.1.0.8802.1.1.2.1.4.1.1.10\"",
             device.ip
         );
         assert!(
@@ -571,7 +600,7 @@ mod tests {
     #[test]
     fn a_device_that_serves_bulk_normally_keeps_its_own_address() {
         for device in super::super::lab() {
-            if !device.refuses_getbulk().is_empty() {
+            if device.needs_shim() {
                 continue;
             }
             assert!(

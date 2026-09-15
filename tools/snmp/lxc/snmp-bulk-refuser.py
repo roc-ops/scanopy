@@ -19,7 +19,11 @@ arriving 5s later is served immediately.
     snmp-bulk-refuser.py --listen 192.168.7.216:161 --upstream 127.0.0.1:16216 \\
                          --refuse 1.0.8802.1.1.2.1.4
 
-Everything that is not a refused GETBULK is relayed untouched, including SNMPv3, whose PDU this
+`--silence` drops every GET, GETNEXT and GETBULK under a subtree rather than GETBULK alone. That is
+a column the device never answers by either method, so a walk reads the rest of the table and stops
+part way (GH #685).
+
+Everything that is not a dropped request is relayed untouched, including SNMPv3, whose PDU this
 deliberately does not try to read. Parsing is fail-open throughout: a packet this cannot make sense
 of is forwarded, because a shim that goes silent on a parse bug turns one unreadable column into a
 device that has vanished, and that is a far more confusing fixture than the one it replaced.
@@ -31,12 +35,15 @@ import socketserver
 import sys
 import threading
 
-# BER tags. Only the ones needed to reach the first varbind of a v1/v2c GETBULK.
+# BER tags. Only the ones needed to reach the first varbind of a v1/v2c request.
 SEQUENCE = 0x30
 INTEGER = 0x02
 OCTET_STRING = 0x04
 OBJECT_IDENTIFIER = 0x06
+GET_PDU = 0xA0
+GETNEXT_PDU = 0xA1
 GETBULK_PDU = 0xA5
+REQUEST_PDUS = (GET_PDU, GETNEXT_PDU, GETBULK_PDU)
 
 UPSTREAM_TIMEOUT = 10.0
 
@@ -83,12 +90,12 @@ def decode_oid(raw):
     return tuple(out)
 
 
-def getbulk_target(packet):
-    """The first varbind OID of a v1/v2c GETBULK, or None if the packet is anything else.
+def request_target(packet):
+    """(PDU tag, first varbind OID) of a v1/v2c request, or None if the packet is anything else.
 
     Walks only as far as it must: the outer SEQUENCE, past version and community, and into the PDU
-    only when the tag says GETBULK. A v3 message fails the community check and leaves here, which
-    is the intended outcome — its PDU may be encrypted and is none of this shim's business.
+    only when the tag names a request. A v3 message fails the community check and leaves here,
+    which is the intended outcome — its PDU may be encrypted and is none of this shim's business.
     """
     tag, body, _, _ = read_tlv(packet, 0)
     if tag != SEQUENCE:
@@ -101,11 +108,12 @@ def getbulk_target(packet):
     if tag != OCTET_STRING:  # community
         raise Unparseable
 
-    tag, pdu, _, _ = read_tlv(packet, i)
-    if tag != GETBULK_PDU:
+    pdu_tag, pdu, _, _ = read_tlv(packet, i)
+    if pdu_tag not in REQUEST_PDUS:
         return None
 
-    # request-id, non-repeaters, max-repetitions.
+    # request-id, then error-status and error-index, which GETBULK reuses as non-repeaters and
+    # max-repetitions. Three integers either way.
     j = pdu
     for _ in range(3):
         tag, _, _, j = read_tlv(packet, j)
@@ -121,28 +129,38 @@ def getbulk_target(packet):
     tag, oid, oid_len, _ = read_tlv(packet, varbind)
     if tag != OBJECT_IDENTIFIER:
         raise Unparseable
-    return decode_oid(packet[oid : oid + oid_len])
+    return pdu_tag, decode_oid(packet[oid : oid + oid_len])
 
 
-def is_refused(packet, prefixes):
-    """Whether to drop this datagram on the floor."""
+def dropped_pdu(packet, refused, silenced):
+    """The name of the request to drop on the floor, or None to relay it."""
     try:
-        target = getbulk_target(packet)
+        target = request_target(packet)
     except Unparseable:
-        return False
+        return None
     if target is None:
-        return False
-    return any(target[: len(p)] == p for p in prefixes)
+        return None
+    pdu_tag, oid = target
+
+    def under(prefixes):
+        return any(oid[: len(p)] == p for p in prefixes)
+
+    if under(silenced):
+        return {GET_PDU: "get", GETNEXT_PDU: "getnext", GETBULK_PDU: "getbulk"}[pdu_tag]
+    if pdu_tag == GETBULK_PDU and under(refused):
+        return "getbulk"
+    return None
 
 
-def serve(listen, upstream, prefixes, log):
+def serve(listen, upstream, refused, silenced, log):
     class Handler(socketserver.BaseRequestHandler):
         def handle(self):
             packet, client = self.request
-            if is_refused(packet, prefixes):
+            dropped = dropped_pdu(packet, refused, silenced)
+            if dropped:
                 # No reply, no error, no upstream call: the device simply does not answer, which
                 # is what the walk under test has to survive.
-                log(f"drop getbulk from {self.client_address[0]}")
+                log(f"drop {dropped} from {self.client_address[0]}")
                 return
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as out:
                 out.settimeout(UPSTREAM_TIMEOUT)
@@ -163,7 +181,9 @@ def serve(listen, upstream, prefixes, log):
 
     with Server(listen, Handler) as server:
         log(f"listening on {listen[0]}:{listen[1]} → {upstream[0]}:{upstream[1]}")
-        log("refusing getbulk under " + ", ".join(".".join(map(str, p)) for p in prefixes))
+        for label, prefixes in (("refusing getbulk", refused), ("silent", silenced)):
+            if prefixes:
+                log(f"{label} under " + ", ".join(".".join(map(str, p)) for p in prefixes))
         server.serve_forever()
 
 
@@ -189,18 +209,28 @@ def main(argv=None):
         "--refuse",
         type=prefix,
         action="append",
-        required=True,
+        default=[],
         metavar="OID",
         help="drop GETBULK whose first varbind is at or under this subtree; repeatable",
     )
+    parser.add_argument(
+        "--silence",
+        type=prefix,
+        action="append",
+        default=[],
+        metavar="OID",
+        help="drop every request whose first varbind is at or under this subtree; repeatable",
+    )
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
+    if not args.refuse and not args.silence:
+        parser.error("nothing to drop: give --refuse, --silence, or both")
 
     def log(message):
         if not args.quiet:
             print(f"[bulk-refuser] {message}", file=sys.stderr, flush=True)
 
-    serve(args.listen, args.upstream, args.refuse, log)
+    serve(args.listen, args.upstream, args.refuse, args.silence, log)
 
 
 if __name__ == "__main__":
