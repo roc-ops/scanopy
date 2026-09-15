@@ -232,7 +232,8 @@ fn arcos() -> ScriptedDevice {
 }
 
 async fn rows(device: &mut ScriptedDevice) -> (Collection, Vec<Interface>) {
-    let coll = collect(device).await.expect("collection succeeds");
+    let models = device.capabilities().await.expect("capabilities");
+    let coll = collect(device, &models).await.expect("collection succeeds");
     let rows = collection_to_interfaces(&coll, uuid::Uuid::new_v4(), uuid::Uuid::new_v4());
     (coll, rows)
 }
@@ -402,7 +403,7 @@ fn unparseable_json_update_is_reported() {
 async fn interfaces_refused_is_an_error_even_with_lldp_present() {
     let mut device =
         ScriptedDevice::default().serve(OPENCONFIG_LLDP.subtrees[1], ARCOS_LLDP_NEIGHBORS);
-    let err = collect(&mut device).await.expect_err("no /interfaces");
+    let err = collect(&mut device, &[]).await.expect_err("no /interfaces");
     let msg = format!("{err:#}");
     assert!(msg.contains("openconfig-interfaces is required"), "{msg}");
     assert!(
@@ -616,6 +617,100 @@ async fn dnos_interfaces_without_any_lldp_model() {
     assert_eq!(row(&rows, "irb100").if_type, Some(if_type::OTHER));
     assert_eq!(row(&rows, "mgmt-ncc-0/0").if_type, Some(if_type::OTHER));
     assert_eq!(row(&rows, "lo0").if_alias.as_deref(), Some("loopback"));
+}
+
+// Captured 2026-08-30 from clab-ml-20-edge-dnos (DriveNets cDNOS 26.2), Subscribe ONCE,
+// PROTO encoding, via gnmic. DNOS serves NO openconfig-lldp -- `/lldp` is answered
+// "Path does not exist: /lldp" -- and puts LLDP under its own model instead. Verbatim
+// except for trimming to the two ports that have neighbours.
+const CDNOS_INTERFACE_STATE: &str = "
+    interfaces/interface[name=ge100-0/0/1]/state/ifindex = 2
+    interfaces/interface[name=ge100-0/0/1]/state/type = ethernetCsmacd
+    interfaces/interface[name=ge100-0/0/1]/state/admin-status = UP
+    interfaces/interface[name=ge100-0/0/1]/state/oper-status = UP
+    interfaces/interface[name=ge100-0/0/1]/state/description = edge-dnos -> core2
+    interfaces/interface[name=ge100-0/0/2]/state/ifindex = 3
+    interfaces/interface[name=ge100-0/0/2]/state/type = ethernetCsmacd
+    interfaces/interface[name=ge100-0/0/2]/state/admin-status = UP
+    interfaces/interface[name=ge100-0/0/2]/state/oper-status = UP
+    interfaces/interface[name=ge100-0/0/2]/state/description = edge-dnos -> [mcast-src,mcast-rcv]
+";
+
+// The same device's LLDP, under `drivenets-top`. Note `oper-items` where openconfig writes
+// `state`, and that the list keys are IDENTICAL to openconfig's -- which is what lets one
+// routing table read both.
+const DNOS_LLDP_NATIVE: &str = "
+    drivenets-top/protocols/lldp/oper-items/chassis-id = 84:40:76:56:95:25
+    drivenets-top/protocols/lldp/oper-items/chassis-id-type = MAC_ADDRESS
+    drivenets-top/protocols/lldp/oper-items/system-name = edge-dnos
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/1]/name = ge100-0/0/1
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/1]/neighbors/neighbor[id=0]/oper-items/chassis-id = aa:c1:ab:1a:bf:7a
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/1]/neighbors/neighbor[id=0]/oper-items/chassis-id-type = MAC_ADDRESS
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/1]/neighbors/neighbor[id=0]/oper-items/port-id = eth3
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/1]/neighbors/neighbor[id=0]/oper-items/port-id-type = INTERFACE_NAME
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/1]/neighbors/neighbor[id=0]/oper-items/system-name = core2
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/1]/oper-items/counters/lldp-in-pkts = 1239
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/2]/neighbors/neighbor[id=0]/oper-items/chassis-id = aa:c1:ab:1f:3b:e8
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/2]/neighbors/neighbor[id=0]/oper-items/port-id = eth1
+    drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/2]/neighbors/neighbor[id=0]/oper-items/system-name = mcast-src
+";
+
+fn cdnos() -> ScriptedDevice {
+    ScriptedDevice::default()
+        .serve(Subtree::INTERFACE_STATE, CDNOS_INTERFACE_STATE)
+        .serve(DN_LLDP.subtrees[0], DNOS_LLDP_NATIVE)
+}
+
+/// The design decision this module settles: `lldp_complete` is true only when the profile's
+/// `neighbors` subtree answered and parsed. DriveNets serves local identity and neighbours in
+/// ONE subtree, so a DriveNets router that answers its native tree perfectly must be
+/// authoritative -- keying this on a FIXED variant (as the openconfig-only version did, always
+/// checking the openconfig neighbours path) would leave it reporting an incomplete read
+/// forever, and its neighbours would never age out.
+#[tokio::test]
+async fn a_drivenets_device_reading_its_native_tree_is_authoritative() {
+    let mut device = cdnos().advertising(&["openconfig-interfaces", "dn-lldp", "dn-interfaces"]);
+    let models = device.capabilities().await.expect("capabilities");
+    let coll = collect(&mut device, &models).await.expect("collection");
+
+    assert_eq!(coll.lldp_model, LldpModel::Advertised("dn-lldp"));
+    assert!(
+        coll.data_complete().lldp,
+        "the native tree answered and parsed, so its neighbour set is authoritative"
+    );
+    assert!(
+        !coll.neighbors.is_empty(),
+        "the native tree yields neighbours"
+    );
+}
+
+#[tokio::test]
+async fn a_device_advertising_no_known_model_reads_openconfig_and_says_so() {
+    let mut device = arcos().advertising(&["openconfig-interfaces"]);
+    let models = device.capabilities().await.expect("capabilities");
+    let coll = collect(&mut device, &models).await.expect("collection");
+
+    assert_eq!(coll.lldp_model, LldpModel::NoneAdvertised);
+    assert!(
+        !coll.neighbors.is_empty(),
+        "openconfig is read anyway: a device may serve a model it does not advertise"
+    );
+}
+
+/// ArcOS refuses `/lldp/state` and serves a complete neighbour list anyway. The device's own
+/// chassis identity is not its neighbour set, so a refusal there must not cost it authority --
+/// if it did, every ArcOS neighbour would be kept forever on the theory it might still be there.
+#[tokio::test]
+async fn refusing_the_local_identity_path_does_not_cost_a_device_its_authority() {
+    let mut device = arcos().advertising(&["openconfig-interfaces"]);
+    let models = device.capabilities().await.expect("capabilities");
+    let coll = collect(&mut device, &models).await.expect("collection");
+
+    assert!(!coll.neighbors.is_empty(), "the neighbour list was served");
+    assert!(
+        coll.data_complete().lldp,
+        "/lldp/state is the device's own identity, not its neighbours"
+    );
 }
 
 #[tokio::test]

@@ -64,9 +64,23 @@ use transport::{ConnectError, GnmiTransport, TonicTransport};
 
 pub struct GnmiIntegration;
 
-/// Working credential handed from probe to execute.
+/// Working credential handed from probe to execute, together with the YANG models the device
+/// advertised.
+///
+/// The model list is carried rather than fetched again: `probe` already completed a
+/// `Capabilities` round trip — that is what it probes with — and which LLDP model to read is
+/// decided from its answer. Asking a second time would be an extra RPC per scan on every gNMI
+/// device.
+///
+/// UNCOVERED, and load-bearing: nothing tests that `probe` actually populates this. `probe`
+/// builds a `TonicTransport` directly, so there is no seam to inject a fake, and a test suite
+/// that cannot reach `probe` cannot notice this field being left empty — which would make every
+/// device look like it advertises no LLDP model and return DriveNets to zero neighbours,
+/// silently. Injecting the transport would close it; until then this assignment is checked by
+/// eye, which is worth knowing before trusting the tests here.
 struct GnmiProbeHandle {
     credential: GnmiQueryCredential,
+    models: Vec<String>,
 }
 
 /// One interface's `openconfig-interfaces` state leaves.
@@ -291,6 +305,14 @@ pub struct LldpModelProfile {
     /// the way in. Scoped to this model's own LLDP tree — see [`normalised_names`] for what
     /// happens when it is not.
     pub state_container: &'static str,
+    /// The subtree within [`Self::subtrees`] whose read decides whether the neighbour set is
+    /// authoritative. Not all of them: `/lldp/state` carries the device's own chassis identity
+    /// rather than its neighbours, and ArcOS refuses that path outright while serving a complete
+    /// neighbour list — folding it in would leave a real device non-authoritative on every scan,
+    /// its neighbours never ageing out. DriveNets serves identity and neighbours together in one
+    /// subtree, so for that profile this IS that subtree; a field rather than an index because
+    /// which one it is, is the model's business.
+    pub neighbors: Subtree,
 }
 
 /// `openconfig-lldp`, rooted at `/lldp`: no root to strip and `state` already named `state`, so
@@ -305,6 +327,7 @@ pub static OPENCONFIG_LLDP: LldpModelProfile = LldpModelProfile {
     ],
     root: &[],
     state_container: "state",
+    neighbors: Subtree::default_origin(&["lldp", "interfaces", "interface[name=*]"]),
 };
 
 /// `dn-lldp`, DriveNets' native LLDP under `/drivenets-top/protocols/lldp`.
@@ -320,6 +343,8 @@ pub static DN_LLDP: LldpModelProfile = LldpModelProfile {
     ])],
     root: &["drivenets-top", "protocols"],
     state_container: "oper-items",
+    // Identity and neighbours travel together in this one subtree, so it is both.
+    neighbors: Subtree::default_origin(&["drivenets-top", "protocols", "lldp"]),
 };
 
 impl LldpModelProfile {
@@ -402,25 +427,47 @@ pub(crate) fn collection_to_interfaces(
 /// device so the operator sees which path it objected to. The other subtrees are optional
 /// extras — `/lldp/state` and `ethernet/state` are not universally served, and a device
 /// without the LLDP model at all still has an interface table worth having.
-pub(crate) async fn collect(transport: &mut dyn GnmiTransport) -> anyhow::Result<Collection> {
-    let mut coll = Collection::default();
-    // TEMPORARY: always reads OPENCONFIG_LLDP's subtrees regardless of what the device
-    // advertises. Profile selection via `LldpModelProfile::select` lands in a later task; this
-    // is the minimal stand-in that keeps `collect` compiling against the struct form of
-    // `Subtree`.
-    let neighbors_subtree = OPENCONFIG_LLDP.subtrees[1];
-    for subtree in Subtree::BASE
-        .into_iter()
-        .chain(OPENCONFIG_LLDP.subtrees.iter().copied())
-    {
+///
+/// `models` is the YANG module list `probe` already obtained (see [`GnmiProbeHandle`]); it
+/// selects which LLDP profile to read.
+pub(crate) async fn collect(
+    transport: &mut dyn GnmiTransport,
+    models: &[String],
+) -> anyhow::Result<Collection> {
+    let selected = LldpModelProfile::select(models);
+    if selected.is_none() {
+        tracing::warn!(
+            advertised_models = models.len(),
+            "gNMI device advertises no LLDP model this collector can read; reading \
+             openconfig-lldp anyway, but expect no neighbours"
+        );
+    }
+    let mut coll = Collection {
+        lldp_model: match selected {
+            Some(profile) => LldpModel::Advertised(profile.module),
+            None => LldpModel::NoneAdvertised,
+        },
+        ..Default::default()
+    };
+    let profile = selected.unwrap_or(&OPENCONFIG_LLDP);
+    // Only the profile's `neighbors` subtree gates authority, not every subtree it names:
+    // `/lldp/state` is the device's own identity, and ArcOS refuses that path outright while
+    // serving a complete neighbour list, so folding it in would leave a real device
+    // non-authoritative on every scan. DriveNets serves identity and neighbours in ONE subtree,
+    // so for that profile `neighbors` names that same subtree, and keying on a single FIXED
+    // variant (as the openconfig-only version did) would leave a device that answered perfectly
+    // reporting an incomplete read forever.
+    let mut lldp_complete = true;
+    for subtree in Subtree::BASE.iter().chain(profile.subtrees).copied() {
+        let is_lldp = subtree == profile.neighbors;
         match transport.subscribe_once(vec![subtree.path()]).await {
             Ok(notifications) => {
                 let mut parsed = true;
                 for n in &notifications {
-                    parsed &= absorb_notification(&mut coll, &OPENCONFIG_LLDP, n);
+                    parsed &= absorb_notification(&mut coll, profile, n);
                 }
-                if subtree == neighbors_subtree {
-                    coll.lldp_complete = parsed;
+                if is_lldp {
+                    lldp_complete &= parsed;
                 }
                 if !parsed {
                     tracing::debug!(?subtree, "gNMI subtree had updates that did not parse");
@@ -429,12 +476,15 @@ pub(crate) async fn collect(transport: &mut dyn GnmiTransport) -> anyhow::Result
             Err(e) if subtree == Subtree::INTERFACE_STATE => {
                 return Err(e.context("openconfig-interfaces is required and was not served"));
             }
-            // `lldp_complete` stays false: a refused or failed LLDP read keeps what is stored.
             Err(e) => {
+                if is_lldp {
+                    lldp_complete = false;
+                }
                 tracing::debug!(?subtree, error = %e, "gNMI subtree not served; continuing");
             }
         }
     }
+    coll.lldp_complete = lldp_complete;
     Ok(coll)
 }
 
@@ -474,12 +524,12 @@ impl DiscoveryIntegration for GnmiIntegration {
             .capabilities()
             .await
             .map_err(|e| ProbeFailure::rejected(e.to_string()))?;
-        let _ = models;
         Ok(ProbeSuccess {
             client_probe: ClientProbe::Gnmi,
             ports: vec![PortType::new_tcp(cred.port)],
             handle: Some(Box::new(GnmiProbeHandle {
                 credential: cred.clone(),
+                models,
             })),
         })
     }
@@ -498,7 +548,7 @@ impl DiscoveryIntegration for GnmiIntegration {
         let mut transport = TonicTransport::connect(ctx.ip, &handle.credential, ctx.cancel.clone())
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        let coll = collect(&mut transport).await?;
+        let coll = collect(&mut transport, &handle.models).await?;
 
         let interfaces =
             collection_to_interfaces(&coll, ctx.host_id, host_data.host.base.network_id);
@@ -506,6 +556,7 @@ impl DiscoveryIntegration for GnmiIntegration {
             ip = %ctx.ip,
             interfaces = coll.interfaces.len(),
             neighbors = coll.neighbors.len(),
+            lldp_model = %coll.lldp_model,
             "gNMI openconfig-interfaces/lldp collection complete"
         );
         if let Some(chassis) = coll
