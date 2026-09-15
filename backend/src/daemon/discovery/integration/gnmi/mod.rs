@@ -94,18 +94,37 @@ pub(crate) struct NeighborLeaves {
     management_address: Option<String>,
 }
 
-impl NeighborLeaves {
-    /// How many of the leaves that identify the far end this entry carries.
-    fn evidence(&self) -> usize {
-        [
-            &self.chassis_id,
-            &self.management_address,
-            &self.system_name,
-            &self.port_id,
-        ]
-        .into_iter()
-        .filter(|v| v.is_some())
-        .count()
+/// One neighbour's leaves as the evidence the server resolves. Remote identity, best evidence
+/// first: an explicit chassis-id leaf; else the management address (resolves against
+/// ip_addresses server-side); else a MAC-shaped port-id. ArcOS serves no chassis-id leaf at all,
+/// so the fallbacks are what carry its neighbours.
+impl From<&NeighborLeaves> for InterfaceNeighborEvidence {
+    fn from(n: &NeighborLeaves) -> Self {
+        let lldp_chassis_id = match &n.chassis_id {
+            Some(id) => map_chassis(id, n.chassis_id_type.as_deref()),
+            None => n
+                .management_address
+                .as_deref()
+                .and_then(|a| a.parse().ok().map(LldpChassisId::NetworkAddress))
+                .or_else(|| {
+                    n.port_id
+                        .as_deref()
+                        .and_then(canonical_mac)
+                        .map(LldpChassisId::MacAddress)
+                }),
+        };
+        Self {
+            lldp_chassis_id,
+            lldp_port_id: n
+                .port_id
+                .as_deref()
+                .and_then(|id| map_port(id, n.port_id_type.as_deref())),
+            lldp_sys_name: n.system_name.clone(),
+            lldp_port_desc: n.port_description.clone(),
+            lldp_mgmt_addr: n.management_address.as_deref().and_then(|a| a.parse().ok()),
+            lldp_sys_desc: n.system_description.clone(),
+            ..Default::default()
+        }
     }
 }
 
@@ -465,68 +484,30 @@ fn map_port(id: &str, id_type: Option<&str>) -> Option<LldpPortId> {
     }
 }
 
-/// Build the interface rows a collection amounts to: one per `/interfaces` entry, with the
-/// LLDP neighbour on the same name folded in. A neighbour on a name `/interfaces` did not list
-/// has no row to live on and is dropped.
+/// Build the interface rows a collection amounts to: one per `/interfaces` entry, with every
+/// LLDP neighbour heard on the same name folded in. A neighbour on a name `/interfaces` did not
+/// list has no row to live on and is dropped.
 pub(crate) fn collection_to_interfaces(
     coll: &Collection,
     host_id: uuid::Uuid,
     network_id: uuid::Uuid,
 ) -> Vec<Interface> {
-    // Several neighbours on one port keep the one with the most identity (multi-neighbour
-    // ports are uplink-shaped and better resolved by the far end anyway). Not the first: ArcOS
-    // lists a Linux host twice, one entry per chassis-id subtype it advertises, and the
-    // lexically earlier entry is the one without a management address or a system name.
-    let mut neighbor_by_port: BTreeMap<&str, &NeighborLeaves> = BTreeMap::new();
+    // Every neighbour a port hears is its own evidence entry, as the SNMP remote table and the
+    // lldpd reader produce them (GH #701); the server groups entries by the host they resolve
+    // to. ArcOS lists a Linux lldpd peer twice on a port, one entry carrying no management
+    // address or system name, and both are sent.
+    let mut neighbors_by_port: BTreeMap<&str, Vec<InterfaceNeighborEvidence>> = BTreeMap::new();
     for ((ifname, _), leaves) in &coll.neighbors {
-        let slot = neighbor_by_port.entry(ifname).or_insert(leaves);
-        if leaves.evidence() > slot.evidence() {
-            *slot = leaves;
-        }
+        neighbors_by_port
+            .entry(ifname)
+            .or_default()
+            .push(leaves.into());
     }
     coll.interfaces
         .iter()
         .map(|(name, i)| {
             let name = name.as_str();
-            let n = neighbor_by_port.get(name).copied();
-            // Remote identity, best evidence first: an explicit chassis-id leaf; else the
-            // management address (resolves against ip_addresses server-side); else a
-            // MAC-shaped port-id. ArcOS serves no chassis-id leaf at all, so the fallbacks are
-            // what carries its neighbours.
-            let chassis = n.and_then(|n| match &n.chassis_id {
-                Some(id) => map_chassis(id, n.chassis_id_type.as_deref()),
-                None => n
-                    .management_address
-                    .as_deref()
-                    .and_then(|a| a.parse().ok().map(LldpChassisId::NetworkAddress))
-                    .or_else(|| {
-                        n.port_id
-                            .as_deref()
-                            .and_then(canonical_mac)
-                            .map(LldpChassisId::MacAddress)
-                    }),
-            });
-            let port = n.and_then(|n| {
-                n.port_id
-                    .as_deref()
-                    .and_then(|id| map_port(id, n.port_id_type.as_deref()))
-            });
-            let neighbor_candidates = n
-                .map(|n| {
-                    vec![InterfaceNeighborEvidence {
-                        lldp_chassis_id: chassis,
-                        lldp_port_id: port,
-                        lldp_sys_name: n.system_name.clone(),
-                        lldp_port_desc: n.port_description.clone(),
-                        lldp_mgmt_addr: n
-                            .management_address
-                            .as_deref()
-                            .and_then(|a| a.parse().ok()),
-                        lldp_sys_desc: n.system_description.clone(),
-                        ..Default::default()
-                    }]
-                })
-                .unwrap_or_default();
+            let neighbor_candidates = neighbors_by_port.remove(name).unwrap_or_default();
             Interface::new(InterfaceBase {
                 host_id,
                 network_id,
@@ -960,19 +941,37 @@ mod tests {
             swp1.speed_bps, None,
             "effective-speed is not the model's port-speed"
         );
-        // Two entries for the same peer: the one with an address and a name is the one kept.
-        assert_eq!(swp1.neighbor_candidates.len(), 1, "one neighbour per port");
-        assert_eq!(lldp(swp1).lldp_sys_name.as_deref(), Some("netlab-server"));
+        // Two entries for the same peer, both kept. Neither carries a chassis-id leaf: the thin
+        // one is identified by its MAC-shaped port-id, the other by its management address.
+        let [thin, rich] = swp1.neighbor_candidates.as_slice() else {
+            panic!(
+                "every neighbour on the port, got {:?}",
+                swp1.neighbor_candidates
+            );
+        };
         assert_eq!(
-            lldp(swp1).lldp_chassis_id,
+            thin.lldp_chassis_id,
+            Some(LldpChassisId::MacAddress("34:80:0d:44:45:05".into())),
+            "no chassis-id leaf and no address: the MAC-shaped port-id is the identity"
+        );
+        assert_eq!(thin.lldp_sys_name, None);
+        assert_eq!(thin.lldp_mgmt_addr, None);
+        assert_eq!(rich.lldp_sys_name.as_deref(), Some("netlab-server"));
+        assert_eq!(
+            rich.lldp_chassis_id,
             Some(LldpChassisId::NetworkAddress(
                 "10.22.64.101".parse().unwrap()
             )),
             "no chassis-id leaf: the management address is the identity"
         );
         assert_eq!(
-            lldp(swp1).lldp_port_id,
+            rich.lldp_port_id,
             Some(LldpPortId::MacAddress("34:80:0d:44:44:f5".into()))
+        );
+        assert_eq!(
+            row(&rows, "swp53").neighbor_candidates.len(),
+            2,
+            "the same double listing on swp53"
         );
 
         assert_eq!(
