@@ -1,7 +1,7 @@
 use super::Collection;
 use super::proto::gnmi::{Notification, PathElem, TypedValue, typed_value};
 use crate::server::interfaces::r#impl::base::{IfAdminStatus, IfOperStatus, if_type};
-use crate::server::lldp::{LldpChassisId, LldpPortId, canonical_mac};
+use crate::server::lldp::{LldpChassisId, LldpPortId, accept_port_identifier, canonical_mac};
 use crate::server::snmp::generated::get_if_type_number;
 
 /// A flattened update: the full path (prefix + update path, JSON keys appended) and the
@@ -249,6 +249,10 @@ pub(super) fn oper_status(v: Option<&str>) -> Option<IfOperStatus> {
 /// Map an `openconfig-lldp-types` identity (`openconfig-lldp-types:MAC_ADDRESS`) plus value
 /// onto the 802.1AB chassis subtype. Unknown or absent types fall back to
 /// [`LldpChassisId::from_identifier_str`].
+///
+/// Unguarded, deliberately: the GH #88 refusal applies to port ids only, because dropping a
+/// chassis id takes the row out of L2 resolution altogether rather than demoting it a tier. See
+/// `decode_tlv_name` in `server::lldp`.
 pub(super) fn map_chassis(id: &str, id_type: Option<&str>) -> Option<LldpChassisId> {
     match id_type.map(unqualified) {
         Some("MAC_ADDRESS") => canonical_mac(id).map(LldpChassisId::MacAddress),
@@ -262,7 +266,14 @@ pub(super) fn map_chassis(id: &str, id_type: Option<&str>) -> Option<LldpChassis
     }
 }
 
+/// Map the port-id leaf the same way, with the guard the chassis path does not get: a leaf that
+/// arrived as a gNMI string is valid UTF-8 by construction, which is exactly why "it decoded" was
+/// mistaken for "it is a name". [`accept_port_identifier`] strips NUL padding and refuses the
+/// rest, logging what it refused, so this transport and the SNMP one keep one rule between them
+/// (GH #88).
 pub(super) fn map_port(id: &str, id_type: Option<&str>) -> Option<LldpPortId> {
+    let id = accept_port_identifier("gnmi", id)?;
+    let id = id.as_ref();
     match id_type.map(unqualified) {
         Some("MAC_ADDRESS") => canonical_mac(id).map(LldpPortId::MacAddress),
         Some("INTERFACE_NAME") => Some(LldpPortId::InterfaceName(id.to_string())),
