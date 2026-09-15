@@ -382,8 +382,9 @@ impl DaemonService {
         // New registration - create host and daemon
         let mut dummy_host = Host::new(HostBase {
             network_id: effective_network_id,
-            // Placeholder identity: the daemon's own reported name, which sits at the same rung
-            // as a hostname, so a later scan of the machine can improve on it.
+            // Placeholder identity: the daemon's own reported name, applied below as an
+            // unattributed name. That ranks as a guess, so the hostname the daemon later reports
+            // for itself titles the host instead.
             name: HostName::unnamed(),
             hostname: None,
             description: None,
@@ -408,7 +409,7 @@ impl DaemonService {
         });
         dummy_host
             .base
-            .apply_name(HostName::from_hostname(request.name.clone()));
+            .apply_name(HostName::unattributed(request.name.clone()));
 
         let host_response = host_service
             .discover_host(

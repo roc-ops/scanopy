@@ -284,18 +284,9 @@ impl HostService {
                 )),
                 ..Default::default()
             });
-            // Ranked, not assigned: a sysName is reverse-DNS-grade evidence, so a real scan's
-            // hostname or a name a person types still outranks it.
-            //
-            // A far end with neither is left unnamed rather than named after its chassis id.
-            // The chassis id is already a column, and `TopologyContext::host_container_header`
-            // reads it as the last rung of the *display* ladder — copying it into the name would
-            // duplicate the evidence and then have to be displaced when a real name arrives.
-            match (&far_end.sys_name, far_end.address) {
-                (Some(name), _) => host.base.apply_name(HostName::from_hostname(name.clone())),
-                (None, Some(address)) => host.base.apply_name(HostName::from_ip(address)),
-                (None, None) => false,
-            };
+            // Left unnamed. The sysName, chassis id and address are identifiers, each already in
+            // its own column, and the display ladder titles the far end by the best of them
+            // without a copy in `name` (see the placement rule in `hosts::impl::name`).
             // The scan's own timestamp, not `Utc::now()`. `create.rs` derives `created_at` from
             // this via `originate_scan_timestamps`, and the digest's window closes at the session's
             // `finished_at` — so a host stamped with the wall clock at mint time lands just past the

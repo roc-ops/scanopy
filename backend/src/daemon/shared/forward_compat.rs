@@ -216,6 +216,7 @@ impl DaemonResponse for HostResponse {
             name_source: _,
             network_id: _,
             hostname: _,
+            hostname_source: _,
             description: _,
             source: _,
             virtualization_metadata: _,

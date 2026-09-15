@@ -21,8 +21,8 @@ use crate::server::{
     credentials::r#impl::types::CredentialAssignment,
     hosts::r#impl::{
         attributes::{
-            HostChassisIdValue, HostFirmwareRevisionValue, HostManagementUrlValue,
-            HostManufacturerValue, HostModelValue, HostSerialNumberValue,
+            HostChassisIdValue, HostFirmwareRevisionValue, HostHostnameValue,
+            HostManagementUrlValue, HostManufacturerValue, HostModelValue, HostSerialNumberValue,
             HostSoftwareRevisionValue, HostSysContactValue, HostSysDescrValue,
             HostSysLocationValue, HostSysNameValue, HostSysObjectIdValue,
         },
@@ -841,6 +841,11 @@ pub struct HostResponse {
     pub network_id: Uuid,
     /// Hostname as resolved or reported by the host.
     pub hostname: Option<String>,
+    /// What produced `hostname`: a PTR lookup, the host's own OS, a controller, mDNS, or a person.
+    /// Read-only: decided by whichever source read it.
+    #[serde(default)]
+    #[schema(read_only)]
+    pub hostname_source: AttributeSource,
     /// Free-text notes about the host.
     pub description: Option<String>,
     /// How this host came to be known — discovered, imported, or created by hand.

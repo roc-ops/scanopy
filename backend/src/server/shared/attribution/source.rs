@@ -91,6 +91,19 @@ impl AttributeMethod {
             Self::Unspecified | Self::Inferred | Self::Announced | Self::Reported => false,
         }
     }
+
+    /// Whether a value at this tier is a guess rather than evidence: nobody claimed it, or we
+    /// derived it ourselves.
+    ///
+    /// The display-name ladder reads this to rank a stored name below the host's identifiers. A
+    /// name guessed from a detected service, or one nothing vouches for, must not hide a hostname
+    /// the host actually carries. Exhaustive, so a new tier cannot be added without answering it.
+    pub fn is_guess(&self) -> bool {
+        match self {
+            Self::Unspecified | Self::Inferred => true,
+            Self::Announced | Self::Reported | Self::Queried | Self::Native | Self::Manual => false,
+        }
+    }
 }
 
 /// How a discovered value reached us.
@@ -119,7 +132,10 @@ pub enum AttributeSource {
     Unspecified,
 
     // --- Derivations we perform ourselves. ---
-    /// The host's own address, standing in for a name it does not have.
+    /// The host's own address, standing in for a name it does not have. Nothing on this server
+    /// writes it any more: an address is an identifier, and the display ladder shows it without a
+    /// copy in `name`. Daemons up to v0.17.14 still send it, and it is kept so their payloads
+    /// deserialise before ingest drops the copy.
     OwnAddress,
     /// Implied by a matched service definition.
     ServiceMatch,
@@ -136,6 +152,9 @@ pub enum AttributeSource {
     /// A DNS-SD instance label — the Chromecast `fn=Living Room TV`, typed by a person during
     /// device setup.
     DnsSdInstanceName,
+    /// A hostname a device announced for itself over mDNS: the SRV target, such as
+    /// `chromecast-a1b2c3.local`. Machine-generated, unlike the instance label beside it.
+    DnsSdHostname,
     /// A chassis ID a neighbour advertised for itself.
     LldpChassisId,
 
@@ -186,7 +205,7 @@ impl AttributeSource {
             | Self::LldpNeighbourAddress
             | Self::CipVendorId => M::Inferred,
 
-            Self::DnsSdInstanceName | Self::LldpChassisId => M::Announced,
+            Self::DnsSdInstanceName | Self::DnsSdHostname | Self::LldpChassisId => M::Announced,
 
             Self::ReverseDns | Self::ForwardingTable => M::Reported,
 
@@ -215,6 +234,7 @@ impl AttributeSource {
             | Self::ServiceMatch
             | Self::LldpNeighbourAddress
             | Self::CipVendorId
+            | Self::DnsSdHostname
             | Self::LldpChassisId
             | Self::ReverseDns
             | Self::ForwardingTable
@@ -276,6 +296,7 @@ impl AttributeSource {
                 }
                 AttributeSourceDiscriminants::CipVendorId => vec![Self::CipVendorId],
                 AttributeSourceDiscriminants::DnsSdInstanceName => vec![Self::DnsSdInstanceName],
+                AttributeSourceDiscriminants::DnsSdHostname => vec![Self::DnsSdHostname],
                 AttributeSourceDiscriminants::LldpChassisId => vec![Self::LldpChassisId],
                 AttributeSourceDiscriminants::ReverseDns => vec![Self::ReverseDns],
                 AttributeSourceDiscriminants::ForwardingTable => vec![Self::ForwardingTable],
@@ -329,6 +350,7 @@ impl AttributeSource {
             AttributeSourceDiscriminants::LldpNeighbourAddress => Self::LldpNeighbourAddress,
             AttributeSourceDiscriminants::CipVendorId => Self::CipVendorId,
             AttributeSourceDiscriminants::DnsSdInstanceName => Self::DnsSdInstanceName,
+            AttributeSourceDiscriminants::DnsSdHostname => Self::DnsSdHostname,
             AttributeSourceDiscriminants::LldpChassisId => Self::LldpChassisId,
             AttributeSourceDiscriminants::ReverseDns => Self::ReverseDns,
             AttributeSourceDiscriminants::ForwardingTable => Self::ForwardingTable,
@@ -437,7 +459,8 @@ impl TypeMetadataProvider for AttributeSourceDiscriminants {
             Self::ServiceMatch => "A detected service",
             Self::LldpNeighbourAddress => "An LLDP neighbour's address",
             Self::CipVendorId => "A CIP vendor ID",
-            Self::DnsSdInstanceName => "mDNS",
+            Self::DnsSdInstanceName => "mDNS name",
+            Self::DnsSdHostname => "mDNS",
             Self::LldpChassisId => "LLDP",
             Self::ReverseDns => "Reverse DNS",
             Self::ForwardingTable => "Another device's ARP or forwarding table",
@@ -464,6 +487,7 @@ impl TypeMetadataProvider for AttributeSourceDiscriminants {
             Self::DnsSdInstanceName => {
                 "The device announced this name over mDNS. A person usually sets it during setup."
             }
+            Self::DnsSdHostname => "The device announced this hostname for itself over mDNS.",
             Self::LldpChassisId => "The device advertised this about itself over LLDP.",
             Self::ReverseDns => "A DNS server supplied this for the host's address.",
             Self::ForwardingTable => {

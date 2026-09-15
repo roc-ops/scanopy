@@ -230,7 +230,11 @@ impl EdgeBuilder {
                                 subnet_ids,
                                 containerized_service_ids,
                             },
-                            label: Some(format!("{} on {}", s.base.name, host.base.name)),
+                            label: Some(format!(
+                                "{} on {}",
+                                s.base.name,
+                                ctx.host_container_header(host).unwrap_or_default()
+                            )),
                             source_handle: EdgeHandle::Bottom,
                             target_handle: EdgeHandle::Top,
                             is_multi_hop,
@@ -446,7 +450,7 @@ impl EdgeBuilder {
                                 if origin_ip_address.base.subnet_id == ip_address.base.subnet_id {
                                     None
                                 } else {
-                                    Some(host.base.name.to_string())
+                                    ctx.host_container_header(host)
                                 };
 
                             Some(Edge {
@@ -649,7 +653,8 @@ impl EdgeBuilder {
                     },
                     label: Some(format!(
                         "{} ↔ {}",
-                        source_host.base.name, target_host.base.name
+                        ctx.host_container_header(source_host).unwrap_or_default(),
+                        ctx.host_container_header(target_host).unwrap_or_default()
                     )),
                     source_handle: EdgeHandle::Bottom,
                     target_handle: EdgeHandle::Top,

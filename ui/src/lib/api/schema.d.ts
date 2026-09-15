@@ -3226,19 +3226,19 @@ export interface components {
             /**
              * @description Association between a service and a port / interface that the service is listening on
              * @example {
-             *       "created_at": "2026-09-13T18:34:24.392067Z",
+             *       "created_at": "2026-09-15T04:26:40.604851Z",
              *       "first_discovery_id": null,
-             *       "id": "43785de5-c057-4d02-bdd8-29b09d803a90",
+             *       "id": "60da91a1-4fb6-442a-ac84-842ed10a9d65",
              *       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *       "last_discovery_id": null,
-             *       "last_seen_at": "2026-09-13T18:34:24.392067Z",
+             *       "last_seen_at": "2026-09-15T04:26:40.604851Z",
              *       "lineage_id": null,
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *       "type": "Port",
-             *       "updated_at": "2026-09-13T18:34:24.392067Z",
-             *       "valid_from": "2026-09-13T18:34:24.392067Z",
+             *       "updated_at": "2026-09-15T04:26:40.604851Z",
+             *       "valid_from": "2026-09-15T04:26:40.604851Z",
              *       "valid_to": null
              *     }
              */
@@ -3774,6 +3774,7 @@ export interface components {
              *       "firmware_revision_source": "Unspecified",
              *       "hidden": false,
              *       "hostname": "web-server-01.local",
+             *       "hostname_source": "Manual",
              *       "id": "550e8400-e29b-41d4-a716-446655440003",
              *       "interfaces": [
              *         {
@@ -3838,7 +3839,7 @@ export interface components {
              *         },
              *         {
              *           "rung": "Hostname",
-             *           "source": null,
+             *           "source": "Manual",
              *           "value": "web-server-01.local"
              *         },
              *         {
@@ -3882,19 +3883,19 @@ export interface components {
              *         {
              *           "bindings": [
              *             {
-             *               "created_at": "2026-09-13T18:34:24.363592Z",
+             *               "created_at": "2026-09-15T04:26:40.579904Z",
              *               "first_discovery_id": null,
-             *               "id": "527be3cc-fc79-41fb-839c-ebfca452bd81",
+             *               "id": "ea877464-d131-41cd-8dda-d27df443e170",
              *               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *               "last_discovery_id": null,
-             *               "last_seen_at": "2026-09-13T18:34:24.363592Z",
+             *               "last_seen_at": "2026-09-15T04:26:40.579904Z",
              *               "lineage_id": null,
              *               "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *               "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *               "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *               "type": "Port",
-             *               "updated_at": "2026-09-13T18:34:24.363592Z",
-             *               "valid_from": "2026-09-13T18:34:24.363592Z",
+             *               "updated_at": "2026-09-15T04:26:40.579904Z",
+             *               "valid_from": "2026-09-15T04:26:40.579904Z",
              *               "valid_to": null
              *             }
              *           ],
@@ -3908,7 +3909,7 @@ export interface components {
              *           "name": "nginx",
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "position": 0,
-             *           "service_definition": "Open WebUI",
+             *           "service_definition": "Immich",
              *           "source": {
              *             "type": "Manual"
              *           },
@@ -3970,6 +3971,11 @@ export interface components {
                 hidden: boolean;
                 /** @description Hostname as resolved or reported by the host. */
                 hostname?: string | null;
+                /**
+                 * @description What produced `hostname`: a PTR lookup, the host's own OS, a controller, mDNS, or a person.
+                 *     Read-only: decided by whichever source read it.
+                 */
+                hostname_source?: components["schemas"]["AttributeSource"];
                 /**
                  * Format: uuid
                  * @description Server-assigned unique identifier.
@@ -4637,19 +4643,19 @@ export interface components {
              * @example {
              *       "bindings": [
              *         {
-             *           "created_at": "2026-09-13T18:34:24.386073Z",
+             *           "created_at": "2026-09-15T04:26:40.599252Z",
              *           "first_discovery_id": null,
-             *           "id": "48799d6d-83b9-4796-942f-b1fc0c74c625",
+             *           "id": "1017ea44-d358-4685-b08a-fba19ced9cb7",
              *           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
              *           "last_discovery_id": null,
-             *           "last_seen_at": "2026-09-13T18:34:24.386073Z",
+             *           "last_seen_at": "2026-09-15T04:26:40.599252Z",
              *           "lineage_id": null,
              *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
              *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
              *           "type": "Port",
-             *           "updated_at": "2026-09-13T18:34:24.386073Z",
-             *           "valid_from": "2026-09-13T18:34:24.386073Z",
+             *           "updated_at": "2026-09-15T04:26:40.599252Z",
+             *           "valid_from": "2026-09-15T04:26:40.599252Z",
              *           "valid_to": null
              *         }
              *       ],
@@ -4663,7 +4669,7 @@ export interface components {
              *       "name": "nginx",
              *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
              *       "position": 0,
-             *       "service_definition": "Open WebUI",
+             *       "service_definition": "Immich",
              *       "source": {
              *         "type": "Manual"
              *       },
@@ -5479,7 +5485,7 @@ export interface components {
          *     that do carry a [`ClientProbe`] keep it under their own name, `{"Probe":"Snmp"}`, which tells them
          *     apart from each other and from every bare name.
          */
-        AttributeSource: "Unspecified" | "OwnAddress" | "ServiceMatch" | "LldpNeighbourAddress" | "CipVendorId" | "DnsSdInstanceName" | "LldpChassisId" | "ReverseDns" | "ForwardingTable" | "ArpReply" | "DaemonSelfReport" | "ProfinetDcp" | {
+        AttributeSource: "Unspecified" | "OwnAddress" | "ServiceMatch" | "LldpNeighbourAddress" | "CipVendorId" | "DnsSdInstanceName" | "DnsSdHostname" | "LldpChassisId" | "ReverseDns" | "ForwardingTable" | "ArpReply" | "DaemonSelfReport" | "ProfinetDcp" | {
             /** @description A value the thing emitted about itself, over whatever transport [`ClientProbe`] names. */
             Probe: components["schemas"]["ClientProbe"];
         } | {
@@ -5528,19 +5534,19 @@ export interface components {
         /**
          * @description Association between a service and a port / interface that the service is listening on
          * @example {
-         *       "created_at": "2026-09-13T18:34:24.364231Z",
+         *       "created_at": "2026-09-15T04:26:40.580635Z",
          *       "first_discovery_id": null,
-         *       "id": "f91a209d-d8bd-446d-95b8-b81d0bceac65",
+         *       "id": "a53c890f-19f5-4849-83b9-d820587a8504",
          *       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *       "last_discovery_id": null,
-         *       "last_seen_at": "2026-09-13T18:34:24.364231Z",
+         *       "last_seen_at": "2026-09-15T04:26:40.580635Z",
          *       "lineage_id": null,
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *       "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *       "type": "Port",
-         *       "updated_at": "2026-09-13T18:34:24.364231Z",
-         *       "valid_from": "2026-09-13T18:34:24.364231Z",
+         *       "updated_at": "2026-09-15T04:26:40.580635Z",
+         *       "valid_from": "2026-09-15T04:26:40.580635Z",
          *       "valid_to": null
          *     }
          */
@@ -5854,7 +5860,7 @@ export interface components {
          *           "id": "550e8400-e29b-41d4-a716-446655440007",
          *           "name": "nginx",
          *           "position": 0,
-         *           "service_definition": "Open WebUI",
+         *           "service_definition": "Immich",
          *           "tags": [],
          *           "virtualization_metadata": null,
          *           "virtualization_service_id": null
@@ -7690,6 +7696,7 @@ export interface components {
          *       "first_discovery_id": null,
          *       "hidden": false,
          *       "hostname": "web-server-01.local",
+         *       "hostname_source": "Manual",
          *       "id": "550e8400-e29b-41d4-a716-446655440003",
          *       "last_discovery_id": null,
          *       "last_seen_at": "2026-01-15T10:30:00Z",
@@ -7769,15 +7776,13 @@ export interface components {
          *     Child entities (ip_addresses, ports, services) are stored in their own tables
          *     and queried by `host_id`. They are NOT stored on the host.
          */
-        HostBase: components["schemas"]["HostName"] & components["schemas"]["HostSysDescr"] & components["schemas"]["HostSysObjectId"] & components["schemas"]["HostSysLocation"] & components["schemas"]["HostSysContact"] & components["schemas"]["HostManagementUrl"] & components["schemas"]["HostChassisId"] & components["schemas"]["HostSysName"] & components["schemas"]["HostManufacturer"] & components["schemas"]["HostModel"] & components["schemas"]["HostSerialNumber"] & components["schemas"]["HostFirmwareRevision"] & components["schemas"]["HostSoftwareRevision"] & {
+        HostBase: components["schemas"]["HostName"] & components["schemas"]["HostHostname"] & components["schemas"]["HostSysDescr"] & components["schemas"]["HostSysObjectId"] & components["schemas"]["HostSysLocation"] & components["schemas"]["HostSysContact"] & components["schemas"]["HostManagementUrl"] & components["schemas"]["HostChassisId"] & components["schemas"]["HostSysName"] & components["schemas"]["HostManufacturer"] & components["schemas"]["HostModel"] & components["schemas"]["HostSerialNumber"] & components["schemas"]["HostFirmwareRevision"] & components["schemas"]["HostSoftwareRevision"] & {
             /** @description Credential assignments for this host (hydrated from junction table). */
             credential_assignments: components["schemas"]["CredentialAssignment"][];
             /** @description Free-text notes about the host. */
             description: string | null;
             /** @description Whether the host is hidden from topology views. */
             hidden: boolean;
-            /** @description Hostname as resolved or reported by the host. */
-            hostname: string | null;
             /**
              * Format: uuid
              * @description The network this entity belongs to.
@@ -7808,6 +7813,11 @@ export interface components {
             /** @description ENTITY-MIB entPhysicalFirmwareRev - firmware revision of the device as a whole */
             firmware_revision?: string;
             firmware_revision_source?: components["schemas"]["AttributeSource"];
+        };
+        HostHostname: {
+            /** @description Hostname as resolved or reported for the host */
+            hostname?: string;
+            hostname_source?: components["schemas"]["AttributeSource"];
         };
         HostManagementUrl: {
             /** @description URL for device management interface (manual or discovered) */
@@ -7840,7 +7850,7 @@ export interface components {
             value: string | null;
         };
         /**
-         * @description One rung of the display-name ladder, highest first.
+         * @description One rung of the display-name ladder.
          * @enum {string}
          */
         HostNameRung: "Name" | "Hostname" | "SysName" | "ChassisId" | "Address";
@@ -7865,6 +7875,7 @@ export interface components {
          *       "firmware_revision_source": "Unspecified",
          *       "hidden": false,
          *       "hostname": "web-server-01.local",
+         *       "hostname_source": "Manual",
          *       "id": "550e8400-e29b-41d4-a716-446655440003",
          *       "interfaces": [
          *         {
@@ -7929,7 +7940,7 @@ export interface components {
          *         },
          *         {
          *           "rung": "Hostname",
-         *           "source": null,
+         *           "source": "Manual",
          *           "value": "web-server-01.local"
          *         },
          *         {
@@ -7973,19 +7984,19 @@ export interface components {
          *         {
          *           "bindings": [
          *             {
-         *               "created_at": "2026-09-13T18:34:24.362658Z",
+         *               "created_at": "2026-09-15T04:26:40.579188Z",
          *               "first_discovery_id": null,
-         *               "id": "f2ea5f76-4e0e-43ce-b694-fd103973c122",
+         *               "id": "d9307169-026b-493e-a3be-125f86deb9e5",
          *               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *               "last_discovery_id": null,
-         *               "last_seen_at": "2026-09-13T18:34:24.362658Z",
+         *               "last_seen_at": "2026-09-15T04:26:40.579188Z",
          *               "lineage_id": null,
          *               "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *               "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *               "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *               "type": "Port",
-         *               "updated_at": "2026-09-13T18:34:24.362658Z",
-         *               "valid_from": "2026-09-13T18:34:24.362658Z",
+         *               "updated_at": "2026-09-15T04:26:40.579188Z",
+         *               "valid_from": "2026-09-15T04:26:40.579188Z",
          *               "valid_to": null
          *             }
          *           ],
@@ -7999,7 +8010,7 @@ export interface components {
          *           "name": "nginx",
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "position": 0,
-         *           "service_definition": "Open WebUI",
+         *           "service_definition": "Immich",
          *           "source": {
          *             "type": "Manual"
          *           },
@@ -8061,6 +8072,11 @@ export interface components {
             hidden: boolean;
             /** @description Hostname as resolved or reported by the host. */
             hostname?: string | null;
+            /**
+             * @description What produced `hostname`: a PTR lookup, the host's own OS, a controller, mDNS, or a person.
+             *     Read-only: decided by whichever source read it.
+             */
+            hostname_source?: components["schemas"]["AttributeSource"];
             /**
              * Format: uuid
              * @description Server-assigned unique identifier.
@@ -9602,6 +9618,11 @@ export interface components {
                 /** @description Hostname as resolved or reported by the host. */
                 hostname?: string | null;
                 /**
+                 * @description What produced `hostname`: a PTR lookup, the host's own OS, a controller, mDNS, or a person.
+                 *     Read-only: decided by whichever source read it.
+                 */
+                hostname_source?: components["schemas"]["AttributeSource"];
+                /**
                  * Format: uuid
                  * @description Server-assigned unique identifier.
                  */
@@ -10805,19 +10826,19 @@ export interface components {
          * @example {
          *       "bindings": [
          *         {
-         *           "created_at": "2026-09-13T18:34:24.364044Z",
+         *           "created_at": "2026-09-15T04:26:40.580437Z",
          *           "first_discovery_id": null,
-         *           "id": "1655b0a7-5f8b-43d6-b227-bbf799b84d8a",
+         *           "id": "c883efb8-c99b-4bbe-8a99-f54e21a5b582",
          *           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
          *           "last_discovery_id": null,
-         *           "last_seen_at": "2026-09-13T18:34:24.364044Z",
+         *           "last_seen_at": "2026-09-15T04:26:40.580437Z",
          *           "lineage_id": null,
          *           "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *           "port_id": "550e8400-e29b-41d4-a716-446655440006",
          *           "service_id": "550e8400-e29b-41d4-a716-446655440007",
          *           "type": "Port",
-         *           "updated_at": "2026-09-13T18:34:24.364044Z",
-         *           "valid_from": "2026-09-13T18:34:24.364044Z",
+         *           "updated_at": "2026-09-15T04:26:40.580437Z",
+         *           "valid_from": "2026-09-15T04:26:40.580437Z",
          *           "valid_to": null
          *         }
          *       ],
@@ -10831,7 +10852,7 @@ export interface components {
          *       "name": "nginx",
          *       "network_id": "550e8400-e29b-41d4-a716-446655440002",
          *       "position": 0,
-         *       "service_definition": "Open WebUI",
+         *       "service_definition": "Immich",
          *       "source": {
          *         "type": "Manual"
          *       },
@@ -11533,7 +11554,7 @@ export interface components {
              * @default {
              *       "Application": [
              *         {
-             *           "id": "1f95a929-5b01-4dee-888a-944225d8b7da",
+             *           "id": "02c0590b-be43-446d-9349-75c3b5542504",
              *           "rule": {
              *             "ByApplication": {
              *               "tag_ids": []
@@ -11543,23 +11564,23 @@ export interface components {
              *       ],
              *       "L2Physical": [
              *         {
-             *           "id": "5439a12d-99c5-4caa-8975-2e310eb21d2b",
+             *           "id": "5dab559f-ec54-4d54-960e-ecd1bc66317d",
              *           "rule": "ByHost"
              *         }
              *       ],
              *       "L3Logical": [
              *         {
-             *           "id": "6edac51c-6afd-4bae-878c-46173e450306",
+             *           "id": "5452814a-cdce-47f7-8383-eef0f0fa3da9",
              *           "rule": "BySubnet"
              *         },
              *         {
-             *           "id": "5f92583a-ecfb-49e7-a1a9-09cd2c0dc0ea",
+             *           "id": "660ad9b5-eb7a-486e-b539-7907e5d3844d",
              *           "rule": "MergeContainerBridges"
              *         }
              *       ],
              *       "Workloads": [
              *         {
-             *           "id": "5439a12d-99c5-4caa-8975-2e310eb21d2b",
+             *           "id": "5dab559f-ec54-4d54-960e-ecd1bc66317d",
              *           "rule": "ByHost"
              *         }
              *       ]
@@ -11572,19 +11593,19 @@ export interface components {
              * @description Rules deciding how entities are placed and inlined within containers.
              * @default [
              *       {
-             *         "id": "9d96737b-20dd-47be-a83f-3ca099c11f33",
+             *         "id": "b1074ed9-9b53-4d9f-9d1d-da039ac71232",
              *         "rule": "ByTrunkPort"
              *       },
              *       {
-             *         "id": "94db2bea-ba2c-4a2c-973e-bc3205a37ccb",
+             *         "id": "614a6214-9559-4bd7-b3a7-24ca8529a197",
              *         "rule": "ByVLAN"
              *       },
              *       {
-             *         "id": "1a22f1c9-c78e-41df-89c1-6874c7e9408d",
+             *         "id": "8c78d06c-f800-4a11-84f1-bb0c3b159df8",
              *         "rule": "ByPortOpStatus"
              *       },
              *       {
-             *         "id": "c988393f-06d8-417b-957e-1547932129ff",
+             *         "id": "799eec85-0535-4a98-ad82-6bf0ca6e3e1d",
              *         "rule": {
              *           "ByServiceCategory": {
              *             "categories": [
@@ -11602,7 +11623,7 @@ export interface components {
              *         }
              *       },
              *       {
-             *         "id": "0ef329f9-b3e0-42df-b8a8-1b7731e0be94",
+             *         "id": "2871e02b-2da2-467a-8bfa-8c373c2c4dbb",
              *         "rule": {
              *           "ByTag": {
              *             "tag_ids": [],
@@ -11611,15 +11632,15 @@ export interface components {
              *         }
              *       },
              *       {
-             *         "id": "cfe86d89-3a47-45a5-80a2-dc6a5fb6a9b4",
+             *         "id": "15b8a129-24bf-4249-a1ad-dfaeb744510a",
              *         "rule": "ByHypervisor"
              *       },
              *       {
-             *         "id": "d29fc1c2-d2c8-49a6-b7d3-c46fb39c3a77",
+             *         "id": "2961f1a5-7b7a-414f-a5b4-4b6d964ce2e3",
              *         "rule": "ByContainerRuntime"
              *       },
              *       {
-             *         "id": "e4ed4573-1240-4ebe-b2a0-92b27ffcad16",
+             *         "id": "95593178-1b40-4c69-bda6-3858e0db384d",
              *         "rule": "ByStack"
              *       }
              *     ]

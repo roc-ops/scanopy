@@ -11,8 +11,8 @@ use crate::server::{
             InterfaceInput, PortInput, ServiceInput, UpdateHostRequest,
         },
         attributes::{
-            HostChassisIdValue, HostManagementUrlValue, HostSysContactValue, HostSysDescrValue,
-            HostSysLocationValue, HostSysNameValue, HostSysObjectIdValue,
+            HostChassisIdValue, HostHostnameValue, HostManagementUrlValue, HostSysContactValue,
+            HostSysDescrValue, HostSysLocationValue, HostSysNameValue, HostSysObjectIdValue,
         },
         base::{Host, HostBase},
         name::{HostName, HostNameSources},
@@ -34,7 +34,7 @@ use crate::server::{
         r#impl::{base::Service, definitions::ServiceDefinitionExt},
         service::ServiceService,
     },
-    shared::attribution::{AttributeSource, Attributed},
+    shared::attribution::{self, AttributeSource, Attributed},
     shared::{
         entities::{ChangeTriggersTopologyStaleness, EntityDiscriminants},
         events::{bus::EventBus, types::EntityOperation},

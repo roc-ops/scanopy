@@ -14,6 +14,7 @@ use crate::daemon::discovery::service::base::DiscoveryRunner;
 use crate::daemon::discovery::service::ops::DiscoveryOps;
 use crate::daemon::utils::base::DaemonUtils;
 use crate::server::bindings::r#impl::base::Binding;
+use crate::server::hosts::r#impl::attributes::HostHostnameValue;
 use crate::server::hosts::r#impl::base::{Host, HostBase};
 use crate::server::hosts::r#impl::name::{HostName, HostNameSources};
 use crate::server::interfaces::r#impl::base::{Interface, InterfaceDataComplete};
@@ -24,6 +25,7 @@ use crate::server::services::definitions::scanopy_daemon::ScanopyDaemon;
 use crate::server::services::r#impl::base::{Service, ServiceBase};
 use crate::server::services::r#impl::definitions::ServiceDefinition;
 use crate::server::services::r#impl::patterns::MatchDetails;
+use crate::server::shared::attribution::{AttributeSource, Attributed};
 use crate::server::shared::storage::traits::Storable;
 use crate::server::shared::types::entities::EntitySource;
 use crate::server::subnets::r#impl::base::Subnet;
@@ -123,14 +125,18 @@ impl DiscoveryRunner {
         Ok(())
     }
 
-    /// The daemon's own `HostBase`, named the way self-report names it.
+    /// The daemon's own `HostBase`.
+    ///
+    /// Unnamed: the OS hostname and the address are identifiers, and the display ladder titles the
+    /// host by them. The hostname outranks a provisioning placeholder the server may hold.
     fn own_host_base(&self, network_id: Uuid) -> HostBase {
         let utils = &self.service.utils;
         let hostname = utils.get_own_hostname();
 
-        let mut host_base = HostBase {
+        HostBase {
             name: HostName::unnamed(),
-            hostname: hostname.clone(),
+            hostname: hostname
+                .map(|h| Attributed::new(HostHostnameValue(h), AttributeSource::DaemonSelfReport)),
             network_id,
             description: Some("Scanopy daemon".to_string()),
             tags: Vec::new(),
@@ -151,17 +157,7 @@ impl DiscoveryRunner {
             firmware_revision: None,
             software_revision: None,
             credential_assignments: vec![],
-        };
-
-        // The daemon's own host: its hostname if the OS reports one, otherwise its address.
-        host_base.apply_name(hostname.map(HostName::from_hostname).unwrap_or_else(|| {
-            match utils.get_own_ip_address() {
-                Ok(ip) => HostName::from_ip(ip),
-                Err(_) => HostName::unnamed(),
-            }
-        }));
-
-        host_base
+        }
     }
 
     /// Self-report phase: detect ip_addresses, create daemon host with Scanopy service.

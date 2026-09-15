@@ -24,6 +24,7 @@ impl HostResponse {
             name_source,
             network_id,
             hostname,
+            hostname_source,
             description,
             source,
             virtualization_metadata,
@@ -78,7 +79,9 @@ impl HostResponse {
             base: HostBase {
                 name: host_name_from_parts(name.clone(), *name_source),
                 network_id: *network_id,
-                hostname: hostname.clone(),
+                hostname: hostname
+                    .clone()
+                    .map(|v| Attributed::new(HostHostnameValue(v), *hostname_source)),
                 description: description.clone(),
                 source: source.clone(),
                 virtualization_metadata: virtualization_metadata.clone(),
@@ -217,7 +220,8 @@ impl HostResponse {
             name_source: name.source(),
             name: name.value().to_string(),
             network_id,
-            hostname,
+            hostname_source: hostname.as_ref().map(|v| v.source()).unwrap_or_default(),
+            hostname: attribution::text_of(&hostname),
             description,
             source,
             virtualization_metadata,

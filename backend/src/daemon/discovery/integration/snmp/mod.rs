@@ -51,10 +51,7 @@ use crate::{
             },
             types::CredentialAssignment,
         },
-        hosts::r#impl::{
-            base::{Host, HostBase},
-            name::{HostName, HostNameSources},
-        },
+        hosts::r#impl::base::{Host, HostBase},
         interface_neighbors::r#impl::base::InterfaceNeighborEvidence,
         interfaces::r#impl::base::{
             IfAdminStatus, IfOperStatus, Interface, InterfaceBase, InterfaceDataComplete, if_type,
@@ -689,13 +686,6 @@ impl DiscoveryIntegration for SnmpIntegration {
             "LLDP local identity queried"
         );
 
-        // --- Hostname enrichment: use SNMP sysName as fallback if DNS didn't provide one ---
-        if let Some(ref info) = system_info
-            && let Some(ref sys_name) = info.sys_name
-        {
-            host_data.with_hostname_fallback(sys_name.clone());
-        }
-
         // --- MAC enrichment from ipAddrTable when ARP didn't provide one ---
         if let Some(ip_entry) = ip_addr_table.get(&ip)
             && let Some(entry) = snmp_if_entries
@@ -1082,17 +1072,13 @@ impl DiscoveryIntegration for SnmpIntegration {
                     position: 0,
                 });
 
-                let mut arp_host = Host::new(HostBase {
+                // An ARP entry carries an address and nothing else. The host stays unnamed: the
+                // display ladder titles it by that address without a copy in `name`.
+                let arp_host = Host::new(HostBase {
                     network_id,
                     source: EntitySource::Discovery,
                     ..Default::default()
                 });
-                // An ARP entry carries an address and nothing else. Naming the host after it
-                // beats the blank label these used to render as, and sits at the bottom of the
-                // ladder so anything that later learns a real name replaces it.
-                arp_host
-                    .base
-                    .apply_name(HostName::from_ip(arp_entry.ip_address));
 
                 tracing::info!(
                     ip = %arp_entry.ip_address,

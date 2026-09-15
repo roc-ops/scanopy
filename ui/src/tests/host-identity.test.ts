@@ -56,6 +56,21 @@ describe('discoveredName', () => {
 		});
 	});
 
+	it('follows the server order, which puts a guessed name below the identifiers', () => {
+		const serverOrder: HostNameLadderEntry[] = [
+			{ rung: 'Hostname', value: 'nas.lan', source: 'ReverseDns' },
+			{ rung: 'SysName', value: null, source: null },
+			{ rung: 'ChassisId', value: null, source: null },
+			{ rung: 'Name', value: 'SSH', source: 'ServiceMatch' },
+			{ rung: 'Address', value: '10.0.0.5', source: null }
+		];
+		expect(discoveredName(serverOrder)).toEqual({
+			value: 'nas.lan',
+			rung: 'Hostname',
+			source: 'ReverseDns'
+		});
+	});
+
 	it('is null when nothing identifies the host', () => {
 		expect(discoveredName(ladder({}))).toBeNull();
 		expect(discoveredName(ladder({ Name: ['Rack 3', 'Manual'] }))).toBeNull();

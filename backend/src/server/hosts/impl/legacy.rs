@@ -369,7 +369,13 @@ impl LegacyHostWithServicesRequest {
                 // at the bottom of the ladder and cannot displace a better-attributed one.
                 name: crate::server::hosts::r#impl::name::HostName::unattributed(host.name),
                 network_id: host.network_id,
-                hostname: host.hostname,
+                // Unattributed for the same reason as the name.
+                hostname: host.hostname.map(|h| {
+                    crate::server::shared::attribution::Attributed::new(
+                        crate::server::hosts::r#impl::attributes::HostHostnameValue(h),
+                        crate::server::shared::attribution::AttributeSource::Unspecified,
+                    )
+                }),
                 description: host.description,
                 source: crate::server::shared::types::entities::EntitySource::Discovery,
                 virtualization_metadata: None,

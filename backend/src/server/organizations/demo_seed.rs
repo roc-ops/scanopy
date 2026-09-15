@@ -338,9 +338,11 @@ pub(crate) async fn insert_demo_data(
     // is a full resolution — `Neighbor::Interface`, never `Neighbor::Host` — and there is no raw
     // LLDP/CDP evidence to fabricate into `interface_neighbor_candidates` to justify it.
     let neighbor_links: Vec<(Uuid, Uuid, Uuid, DateTime<Utc>)> = {
+        // By title rather than stored name: demo neighbour pairings name hosts the way the UI
+        // does, and some demo hosts are nameless and titled by an identifier.
         let host_id_to_name: HashMap<Uuid, String> = all_hosts
             .iter()
-            .map(|h| (h.id, h.base.name.to_string()))
+            .map(|h| (h.id, h.display_name(&[]).unwrap_or_default()))
             .collect();
 
         let mut if_entry_lookup: HashMap<(String, Option<i32>), Uuid> = HashMap::new();

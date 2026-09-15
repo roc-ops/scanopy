@@ -188,34 +188,14 @@ impl HostService {
             existing_host
         );
 
-        // Update hostname if not set
-        if existing_host.base.hostname.is_none()
-            && new_host_data
-                .base
-                .hostname
-                .as_ref()
-                .is_some_and(|h| !h.is_empty())
-        {
-            has_updates = true;
-            existing_host.base.hostname = new_host_data.base.hostname.clone();
-        }
-
-        // The display name. Both candidates go through the same ladder, which is the whole
-        // reason this is two arms rather than a string-shape guess: the incoming name carries
-        // the rank of whatever produced it, so a controller's name refreshes on every sync, a
-        // reverse-DNS hostname fills in only over something weaker, and a name a person typed is
-        // never touched by either. A daemon too old to send a rank enters as `Unspecified` and
-        // changes nothing on its own — the hostname arm still reproduces its old IP-upgrade.
+        // The name. Only names travel through here: the hostname and the other identifiers are
+        // merged with the attributes below by source rank, and are never copied into `name` (see
+        // the placement rule in `hosts::impl::name`). The incoming name carries the rank of
+        // whatever produced it, so a controller's name refreshes on every sync and a name a person
+        // typed is never touched.
         if existing_host
             .base
             .apply_name(new_host_data.base.name.clone())
-        {
-            has_updates = true;
-        }
-        if let Some(hostname) = existing_host.base.hostname.clone()
-            && existing_host
-                .base
-                .apply_name(HostName::from_hostname(hostname))
         {
             has_updates = true;
         }
