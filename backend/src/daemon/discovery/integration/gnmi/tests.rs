@@ -194,9 +194,20 @@ const ARCOS_ETHERNET_STATE: &str = "
     interfaces/interface[name=ma1]/ethernet/state/effective-speed = 1000
 ";
 
-/// No `chassis-id` leaf on any neighbour. A Linux lldpd peer (netlab-server) shows up
-/// twice on swp1 and swp53, one entry per chassis-id subtype it advertises; only one
-/// carries the management address and system name.
+/// No `chassis-id` leaf on any neighbour, so the remote identity comes from the
+/// management address or a MAC-shaped port-id.
+///
+/// `swp53` hears one peer twice: both entries carry port-id `98:03:9b:7f:6f:58`, which is
+/// netlab-server's `ens1f0np0`, and only one of them also carries the management address and
+/// system name. That is a double listing.
+///
+/// `swp1` is NOT that, though an earlier version of this comment said it was. Its two entries
+/// carry DIFFERENT port-ids: `34:80:0d:44:44:f5` is netlab-server's `eno2` (confirmed from the
+/// far end -- `lldpcli` on eno2 reports netlab-leaf1:swp1), while `34:80:0d:44:45:05` is not
+/// netlab-server at all -- not one of its NICs, not its chassis id (`34:80:0d:44:44:f4`, eno1),
+/// and absent from the management network's ARP and FDB when checked on 2026-09-15. So swp1
+/// heard two different devices: a shared segment, which is GH #701's own case, captured here
+/// by accident on 2026-08-30 and mislabelled until now.
 const ARCOS_LLDP_NEIGHBORS: &str = "
     lldp/interfaces/interface[name=swp1]/name = swp1
     lldp/interfaces/interface[name=swp1]/neighbors/neighbor[id=5-34:80:0d:44:45:05]/id = 5-34:80:0d:44:45:05
