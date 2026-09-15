@@ -13,7 +13,6 @@
 		common_serialNumber,
 		common_softwareRevision,
 		hosts_deviceFacts_firmwareGroup,
-		hosts_deviceFacts_heading,
 		hosts_deviceFacts_identityGroup,
 		hosts_deviceFacts_locationGroup,
 		hosts_snmp_chassisId,
@@ -115,8 +114,7 @@
 </script>
 
 {#if sections.length > 0}
-	<div class="card card-static space-y-4">
-		<h3 class="text-primary text-sm font-semibold">{hosts_deviceFacts_heading()}</h3>
+	<div class="card card-static">
 		<div class="divide-y divide-gray-200 dark:divide-gray-700">
 			{#each sections as section (section.title)}
 				<div class="space-y-2 py-3 first:pt-0 last:pb-0">
