@@ -38,10 +38,10 @@ use crate::{
         hosts::r#impl::{
             api::{DiscoveryHostRequest, HostResponse},
             attributes::{
-                HostChassisIdValue, HostFirmwareRevisionValue, HostManagementUrlValue,
-                HostManufacturerValue, HostModelValue, HostSerialNumberValue,
-                HostSoftwareRevisionValue, HostSysContactValue, HostSysDescrValue,
-                HostSysLocationValue, HostSysNameValue, HostSysObjectIdValue,
+                HostChassisIdValue, HostFirmwareRevisionValue, HostHostnameAttributed,
+                HostHostnameValue, HostManagementUrlValue, HostManufacturerValue, HostModelValue,
+                HostSerialNumberValue, HostSoftwareRevisionValue, HostSysContactValue,
+                HostSysDescrValue, HostSysLocationValue, HostSysNameValue, HostSysObjectIdValue,
             },
             base::{Host, HostBase},
             name::{HostName, HostNameSources},
@@ -495,17 +495,16 @@ impl HostData {
         self
     }
 
-    /// Set hostname from SNMP sysName as a fallback if DNS didn't provide one.
+    /// Record a hostname an integration learned for the host being scanned, with its source.
     ///
-    /// The name follows the same ladder as everything else: a hostname outranks an IP or a
-    /// detected service, and loses to a name a controller or a person supplied.
-    pub fn with_hostname_fallback(&mut self, hostname: String) -> &mut Self {
-        if self.host.base.hostname.is_none() {
-            self.host
-                .base
-                .apply_name(HostName::from_hostname(hostname.clone()));
-            self.host.base.hostname = Some(hostname);
-        }
+    /// Ranked like every other attribute, so a controller's DHCP hostname fills in where the scan's
+    /// own lookup found nothing and never displaces a stronger reading. A hostname is an identifier,
+    /// not a name, so this leaves `name` alone (see the placement rule in `hosts::impl::name`).
+    pub fn with_hostname(&mut self, hostname: String, source: AttributeSource) -> &mut Self {
+        Attributed::apply(
+            &mut self.host.base.hostname,
+            Attributed::new(HostHostnameValue(hostname), source),
+        );
         self
     }
 
@@ -1384,7 +1383,7 @@ impl DiscoveryOps {
     pub async fn build_host_from_scan(
         &self,
         params: ServiceMatchBaselineParams<'_>,
-        hostname: Option<String>,
+        hostname: Option<HostHostnameAttributed>,
         host_naming_fallback: HostNamingFallback,
     ) -> Result<Option<HostData>, Error> {
         let ServiceMatchBaselineParams { ip_address, .. } = params;
@@ -1396,7 +1395,7 @@ impl DiscoveryOps {
 
         let mut host = Host::new(HostBase {
             name: HostName::unnamed(),
-            hostname: hostname.clone(),
+            hostname,
             tags: Vec::new(),
             network_id,
             description: None,
@@ -1430,19 +1429,17 @@ impl DiscoveryOps {
             .find(|s| !ServiceDefinitionExt::is_generic(&s.base.service_definition))
             .map(|s| s.base.service_definition.name().to_string());
 
-        // Rungs the scan itself can reach. `host_naming_fallback` decides which of the two
-        // bottom rungs the user prefers when there is no hostname; an integration that knows a
-        // human-assigned name outranks all of them and applies later, during `execute()`.
-        let ip_name = HostName::from_ip(ip_address.base.ip_address);
-        let candidate = match (hostname, best_service_name, host_naming_fallback) {
-            (Some(hostname), _, _) => HostName::from_hostname(hostname),
-            (None, _, HostNamingFallback::Ip) => ip_name,
-            (None, Some(service), HostNamingFallback::BestService) => {
-                HostName::from_service(service)
-            }
-            (None, None, HostNamingFallback::BestService) => ip_name,
-        };
-        host.base.apply_name(candidate);
+        // Only names go in `name`. The hostname and the address are identifiers with their own
+        // columns, and the display ladder shows them without a copy (see the placement rule in
+        // `hosts::impl::name`). The one name a scan can derive is a guess from the best
+        // non-generic service, stored only when the user chose that fallback. It ranks below the
+        // identifiers, and an integration that knows a human-assigned name replaces it later,
+        // during `execute()`.
+        if let (HostNamingFallback::BestService, Some(service)) =
+            (host_naming_fallback, best_service_name)
+        {
+            host.base.apply_name(HostName::from_service(service));
+        }
 
         // A DNS-SD instance name is what the owner typed during setup — "Living Room TV" rather
         // than "chromecast-a1b2c3" — so it outranks everything the scan can derive and applies

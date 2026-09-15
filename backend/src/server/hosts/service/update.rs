@@ -73,7 +73,8 @@ impl HostService {
                 name: existing.base.name.clone(),
                 network_id,
                 source: existing.base.source,
-                hostname,
+                // Carried over and reconciled below, for the same reason as the name.
+                hostname: existing.base.hostname.clone(),
                 description,
                 virtualization_metadata,
                 virtualization_service_id,
@@ -108,6 +109,16 @@ impl HostService {
             updated_host.base.clear_name();
         } else if updated_host.base.name.value().as_str() != name {
             updated_host.base.apply_name(HostName::manual(name));
+        }
+
+        // The same rule for the hostname: the edit modal sends the stored value back on every
+        // save, so only an actual change is a person asserting one. Blank clears it.
+        let requested_hostname = hostname
+            .map(|h| h.trim().to_string())
+            .filter(|h| !h.is_empty());
+        if requested_hostname != attribution::text_of(&updated_host.base.hostname) {
+            updated_host.base.hostname = requested_hostname
+                .map(|h| Attributed::new(HostHostnameValue(h), AttributeSource::Manual));
         }
 
         if let Some(org_id) = authentication.organization_id() {

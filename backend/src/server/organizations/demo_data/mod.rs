@@ -356,7 +356,14 @@ fn create_host(
         base: HostBase {
             name: HostName::manual(name.to_string()),
             network_id: network.id,
-            hostname: hostname.map(String::from),
+            // The demo stands in for scans, as `with_snmp` does, so its hostnames carry what a
+            // scan's PTR lookup would record.
+            hostname: hostname.map(|h| {
+                Attributed::new(
+                    crate::server::hosts::r#impl::attributes::HostHostnameValue(h.to_string()),
+                    AttributeSource::ReverseDns,
+                )
+            }),
             description: description.map(String::from),
             source: EntitySource::Manual,
             virtualization_metadata,
@@ -726,12 +733,11 @@ mod tests {
         );
     }
 
-    /// The host editor explains each host's title by the rung that produced it. The demo has to
-    /// show that explanation doing something: a named host, and nameless ones titled by their
-    /// sysName, their chassis ID and their address. Hostname is left out because discovery copies
-    /// a hostname into `name`, so a nameless host holding one is not a state a real network shows.
+    /// The host editor explains each host's title by the rung that produced it, so the demo has a
+    /// host titled from each: a named host, and nameless ones titled by their hostname, sysName,
+    /// chassis ID and address.
     #[test]
-    fn demo_hosts_are_titled_from_every_rung_but_hostname() {
+    fn demo_hosts_are_titled_from_every_rung() {
         use crate::server::hosts::r#impl::name_ladder::HostNameRung;
 
         let demo = DemoData::generate(Uuid::new_v4(), Uuid::new_v4());
@@ -744,6 +750,7 @@ mod tests {
 
         for rung in [
             HostNameRung::Name,
+            HostNameRung::Hostname,
             HostNameRung::SysName,
             HostNameRung::ChassisId,
             HostNameRung::Address,

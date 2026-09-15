@@ -697,10 +697,7 @@ fn build_card(
 }
 
 fn host_summary(h: &Host) -> HostSummary {
-    let label = h
-        .base
-        .hostname
-        .clone()
+    let label = crate::server::shared::attribution::text_of(&h.base.hostname)
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| h.base.name.to_string());
     HostSummary { id: h.id, label }

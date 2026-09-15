@@ -18,10 +18,12 @@ type AttributeSource = components['schemas']['AttributeSource'];
  * apart: the discovered name is shown read-only, and the Name field edits only the override.
  *
  * The ladder behind the discovered name is `Host::name_ladder` on the server, sent as
- * `name_ladder`: the rungs, their order, their values with blanks dropped, and each value's
- * source. Nothing here walks rungs of its own (see `host-display-name.ts` for why a second copy is
- * forbidden). When the stored name is an override, the discovered name is the first entry below
- * `Name` holding a value, which is the server's own resolution rule applied to the server's list.
+ * `name_ladder`: the rungs in resolution order, their values with blanks dropped, and each value's
+ * source. The server already places a guessed name below the identifiers (the placement rule is
+ * documented in `backend/src/server/hosts/impl/name.rs`). Nothing here walks rungs of its own (see
+ * `host-display-name.ts` for why a second copy is forbidden). The discovered name is the first
+ * entry holding a value, skipping a name a person set: the server's own resolution rule, applied to
+ * the server's list, with the override set aside.
  */
 export interface DiscoveredName {
 	value: string;
@@ -33,13 +35,11 @@ export interface DiscoveredName {
 
 /** What the host is called when no override is set. `null` when nothing identifies it. */
 export function discoveredName(ladder: HostNameLadderEntry[]): DiscoveredName | null {
-	const stored = ladder.find((entry) => entry.rung === 'Name');
-	if (stored?.value && stored.source !== 'Manual') {
-		return { value: stored.value, rung: 'Name', source: stored.source ?? null };
-	}
-	const fallback = ladder.find((entry) => entry.rung !== 'Name' && entry.value);
-	return fallback?.value
-		? { value: fallback.value, rung: fallback.rung, source: fallback.source ?? null }
+	const entry = ladder.find(
+		(candidate) => candidate.value && !(candidate.rung === 'Name' && candidate.source === 'Manual')
+	);
+	return entry?.value
+		? { value: entry.value, rung: entry.rung, source: entry.source ?? null }
 		: null;
 }
 

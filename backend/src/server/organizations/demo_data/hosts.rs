@@ -762,7 +762,12 @@ pub(super) fn generate_hosts_and_services(
             base: HostBase {
                 name: HostName::manual("docker-prod01".to_string()),
                 network_id: hq.id,
-                hostname: Some("docker-prod01.acme.local".to_string()),
+                hostname: Some(Attributed::new(
+                    crate::server::hosts::r#impl::attributes::HostHostnameValue(
+                        "docker-prod01.acme.local".to_string(),
+                    ),
+                    AttributeSource::ReverseDns,
+                )),
                 description: Some("Production Docker host".to_string()),
                 source: EntitySource::Manual,
                 virtualization_metadata: None,
@@ -1130,30 +1135,27 @@ pub(super) fn generate_hosts_and_services(
             103,
             0x21,
         ),
-        (
-            "ws-hr-01",
-            "ws-hr-01.acme.local",
-            "HR workstation",
-            104,
-            0x22,
-        ),
+        // Never named in Scanopy, so it is titled by the hostname its PTR record gives it.
+        ("", "ws-hr-01.acme.local", "HR workstation", 104, 0x22),
     ] {
-        result.push(host_with_services!(
-            with_mac(
-                create_host(
-                    name,
-                    Some(hostname),
-                    Some(desc),
-                    hq,
-                    hq_lan,
-                    Ipv4Addr::new(10, 0, 10, ip_last),
-                    vec![],
-                    None,
-                    None,
-                    now
-                ),
-                [0xf8, 0xbc, 0x12, 0x10, mac_last, 0x01],
+        let host = with_mac(
+            create_host(
+                name,
+                Some(hostname),
+                Some(desc),
+                hq,
+                hq_lan,
+                Ipv4Addr::new(10, 0, 10, ip_last),
+                vec![],
+                None,
+                None,
+                now,
             ),
+            [0xf8, 0xbc, 0x12, 0x10, mac_last, 0x01],
+        );
+        let host = if name.is_empty() { unnamed(host) } else { host };
+        result.push(host_with_services!(
+            host,
             now,
             ("Workstation", "Workstation", Some(PortType::Rdp), vec![]),
         ));
@@ -2038,7 +2040,12 @@ pub(super) fn generate_hosts_and_services(
             base: HostBase {
                 name: HostName::manual("dc-docker01".to_string()),
                 network_id: dc.id,
-                hostname: Some("docker01.dc.acme.io".to_string()),
+                hostname: Some(Attributed::new(
+                    crate::server::hosts::r#impl::attributes::HostHostnameValue(
+                        "docker01.dc.acme.io".to_string(),
+                    ),
+                    AttributeSource::ReverseDns,
+                )),
                 description: Some("Data center Docker host".to_string()),
                 source: EntitySource::Manual,
                 virtualization_metadata: None,

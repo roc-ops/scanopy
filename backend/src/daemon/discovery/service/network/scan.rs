@@ -20,14 +20,15 @@ use crate::server::ip_addresses::r#impl::base::{IPAddress, IPAddressBase};
 use crate::server::ip_addresses::r#impl::base::{MacEvidence, MacEvidenceValue};
 use crate::server::ports::r#impl::base::PortType;
 use crate::server::services::r#impl::base::{Service, ServiceMatchBaselineParams};
-use crate::server::shared::attribution::AttributeSource;
+use crate::server::shared::attribution::{AttributeSource, Attributed};
 use crate::server::shared::types::entities::EntitySource;
 use crate::server::{
     daemons::r#impl::base::DaemonMode,
     hosts::r#impl::{
         api::{DiscoveryHostRequest, HostResponse},
+        attributes::HostHostnameValue,
         base::{Host, HostBase},
-        name::{HostName, HostNameSources, host_name_from_parts},
+        name::host_name_from_parts,
     },
     subnets::r#impl::base::Subnet,
 };
@@ -838,16 +839,13 @@ impl NetworkScan {
                                 let early_config_store = ops.config_store.clone();
                                 let early_api_client = ops.api_client.clone();
                                 let early_handle = tokio::spawn(async move {
-                                    // Through the ladder, not by assigning `name`: a stub that
-                                    // does not declare its rung enters as `Unspecified` and can
-                                    // never refresh the address-derived name it wrote last scan,
-                                    // so a host whose DHCP lease moved keeps showing the old one.
-                                    let mut host = Host::new(HostBase {
+                                    // Unnamed: the address is an identifier, and the display ladder
+                                    // titles the host by it without a copy in `name`.
+                                    let host = Host::new(HostBase {
                                         network_id: early_subnet.base.network_id,
                                         source: EntitySource::Discovery,
                                         ..Default::default()
                                     });
-                                    host.base.apply_name(HostName::from_ip(ip));
                                     let host_id = host.id;
                                     let ip_address = IPAddress::new(IPAddressBase {
                                         network_id: early_subnet.base.network_id,
@@ -1719,10 +1717,16 @@ impl NetworkScan {
         // and the device answers for itself. Used as a fallback rather than a replacement — where
         // an operator maintains reverse DNS, that is the more deliberate name of the two.
         let dns_sd = mdns_hosts.get(&ip).cloned();
-        let hostname = self
-            .get_hostname_for_ip(ip)
-            .await?
-            .or_else(|| dns_sd.as_ref().and_then(|host| host.hostname.clone()));
+        let hostname = match self.get_hostname_for_ip(ip).await? {
+            Some(ptr) => Some(Attributed::new(
+                HostHostnameValue(ptr),
+                AttributeSource::ReverseDns,
+            )),
+            None => dns_sd
+                .as_ref()
+                .and_then(|host| host.hostname.clone())
+                .map(|srv| Attributed::new(HostHostnameValue(srv), AttributeSource::DnsSdHostname)),
+        };
         // MAC enrichment from SNMP ipAddrTable now handled by SnmpIntegration.execute()
         let ip_address = IPAddress::new(IPAddressBase {
             network_id: subnet.base.network_id,

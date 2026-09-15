@@ -12643,19 +12643,19 @@
             ],
             "description": "Association between a service and a port / interface that the service is listening on",
             "example": {
-              "created_at": "2026-09-13T18:34:24.392062Z",
+              "created_at": "2026-09-15T04:26:40.604817Z",
               "first_discovery_id": null,
-              "id": "7b6aa940-a832-4c21-a490-063a591de8c6",
+              "id": "d2701ef0-d280-4525-993a-01157a629803",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-09-13T18:34:24.392062Z",
+              "last_seen_at": "2026-09-15T04:26:40.604817Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-09-13T18:34:24.392062Z",
-              "valid_from": "2026-09-13T18:34:24.392062Z",
+              "updated_at": "2026-09-15T04:26:40.604817Z",
+              "valid_from": "2026-09-15T04:26:40.604817Z",
               "valid_to": null
             }
           },
@@ -13775,6 +13775,10 @@
                 ],
                 "description": "Hostname as resolved or reported by the host."
               },
+              "hostname_source": {
+                "$ref": "#/components/schemas/AttributeSource",
+                "description": "What produced `hostname`: a PTR lookup, the host's own OS, a controller, mDNS, or a person.\nRead-only: decided by whichever source read it."
+              },
               "id": {
                 "type": "string",
                 "format": "uuid",
@@ -13996,6 +14000,7 @@
               "firmware_revision_source": "Unspecified",
               "hidden": false,
               "hostname": "web-server-01.local",
+              "hostname_source": "Manual",
               "id": "550e8400-e29b-41d4-a716-446655440003",
               "interfaces": [
                 {
@@ -14060,7 +14065,7 @@
                 },
                 {
                   "rung": "Hostname",
-                  "source": null,
+                  "source": "Manual",
                   "value": "web-server-01.local"
                 },
                 {
@@ -14104,19 +14109,19 @@
                 {
                   "bindings": [
                     {
-                      "created_at": "2026-09-13T18:34:24.363612Z",
+                      "created_at": "2026-09-15T04:26:40.579917Z",
                       "first_discovery_id": null,
-                      "id": "aed071bc-e960-4eb2-8435-e7f2faeafa73",
+                      "id": "9c128b4b-7a6b-48b3-8217-7f06e461ec5e",
                       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                       "last_discovery_id": null,
-                      "last_seen_at": "2026-09-13T18:34:24.363612Z",
+                      "last_seen_at": "2026-09-15T04:26:40.579917Z",
                       "lineage_id": null,
                       "network_id": "550e8400-e29b-41d4-a716-446655440002",
                       "port_id": "550e8400-e29b-41d4-a716-446655440006",
                       "service_id": "550e8400-e29b-41d4-a716-446655440007",
                       "type": "Port",
-                      "updated_at": "2026-09-13T18:34:24.363612Z",
-                      "valid_from": "2026-09-13T18:34:24.363612Z",
+                      "updated_at": "2026-09-15T04:26:40.579917Z",
+                      "valid_from": "2026-09-15T04:26:40.579917Z",
                       "valid_to": null
                     }
                   ],
@@ -14130,7 +14135,7 @@
                   "name": "nginx",
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "position": 0,
-                  "service_definition": "Open WebUI",
+                  "service_definition": "Immich",
                   "source": {
                     "type": "Manual"
                   },
@@ -15349,19 +15354,19 @@
             "example": {
               "bindings": [
                 {
-                  "created_at": "2026-09-13T18:34:24.386079Z",
+                  "created_at": "2026-09-15T04:26:40.599235Z",
                   "first_discovery_id": null,
-                  "id": "c2ce1973-8624-4172-a786-492d86b08c77",
+                  "id": "2a8b32d7-696c-4f00-9d54-03a22c2b05aa",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-09-13T18:34:24.386079Z",
+                  "last_seen_at": "2026-09-15T04:26:40.599235Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-09-13T18:34:24.386079Z",
-                  "valid_from": "2026-09-13T18:34:24.386079Z",
+                  "updated_at": "2026-09-15T04:26:40.599235Z",
+                  "valid_from": "2026-09-15T04:26:40.599235Z",
                   "valid_to": null
                 }
               ],
@@ -15375,7 +15380,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Open WebUI",
+              "service_definition": "Immich",
               "source": {
                 "type": "Manual"
               },
@@ -17173,7 +17178,7 @@
           },
           {
             "type": "string",
-            "description": "The host's own address, standing in for a name it does not have.",
+            "description": "The host's own address, standing in for a name it does not have. Nothing on this server\nwrites it any more: an address is an identifier, and the display ladder shows it without a\ncopy in `name`. Daemons up to v0.17.14 still send it, and it is kept so their payloads\ndeserialise before ingest drops the copy.",
             "enum": [
               "OwnAddress"
             ]
@@ -17204,6 +17209,13 @@
             "description": "A DNS-SD instance label — the Chromecast `fn=Living Room TV`, typed by a person during\ndevice setup.",
             "enum": [
               "DnsSdInstanceName"
+            ]
+          },
+          {
+            "type": "string",
+            "description": "A hostname a device announced for itself over mDNS: the SRV target, such as\n`chromecast-a1b2c3.local`. Machine-generated, unlike the instance label beside it.",
+            "enum": [
+              "DnsSdHostname"
             ]
           },
           {
@@ -17623,19 +17635,19 @@
         ],
         "description": "Association between a service and a port / interface that the service is listening on",
         "example": {
-          "created_at": "2026-09-13T18:34:24.364253Z",
+          "created_at": "2026-09-15T04:26:40.580653Z",
           "first_discovery_id": null,
-          "id": "ffc08bd4-3080-4c60-9b33-edd6feda48f6",
+          "id": "65476ef1-fc92-454f-aba0-61967f45d2a8",
           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
           "last_discovery_id": null,
-          "last_seen_at": "2026-09-13T18:34:24.364253Z",
+          "last_seen_at": "2026-09-15T04:26:40.580653Z",
           "lineage_id": null,
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "port_id": "550e8400-e29b-41d4-a716-446655440006",
           "service_id": "550e8400-e29b-41d4-a716-446655440007",
           "type": "Port",
-          "updated_at": "2026-09-13T18:34:24.364253Z",
-          "valid_from": "2026-09-13T18:34:24.364253Z",
+          "updated_at": "2026-09-15T04:26:40.580653Z",
+          "valid_from": "2026-09-15T04:26:40.580653Z",
           "valid_to": null
         }
       },
@@ -18330,7 +18342,7 @@
               "id": "550e8400-e29b-41d4-a716-446655440007",
               "name": "nginx",
               "position": 0,
-              "service_definition": "Open WebUI",
+              "service_definition": "Immich",
               "tags": [],
               "virtualization_metadata": null,
               "virtualization_service_id": null
@@ -22876,6 +22888,7 @@
           "first_discovery_id": null,
           "hidden": false,
           "hostname": "web-server-01.local",
+          "hostname_source": "Manual",
           "id": "550e8400-e29b-41d4-a716-446655440003",
           "last_discovery_id": null,
           "last_seen_at": "2026-01-15T10:30:00Z",
@@ -22899,6 +22912,10 @@
           {
             "$ref": "#/components/schemas/HostName",
             "description": "The host's name, together with the rung of the naming ladder that produced it.\n\nSerialises as the two flat keys `name` and `name_source`, so the wire format is a bare\nstring exactly as it has always been. Assign only through [`HostBase::apply_name`]."
+          },
+          {
+            "$ref": "#/components/schemas/HostHostname",
+            "description": "The host's hostname, with the source that produced it.\n\nAn identifier rather than a name, so it is never copied into `name`: see the placement rule\nin [`super::name`]. Two flat wire keys, `hostname` and `hostname_source`, so a daemon that\nsends only `hostname` still deserialises, at `Unspecified`."
           },
           {
             "$ref": "#/components/schemas/HostSysDescr",
@@ -22952,7 +22969,6 @@
             "type": "object",
             "required": [
               "network_id",
-              "hostname",
               "description",
               "source",
               "virtualization_metadata",
@@ -22979,13 +22995,6 @@
               "hidden": {
                 "type": "boolean",
                 "description": "Whether the host is hidden from topology views."
-              },
-              "hostname": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "description": "Hostname as resolved or reported by the host."
               },
               "network_id": {
                 "type": "string",
@@ -23048,6 +23057,18 @@
             "description": "ENTITY-MIB entPhysicalFirmwareRev - firmware revision of the device as a whole"
           },
           "firmware_revision_source": {
+            "$ref": "#/components/schemas/AttributeSource"
+          }
+        }
+      },
+      "HostHostname": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "description": "Hostname as resolved or reported for the host"
+          },
+          "hostname_source": {
             "$ref": "#/components/schemas/AttributeSource"
           }
         }
@@ -23122,7 +23143,7 @@
               },
               {
                 "$ref": "#/components/schemas/AttributeSource",
-                "description": "Where the value came from. `None` when there is no value, and for the rungs whose field\ncarries no provenance (`Hostname` and `Address`)."
+                "description": "Where the value came from. `None` when there is no value, and for `Address`, whose column\ncarries no provenance."
               }
             ]
           },
@@ -23137,7 +23158,7 @@
       },
       "HostNameRung": {
         "type": "string",
-        "description": "One rung of the display-name ladder, highest first.",
+        "description": "One rung of the display-name ladder.",
         "enum": [
           "Name",
           "Hostname",
@@ -23259,6 +23280,10 @@
               "null"
             ],
             "description": "Hostname as resolved or reported by the host."
+          },
+          "hostname_source": {
+            "$ref": "#/components/schemas/AttributeSource",
+            "description": "What produced `hostname`: a PTR lookup, the host's own OS, a controller, mDNS, or a person.\nRead-only: decided by whichever source read it."
           },
           "id": {
             "type": "string",
@@ -23481,6 +23506,7 @@
           "firmware_revision_source": "Unspecified",
           "hidden": false,
           "hostname": "web-server-01.local",
+          "hostname_source": "Manual",
           "id": "550e8400-e29b-41d4-a716-446655440003",
           "interfaces": [
             {
@@ -23545,7 +23571,7 @@
             },
             {
               "rung": "Hostname",
-              "source": null,
+              "source": "Manual",
               "value": "web-server-01.local"
             },
             {
@@ -23589,19 +23615,19 @@
             {
               "bindings": [
                 {
-                  "created_at": "2026-09-13T18:34:24.362671Z",
+                  "created_at": "2026-09-15T04:26:40.579177Z",
                   "first_discovery_id": null,
-                  "id": "bb4bffc7-6822-4912-8e06-3cb476c83c2b",
+                  "id": "71bedb9c-7fa8-48cd-a2aa-60d34b4be51d",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-09-13T18:34:24.362671Z",
+                  "last_seen_at": "2026-09-15T04:26:40.579177Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-09-13T18:34:24.362671Z",
-                  "valid_from": "2026-09-13T18:34:24.362671Z",
+                  "updated_at": "2026-09-15T04:26:40.579177Z",
+                  "valid_from": "2026-09-15T04:26:40.579177Z",
                   "valid_to": null
                 }
               ],
@@ -23615,7 +23641,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Open WebUI",
+              "service_definition": "Immich",
               "source": {
                 "type": "Manual"
               },
@@ -26683,6 +26709,10 @@
                   ],
                   "description": "Hostname as resolved or reported by the host."
                 },
+                "hostname_source": {
+                  "$ref": "#/components/schemas/AttributeSource",
+                  "description": "What produced `hostname`: a PTR lookup, the host's own OS, a controller, mDNS, or a person.\nRead-only: decided by whichever source read it."
+                },
                 "id": {
                   "type": "string",
                   "format": "uuid",
@@ -26904,6 +26934,7 @@
                 "firmware_revision_source": "Unspecified",
                 "hidden": false,
                 "hostname": "web-server-01.local",
+                "hostname_source": "Manual",
                 "id": "550e8400-e29b-41d4-a716-446655440003",
                 "interfaces": [
                   {
@@ -26968,7 +26999,7 @@
                   },
                   {
                     "rung": "Hostname",
-                    "source": null,
+                    "source": "Manual",
                     "value": "web-server-01.local"
                   },
                   {
@@ -27012,19 +27043,19 @@
                   {
                     "bindings": [
                       {
-                        "created_at": "2026-09-13T18:34:24.344108Z",
+                        "created_at": "2026-09-15T04:26:40.564137Z",
                         "first_discovery_id": null,
-                        "id": "5b54b116-3409-4039-816a-943603ab4f6d",
+                        "id": "1b947f2e-f8eb-42cc-a84f-5f6d1ff85db7",
                         "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                         "last_discovery_id": null,
-                        "last_seen_at": "2026-09-13T18:34:24.344108Z",
+                        "last_seen_at": "2026-09-15T04:26:40.564137Z",
                         "lineage_id": null,
                         "network_id": "550e8400-e29b-41d4-a716-446655440002",
                         "port_id": "550e8400-e29b-41d4-a716-446655440006",
                         "service_id": "550e8400-e29b-41d4-a716-446655440007",
                         "type": "Port",
-                        "updated_at": "2026-09-13T18:34:24.344108Z",
-                        "valid_from": "2026-09-13T18:34:24.344108Z",
+                        "updated_at": "2026-09-15T04:26:40.564137Z",
+                        "valid_from": "2026-09-15T04:26:40.564137Z",
                         "valid_to": null
                       }
                     ],
@@ -27038,7 +27069,7 @@
                     "name": "nginx",
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "position": 0,
-                    "service_definition": "Open WebUI",
+                    "service_definition": "Immich",
                     "source": {
                       "type": "Manual"
                     },
@@ -27181,19 +27212,19 @@
               "example": {
                 "bindings": [
                   {
-                    "created_at": "2026-09-13T18:34:24.384947Z",
+                    "created_at": "2026-09-15T04:26:40.598273Z",
                     "first_discovery_id": null,
-                    "id": "08a95873-5651-41ae-9e53-b8d78f6fc831",
+                    "id": "a781bec8-ad7e-4215-8900-6fa9ceedc9a3",
                     "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                     "last_discovery_id": null,
-                    "last_seen_at": "2026-09-13T18:34:24.384947Z",
+                    "last_seen_at": "2026-09-15T04:26:40.598273Z",
                     "lineage_id": null,
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "port_id": "550e8400-e29b-41d4-a716-446655440006",
                     "service_id": "550e8400-e29b-41d4-a716-446655440007",
                     "type": "Port",
-                    "updated_at": "2026-09-13T18:34:24.384947Z",
-                    "valid_from": "2026-09-13T18:34:24.384947Z",
+                    "updated_at": "2026-09-15T04:26:40.598273Z",
+                    "valid_from": "2026-09-15T04:26:40.598273Z",
                     "valid_to": null
                   }
                 ],
@@ -27207,7 +27238,7 @@
                 "name": "nginx",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
                 "position": 0,
-                "service_definition": "Open WebUI",
+                "service_definition": "Immich",
                 "source": {
                   "type": "Manual"
                 },
@@ -29264,19 +29295,19 @@
         "example": {
           "bindings": [
             {
-              "created_at": "2026-09-13T18:34:24.364066Z",
+              "created_at": "2026-09-15T04:26:40.580448Z",
               "first_discovery_id": null,
-              "id": "b966fc44-d336-40e5-b06a-7c069e020ed3",
+              "id": "aecb2d5f-df30-4544-88c1-06cdd08c2135",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-09-13T18:34:24.364066Z",
+              "last_seen_at": "2026-09-15T04:26:40.580448Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-09-13T18:34:24.364066Z",
-              "valid_from": "2026-09-13T18:34:24.364066Z",
+              "updated_at": "2026-09-15T04:26:40.580448Z",
+              "valid_from": "2026-09-15T04:26:40.580448Z",
               "valid_to": null
             }
           ],
@@ -29290,7 +29321,7 @@
           "name": "nginx",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "position": 0,
-          "service_definition": "Open WebUI",
+          "service_definition": "Immich",
           "source": {
             "type": "Manual"
           },
@@ -30611,7 +30642,7 @@
             "default": {
               "Application": [
                 {
-                  "id": "f3cab64d-82a7-4406-8c81-484a025b060f",
+                  "id": "f2ccd7b0-ae8d-4ee4-ade1-001a5456ef27",
                   "rule": {
                     "ByApplication": {
                       "tag_ids": []
@@ -30621,23 +30652,23 @@
               ],
               "L2Physical": [
                 {
-                  "id": "2b601ec7-1650-4ad9-8e9e-50f00eb25bfb",
+                  "id": "85568638-5553-49a3-973f-d088761060bd",
                   "rule": "ByHost"
                 }
               ],
               "L3Logical": [
                 {
-                  "id": "23ff76cb-594b-450b-b280-055167da6484",
+                  "id": "66cb8aef-ee56-4135-8f63-634d776166cd",
                   "rule": "BySubnet"
                 },
                 {
-                  "id": "aeb2678e-71c4-4081-9b24-b5f152816e61",
+                  "id": "cc6f2864-f4e9-4dcd-8a20-1a3216958b29",
                   "rule": "MergeContainerBridges"
                 }
               ],
               "Workloads": [
                 {
-                  "id": "2b601ec7-1650-4ad9-8e9e-50f00eb25bfb",
+                  "id": "85568638-5553-49a3-973f-d088761060bd",
                   "rule": "ByHost"
                 }
               ]
@@ -30667,19 +30698,19 @@
             "description": "Rules deciding how entities are placed and inlined within containers.",
             "default": [
               {
-                "id": "c40a6b11-ed22-49e0-875f-5aa6c61d8f51",
+                "id": "5cf4c1b8-4ec8-4736-bc24-333d64c70ea0",
                 "rule": "ByTrunkPort"
               },
               {
-                "id": "e0c6fdb4-2680-4099-aaa4-e1d0563178a1",
+                "id": "2ad724c1-5387-490a-8483-f25dab201cef",
                 "rule": "ByVLAN"
               },
               {
-                "id": "0700478b-d55b-438c-a2d3-951574db870a",
+                "id": "d7e18b51-c29a-472c-9dc2-821b6aa415fc",
                 "rule": "ByPortOpStatus"
               },
               {
-                "id": "f72359e7-3f09-40e9-a966-e446f1ce98ad",
+                "id": "2ffe6bfc-ece1-4eef-a24b-caf0030507c3",
                 "rule": {
                   "ByServiceCategory": {
                     "categories": [
@@ -30697,7 +30728,7 @@
                 }
               },
               {
-                "id": "ccdaf70f-c48e-4db3-89bb-92bbc5b14764",
+                "id": "28cd7291-2157-4daf-a05e-2d3070e51485",
                 "rule": {
                   "ByTag": {
                     "tag_ids": [],
@@ -30706,15 +30737,15 @@
                 }
               },
               {
-                "id": "efcd74fe-0f3b-44c7-8e23-9abf69040f3a",
+                "id": "bf9af5d6-ba3d-4867-94ed-662b8ea2057a",
                 "rule": "ByHypervisor"
               },
               {
-                "id": "7dc0f515-ecc7-4032-bc95-de991390b2e6",
+                "id": "4f042998-78e8-4d13-a040-65f315aa9771",
                 "rule": "ByContainerRuntime"
               },
               {
-                "id": "eee9894c-34ef-4dc9-8e9e-92230fbf382f",
+                "id": "20a4e905-cf1e-4944-babc-ac6da7bbe967",
                 "rule": "ByStack"
               }
             ]

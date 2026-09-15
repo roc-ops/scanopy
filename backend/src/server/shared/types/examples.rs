@@ -122,7 +122,12 @@ pub fn host() -> Host {
         first_discovery_id: None,
         base: HostBase {
             name: HostName::manual("web-server-01".to_string()),
-            hostname: Some("web-server-01.local".to_string()),
+            hostname: Some(crate::server::shared::attribution::Attributed::new(
+                crate::server::hosts::r#impl::attributes::HostHostnameValue(
+                    "web-server-01.local".to_string(),
+                ),
+                crate::server::shared::attribution::AttributeSource::Manual,
+            )),
             network_id: ids::NETWORK,
             description: Some("Primary web server".to_string()),
             source: EntitySource::Manual,

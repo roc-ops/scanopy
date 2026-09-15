@@ -13,7 +13,7 @@
 </script>
 
 {#if tag}
-	<Tag label={tag.label} color={tag.color} icon={tag.icon} title={tag.title} />
+	<Tag label={tag.label} color={tag.color} title={tag.title} />
 {:else}
 	<span class="text-secondary text-xs italic">{common_noSourceRecorded()}</span>
 {/if}

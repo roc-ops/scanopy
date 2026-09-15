@@ -36,7 +36,7 @@ use crate::server::{
     daemons::r#impl::{base::Daemon, version::pre_interface_to_ip_address_rename},
     hosts::r#impl::{
         api::{CreateHostRequest, DiscoveryHostRequest, HostResponse, UpdateHostRequest},
-        base::{Host, PRIMARY_INTERFACE_JOIN, host_display_name_sql},
+        base::{Host, PRIMARY_INTERFACE_JOIN},
         legacy::{HostCreateRequestBody, HostCreateResponse, LegacyHostWithServicesResponse},
     },
     shared::types::api::{ApiError, ApiResponse, ApiResult, PaginatedApiResponse},
@@ -82,11 +82,16 @@ pub enum HostOrderField {
     LastSeenAt,
 }
 
+/// The host title in SQL, built once: `to_sql` hands out `&'static str`.
+static HOST_TITLE_SQL: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    crate::server::hosts::r#impl::name_ladder::display_name_sql("hosts", "primary_interface")
+});
+
 impl OrderField for HostOrderField {
     fn to_sql(&self) -> &'static str {
         match self {
             Self::CreatedAt => "hosts.created_at",
-            Self::Name => host_display_name_sql!("hosts", "primary_interface"),
+            Self::Name => HOST_TITLE_SQL.as_str(),
             Self::Hostname => "hosts.hostname",
             Self::UpdatedAt => "hosts.updated_at",
             Self::NetworkId => "hosts.network_id",

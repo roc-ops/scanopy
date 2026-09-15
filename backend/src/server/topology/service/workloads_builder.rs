@@ -146,7 +146,7 @@ impl ViewBuilder for WorkloadsBuilder {
                     vm_host_id,
                     ElementEntityType::Host {},
                 );
-                node.header = Some(vm_host.base.name.to_string());
+                node.header = ctx.host_container_header(vm_host);
                 nodes.push(node);
             }
         }

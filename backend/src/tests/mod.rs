@@ -128,7 +128,10 @@ pub fn network(organization_id: &Uuid) -> Network {
 pub fn host(network_id: &Uuid) -> Host {
     Host::new(HostBase {
         name: HostName::manual("Test Host".to_string()),
-        hostname: Some("test.local".to_string()),
+        hostname: Some(crate::server::shared::attribution::Attributed::new(
+            crate::server::hosts::r#impl::attributes::HostHostnameValue("test.local".to_string()),
+            AttributeSource::ReverseDns,
+        )),
         network_id: *network_id,
         description: None,
         source: EntitySource::System,

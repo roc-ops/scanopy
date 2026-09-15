@@ -79,7 +79,9 @@ export interface HostFormData
 	updated_at: string;
 	name: string;
 	network_id: string;
-	hostname: string | null;
+	// Optional rather than nullable, like the discovered attributes below: it travels with the
+	// source that produced it, and absence is the pair missing, not a `null` value.
+	hostname?: string;
 	description: string | null;
 	source: components['schemas']['EntitySource'];
 	virtualization_metadata: HostVirtualization | null;

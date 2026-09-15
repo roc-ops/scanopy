@@ -40,7 +40,12 @@
 			{
 				title: hosts_deviceFacts_identityGroup(),
 				facts: [
-					{ label: common_hostname(), value: host.hostname, source: null, mono: true },
+					{
+						label: common_hostname(),
+						value: host.hostname,
+						source: host.hostname_source,
+						mono: true
+					},
 					{ label: hosts_snmp_sysName(), value: host.sys_name, source: host.sys_name_source },
 					{
 						label: hosts_snmp_chassisId(),
