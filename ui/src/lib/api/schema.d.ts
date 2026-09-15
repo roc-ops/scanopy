@@ -7122,6 +7122,15 @@ export interface components {
             /** @enum {string} */
             code: "VlanRecordingFailed";
         } | {
+            /** @description The device both integrations read. */
+            address: string;
+            /** @enum {string} */
+            code: "EqualReachIntegrationsMerged";
+            /** @description The integration that answered first. Its row stands on every port both describe. */
+            first: components["schemas"]["CredentialQueryPayloadDiscriminants"];
+            /** @description The integration that answered second. */
+            second: components["schemas"]["CredentialQueryPayloadDiscriminants"];
+        } | {
             /** @description The address the credential is bound to. */
             address: string;
             /** @enum {string} */

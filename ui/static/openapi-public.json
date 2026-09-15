@@ -21145,6 +21145,37 @@
           },
           {
             "type": "object",
+            "title": "EqualReachIntegrationsMerged",
+            "description": "Two integrations that each read the device's full interface table both collected it, and\ntheir interface sets were merged.\n\nA supported configuration, not a fault. It is reported because the merge keeps one row\nper port: where both describe a port, the first to answer supplies the row and its\nneighbours, and the second's are dropped. Someone chasing a missing link needs to know\nthat happened.",
+            "required": [
+              "address",
+              "first",
+              "second",
+              "code"
+            ],
+            "properties": {
+              "address": {
+                "type": "string",
+                "description": "The device both integrations read."
+              },
+              "code": {
+                "type": "string",
+                "enum": [
+                  "EqualReachIntegrationsMerged"
+                ]
+              },
+              "first": {
+                "$ref": "#/components/schemas/CredentialQueryPayloadDiscriminants",
+                "description": "The integration that answered first. Its row stands on every port both describe."
+              },
+              "second": {
+                "$ref": "#/components/schemas/CredentialQueryPayloadDiscriminants",
+                "description": "The integration that answered second."
+              }
+            }
+          },
+          {
+            "type": "object",
             "title": "CredentialTargetNotScanned",
             "description": "The credential's address is not on any subnet this scan covers.",
             "required": [

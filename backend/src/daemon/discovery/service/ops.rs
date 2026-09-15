@@ -138,6 +138,13 @@ pub struct HostData {
     /// wrote last. Not sent to the server — `interfaces`, `interfaces_complete` and
     /// `interface_data_complete` are the merged result.
     contributions: Vec<InterfaceContribution>,
+    /// The first two full-ifTable integrations to collect this host, in the order they
+    /// contributed. `HostData` has no route to the session's warning buffers, so the detection is
+    /// held here and the runner records it where the host is submitted.
+    equal_reach_integrations: Option<(
+        CredentialQueryPayloadDiscriminants,
+        CredentialQueryPayloadDiscriminants,
+    )>,
 }
 
 /// One integration's interface set, as offered.
@@ -168,6 +175,7 @@ impl HostData {
             interfaces_complete: true,
             interface_data_complete: InterfaceDataComplete::default(),
             contributions: Vec::new(),
+            equal_reach_integrations: None,
         }
     }
 
@@ -364,23 +372,27 @@ impl HostData {
         {
             Some(existing) => *existing = offer,
             None => {
-                // Two collectors of equal reach on one host is a configuration to tell someone
-                // about — an SNMP and a gNMI credential both broadcast over the network, say.
-                // The merge below does not need it resolved, so this is a log line and not a
-                // scan warning; it becomes worth promoting when a second `FullIfTable`
-                // integration exists to trigger it.
+                // Two integrations of equal reach on one host, such as SNMP and gNMI on one
+                // switch, is a supported configuration. Two full-ifTable readers are surfaced to
+                // the operator as an informational discovery warning.
                 if let Some(peer) = self.contributions.iter().find(|c| {
                     c.source.scope == source.scope
                         && source.scope != InterfaceViewScope::NoInterfaces
                 }) {
-                    tracing::warn!(
+                    tracing::debug!(
                         host = %self.host.id,
                         first = ?peer.source.credential,
                         second = ?source.credential,
                         scope = ?source.scope,
                         "Two integrations of equal interface reach collected one host; their \
-                         interface sets are merged, but only one of them needs to be configured"
+                         interface sets are merged"
                     );
+                    if source.scope == InterfaceViewScope::FullIfTable
+                        && self.equal_reach_integrations.is_none()
+                    {
+                        self.equal_reach_integrations =
+                            Some((peer.source.credential, source.credential));
+                    }
                 }
                 self.contributions.push(offer);
             }
@@ -462,7 +474,48 @@ impl HostData {
                 }
             });
 
+        // Which source won each port, for whoever is chasing a missing edge: a link only the
+        // losing contributor saw on a shared port is not drawn.
+        if self.contributions.len() > 1 {
+            let supplied: Vec<String> = order
+                .iter()
+                .map(|c| {
+                    let rows: Vec<&Interface> = merged
+                        .iter()
+                        .zip(&owners)
+                        .filter(|(_, owner)| owner.credential == c.source.credential)
+                        .map(|(row, _)| row)
+                        .collect();
+                    let names: Vec<&str> = rows
+                        .iter()
+                        .filter_map(|row| row.base.if_name.as_deref())
+                        .collect();
+                    if names.len() == rows.len() {
+                        format!("{:?}: [{}]", c.source.credential, names.join(", "))
+                    } else {
+                        format!("{:?}: {} interface(s)", c.source.credential, rows.len())
+                    }
+                })
+                .collect();
+            tracing::debug!(
+                host = %self.host.id,
+                supplied = %supplied.join("; "),
+                "Merged interface contributions; each source lists the rows it supplied"
+            );
+        }
+
         self.interfaces = merged;
+    }
+
+    /// The first two full-ifTable integrations to collect this host, in contribution order, if
+    /// two did.
+    pub fn equal_reach_integrations(
+        &self,
+    ) -> Option<(
+        CredentialQueryPayloadDiscriminants,
+        CredentialQueryPayloadDiscriminants,
+    )> {
+        self.equal_reach_integrations
     }
 
     /// Every integration that has offered interfaces for this host, widest view first.
@@ -699,6 +752,9 @@ impl DiscoveryOps {
         }
         if let Ok(records) = session.vlan_recording_failures.lock() {
             warnings.extend(warnings::warn_vlan_recording_failures(&records));
+        }
+        if let Ok(records) = session.equal_reach_integrations.lock() {
+            warnings.extend(warnings::warn_equal_reach_integrations(&records));
         }
         if let Ok(issues) = session.credential_issues.lock() {
             warnings.extend(warnings::warn_credential_issues(&issues));
@@ -981,6 +1037,21 @@ impl DiscoveryOps {
             && let Ok(mut buffer) = session.malformed_neighbours.lock()
         {
             buffer.push(record);
+        }
+    }
+
+    /// Record that two full-ifTable integrations collected this host, if they did.
+    ///
+    /// Called where the host is submitted, after every integration has run, because `HostData`
+    /// holds the detection and has no route to the session itself.
+    pub async fn record_equal_reach_integrations(&self, ip: IpAddr, host_data: &HostData) {
+        let Some((first, second)) = host_data.equal_reach_integrations() else {
+            return;
+        };
+        if let Ok(session) = self.get_session().await
+            && let Ok(mut buffer) = session.equal_reach_integrations.lock()
+        {
+            buffer.push(warnings::EqualReachIntegrations { ip, first, second });
         }
     }
 
@@ -1529,6 +1600,7 @@ mod tests {
     }
 
     const SNMP: CredentialQueryPayloadDiscriminants = CredentialQueryPayloadDiscriminants::Snmp;
+    const GNMI: CredentialQueryPayloadDiscriminants = CredentialQueryPayloadDiscriminants::Gnmi;
     const UNIFI: CredentialQueryPayloadDiscriminants =
         CredentialQueryPayloadDiscriminants::UnifiController;
 
@@ -1620,6 +1692,11 @@ mod tests {
         assert_eq!(host_data.interfaces.len(), 3);
         assert!(host_data.interfaces_complete);
         assert!(host_data.interface_data_complete.lldp);
+        assert_eq!(
+            host_data.equal_reach_integrations(),
+            None,
+            "one contributor revising itself is not a second integration"
+        );
     }
 
     /// A controller's ports being a subset of the ifTable is the ordinary case, and it must cost
@@ -1650,6 +1727,35 @@ mod tests {
         assert_eq!(host_data.interfaces.len(), 3);
         assert!(host_data.interfaces_complete);
         assert!(host_data.interface_data_complete.cdp);
+        assert_eq!(
+            host_data.equal_reach_integrations(),
+            None,
+            "a controller beside an ifTable reader is the ordinary case, not one to report"
+        );
+    }
+
+    /// SNMP and gNMI on one switch: both read the whole ifTable, so a port both describe keeps
+    /// the first contributor's row and neighbours. The host carries which two, in that order, so
+    /// the runner can say so in the scan record.
+    #[test]
+    fn two_full_if_table_contributors_are_recorded_in_the_order_they_answered() {
+        let mut host_data = empty_host_data();
+
+        host_data.contribute_interfaces(
+            source(GNMI, InterfaceViewScope::FullIfTable),
+            vec![port("eth1", 1), port("eth2", 2)],
+            true,
+            InterfaceDataComplete::default(),
+        );
+        host_data.contribute_interfaces(
+            source(SNMP, InterfaceViewScope::FullIfTable),
+            vec![port("eth1", 1), port("eth3", 3)],
+            true,
+            InterfaceDataComplete::default(),
+        );
+
+        assert_eq!(host_data.interfaces.len(), 3);
+        assert_eq!(host_data.equal_reach_integrations(), Some((GNMI, SNMP)));
     }
 
     /// A port only the narrower view has is added — and its presence is itself the proof that the

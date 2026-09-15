@@ -1828,6 +1828,8 @@ impl NetworkScan {
                 }
             }
 
+            ops.record_equal_reach_integrations(ip, &host_data).await;
+
             // Extract final state from host_data
             let interfaces_complete = host_data.interfaces_complete;
             let interface_data_complete = host_data.interface_data_complete;
