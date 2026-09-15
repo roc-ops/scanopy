@@ -6480,6 +6480,8 @@ dependencies = [
  "postgres-protocol",
  "posthog-rs",
  "procfs",
+ "prost",
+ "prost-types",
  "psl",
  "rand 0.9.3",
  "rand_core 0.9.3",
@@ -6514,7 +6516,10 @@ dependencies = [
  "tokio",
  "tokio-cron-scheduler",
  "tokio-rustls 0.26.4",
+ "tokio-stream",
  "tokio-util",
+ "tonic",
+ "tonic-prost",
  "top-english-words",
  "tower 0.4.13",
  "tower-http 0.5.2",
@@ -7920,11 +7925,13 @@ dependencies = [
  "socket2 0.6.1",
  "sync_wrapper 1.0.2",
  "tokio",
+ "tokio-rustls 0.26.4",
  "tokio-stream",
  "tower 0.5.2",
  "tower-layer",
  "tower-service",
  "tracing",
+ "webpki-roots 1.0.4",
 ]
 
 [[package]]
