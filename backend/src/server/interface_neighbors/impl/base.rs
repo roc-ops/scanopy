@@ -29,7 +29,8 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::server::lldp::{
-    AdvertisedFarEndPort, AdvertisedIdentity, LldpChassisId, LldpPortId, is_usable_identity_address,
+    AdvertisedFarEndPort, AdvertisedIdentity, LldpChassisId, LldpPortId,
+    is_usable_identity_address, usable_identifier,
 };
 
 // ============================================================================
@@ -144,8 +145,25 @@ impl InterfaceNeighborEvidence {
         AdvertisedFarEndPort {
             name: port_id
                 .and_then(LldpPortId::port_name)
+                // `cdp_port_id` is left ungated deliberately: it is a free vendor string, so a
+                // CDP neighbour advertising a control-character port id can in principle
+                // reproduce the GH #88 outcome here and short-circuit before the guarded
+                // `lldp_port_desc` tier below. Gating it is scope creep beyond that fix — flagged
+                // rather than fixed so the next reader does not have to re-derive it.
                 .or(self.cdp_port_id.as_deref())
-                .or(self.lldp_port_desc.as_deref())
+                // GH #88, one tier down: `lldp_port_desc` is stored whatever it holds and shown
+                // to operators, but a control character in it is no more a port name here than
+                // it was at the port-id boundary — and this tier fires *more* often on exactly
+                // the rows the guard refused, since `port_name()` is `None` for them. Same gate
+                // as `desc_worth_matching` (topology/mod.rs), reusing `usable_identifier` rather
+                // than a second predicate — a second one is how the UniFi divergence happened.
+                // Checked against the trimmed value: the trim below runs after this filter, and
+                // a trailing/leading control character (e.g. a padded `"swp2\n"`) must not fail
+                // the gate on account of whitespace that is about to be removed anyway.
+                .or(self
+                    .lldp_port_desc
+                    .as_deref()
+                    .filter(|d| usable_identifier(d.trim())))
                 .map(str::trim)
                 .filter(|name| !name.is_empty()),
             mac: port_id.and_then(LldpPortId::port_mac),
@@ -225,6 +243,72 @@ mod evidence_tests {
             blank.advertised_far_end_port().name,
             None,
             "whitespace is not a port name, and a row keyed on it would match nothing forever"
+        );
+    }
+
+    /// GH #88, one tier down. A row whose port id was refused by the SNMP/gNMI/lldpd/UniFi guard
+    /// carries no `port_name()` at all, which is exactly what sends this fallback to
+    /// `lldp_port_desc` — so a description holding the same class of unusable payload must not be
+    /// read as a name here either, or the guard one tier up is undone by the tier it deliberately
+    /// falls through to. Without the gate this asserted `Some("swp\u{1}2")`.
+    #[test]
+    fn a_description_holding_a_control_character_is_not_read_as_a_name() {
+        let refused_id_and_desc = InterfaceNeighborEvidence {
+            // The port id itself was already refused upstream (GH #88), so it never reaches here
+            // as an `InterfaceName`/etc — only a MAC or network address survives that far, and
+            // neither names the port, which is what makes this tier fire at all.
+            lldp_port_id: None,
+            lldp_port_desc: Some("swp\u{1}2".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            refused_id_and_desc.advertised_far_end_port().name,
+            None,
+            "a control character in the description is no more a name here than at the port-id \
+             boundary"
+        );
+
+        // And the fallback is not disabled outright: a real description still names the port.
+        let real_desc = InterfaceNeighborEvidence {
+            lldp_port_id: None,
+            lldp_port_desc: Some("swp2".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            real_desc.advertised_far_end_port().name,
+            Some("swp2"),
+            "the gate must not reject a real description along with a garbage one"
+        );
+    }
+
+    /// The usability gate must run against the *trimmed* description, not the raw one — a
+    /// control character that trimming would have removed (e.g. a trailing `\n`) must not sink
+    /// an otherwise-usable description. Before the fix, the gate ran before the trim and this
+    /// asserted `None`.
+    #[test]
+    fn a_description_padded_with_a_control_character_is_still_read_as_a_name() {
+        let padded = InterfaceNeighborEvidence {
+            lldp_port_id: None,
+            lldp_port_desc: Some("swp2\n".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            padded.advertised_far_end_port().name,
+            Some("swp2"),
+            "a trailing control character that trimming removes must not fail the gate"
+        );
+
+        // A control character that trimming does NOT remove — one embedded in the interior —
+        // is still refused, same as before.
+        let embedded = InterfaceNeighborEvidence {
+            lldp_port_id: None,
+            lldp_port_desc: Some("swp\u{1}2".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            embedded.advertised_far_end_port().name,
+            None,
+            "a control character trimming cannot remove is still unusable"
         );
     }
 
