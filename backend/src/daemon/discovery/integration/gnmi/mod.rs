@@ -417,7 +417,7 @@ pub(crate) async fn collect(transport: &mut dyn GnmiTransport) -> anyhow::Result
             Ok(notifications) => {
                 let mut parsed = true;
                 for n in &notifications {
-                    parsed &= absorb_notification(&mut coll, n);
+                    parsed &= absorb_notification(&mut coll, &OPENCONFIG_LLDP, n);
                 }
                 if subtree == neighbors_subtree {
                     coll.lldp_complete = parsed;

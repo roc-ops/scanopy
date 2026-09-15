@@ -1,3 +1,4 @@
+use super::parse::{Leaf, normalised_names};
 use super::*;
 use crate::server::interfaces::r#impl::base::{IfAdminStatus, IfOperStatus, if_type};
 use crate::server::lldp::LldpPortId;
@@ -387,7 +388,11 @@ fn unparseable_json_update_is_reported() {
         }],
         ..Default::default()
     };
-    assert!(!absorb_notification(&mut Collection::default(), &n));
+    assert!(!absorb_notification(
+        &mut Collection::default(),
+        &OPENCONFIG_LLDP,
+        &n
+    ));
 }
 
 /// A device serving LLDP but not `openconfig-interfaces` is an error naming the refused
@@ -445,7 +450,7 @@ fn json_ietf_blob_flattens_to_the_same_leaves() {
         ..Default::default()
     };
     let mut coll = Collection::default();
-    absorb_notification(&mut coll, &n);
+    absorb_notification(&mut coll, &OPENCONFIG_LLDP, &n);
     let rows = collection_to_interfaces(&coll, uuid::Uuid::new_v4(), uuid::Uuid::new_v4());
     let eth1 = row(&rows, "Ethernet1");
     assert_eq!(
@@ -499,10 +504,11 @@ fn explicit_chassis_type_maps_and_prefix_is_honoured() {
         ..Default::default()
     };
     let mut coll = Collection::default();
-    absorb_notification(&mut coll, &n);
+    absorb_notification(&mut coll, &OPENCONFIG_LLDP, &n);
     // The row itself comes from `/interfaces`; the neighbour only decorates it.
     absorb_notification(
         &mut coll,
+        &OPENCONFIG_LLDP,
         &Notification {
             update: vec![Update {
                 path: Some(parse_path("interfaces/interface[name=eth0]/state/ifindex")),
@@ -644,4 +650,56 @@ fn advertising_both_reads_openconfig() {
 fn advertising_no_known_lldp_model_selects_nothing() {
     let models = vec!["openconfig-interfaces".to_string()];
     assert!(LldpModelProfile::select(&models).is_none());
+}
+
+/// Parse a gnmic-style path into a `Leaf` with no value, reusing the same path-parsing the
+/// fixtures above rely on.
+fn leaf_from(path: &str) -> Leaf {
+    Leaf {
+        elems: parse_path(path).elem,
+        value: String::new(),
+    }
+}
+
+/// The scoping bug this fold has to avoid: a device whose profile renames the state
+/// container must not have that rename applied to its `/interfaces` tree, where `state`
+/// is already `state` and an `oper-items` container means something else entirely.
+#[test]
+fn the_state_rewrite_is_scoped_to_the_models_own_lldp_tree() {
+    let leaf = leaf_from("interfaces/interface[name=ge100-0/0/1]/oper-items/ifindex");
+    let names = normalised_names(&DN_LLDP, &leaf);
+    assert_eq!(
+        names,
+        vec!["interfaces", "interface", "oper-items", "ifindex"],
+        "not this model's LLDP tree: nothing is stripped and nothing is renamed"
+    );
+}
+
+#[test]
+fn the_drivenets_root_is_stripped_and_oper_items_reads_as_state() {
+    let leaf = leaf_from(
+        "drivenets-top/protocols/lldp/interfaces/interface[name=ge100-0/0/2]\
+         /neighbors/neighbor[id=0]/oper-items/system-name",
+    );
+    let names = normalised_names(&DN_LLDP, &leaf);
+    assert_eq!(
+        names,
+        vec![
+            "lldp",
+            "interfaces",
+            "interface",
+            "neighbors",
+            "neighbor",
+            "state",
+            "system-name"
+        ],
+    );
+}
+
+#[test]
+fn openconfig_normalisation_is_the_identity() {
+    let leaf =
+        leaf_from("lldp/interfaces/interface[name=swp1]/neighbors/neighbor[id=1]/state/port-id");
+    let before: Vec<&str> = leaf.elems.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(normalised_names(&OPENCONFIG_LLDP, &leaf), before);
 }
