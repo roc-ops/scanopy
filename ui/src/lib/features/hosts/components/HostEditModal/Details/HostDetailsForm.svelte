@@ -9,8 +9,7 @@
 	import DeviceFactsSection from './DeviceFactsSection.svelte';
 	import {
 		common_description,
-		hosts_details_descriptionPlaceholder,
-		hosts_details_organizeHeading
+		hosts_details_descriptionPlaceholder
 	} from '$lib/paraglide/messages';
 
 	interface Props {
@@ -33,12 +32,13 @@
 	<IdentitySection {form} {formData} {isEditing} />
 
 	<div class="card card-static space-y-6">
-		<h3 class="text-primary text-sm font-semibold">{hosts_details_organizeHeading()}</h3>
-
-		<SelectNetwork
-			selectedNetworkId={formData.network_id}
-			onNetworkChange={(id) => (formData.network_id = id)}
-		/>
+		<!-- Create only: an update keeps the host's existing network whatever the request says. -->
+		{#if !isEditing}
+			<SelectNetwork
+				selectedNetworkId={formData.network_id}
+				onNetworkChange={(id) => (formData.network_id = id)}
+			/>
+		{/if}
 
 		<form.Field
 			name="description"

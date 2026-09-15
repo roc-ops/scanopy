@@ -11,7 +11,6 @@
 		common_name,
 		common_placeholderHostname,
 		hosts_details_namePlaceholder,
-		hosts_identity_discoveredName,
 		hosts_identity_fromRung,
 		hosts_identity_nothingDiscovered,
 		hosts_identity_overrideHelp,
@@ -44,24 +43,21 @@
 <div class="card card-static space-y-5">
 	{#if isEditing}
 		<div class="space-y-1">
-			<div class="text-secondary text-xs font-medium uppercase tracking-wide">
-				{hosts_identity_discoveredName()}
-			</div>
 			{#if discovered}
-				<div class="text-primary break-all text-lg font-semibold">{discovered.value}</div>
-				<div class="flex flex-wrap items-center gap-2 text-sm">
-					{#if discovered.rung !== 'Name'}
-						<span class="text-secondary">
-							{hosts_identity_fromRung({ rung: rungLabel(discovered.rung) })}
-						</span>
-					{/if}
+				<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+					<span class="text-primary break-all text-lg font-semibold">{discovered.value}</span>
 					{#if discovered.source}
 						<AttributeSourceTag source={discovered.source} />
 					{/if}
-					{#if liveOverride.trim()}
-						<span class="text-secondary italic">{hosts_identity_overridden()}</span>
+					{#if discovered.rung !== 'Name'}
+						<span class="text-secondary text-sm">
+							{hosts_identity_fromRung({ rung: rungLabel(discovered.rung) })}
+						</span>
 					{/if}
 				</div>
+				{#if liveOverride.trim()}
+					<div class="text-secondary text-sm italic">{hosts_identity_overridden()}</div>
+				{/if}
 			{:else}
 				<div class="text-secondary text-lg font-semibold">{hosts_unnamedHost()}</div>
 				<div class="text-secondary text-sm">{hosts_identity_nothingDiscovered()}</div>
