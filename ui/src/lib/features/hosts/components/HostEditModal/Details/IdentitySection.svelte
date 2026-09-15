@@ -1,21 +1,25 @@
 <script lang="ts">
 	import type { AnyFieldApi } from '@tanstack/svelte-form';
 	import { untrack } from 'svelte';
+	import { Pencil } from 'lucide-svelte';
 	import type { HostFormData } from '$lib/features/hosts/types/base';
 	import { discoveredName, overrideOf, rungLabel } from '$lib/features/hosts/host-identity';
 	import { hostnameFormat, max } from '$lib/shared/components/forms/validators';
 	import TextInput from '$lib/shared/components/forms/input/TextInput.svelte';
+	import Tag from '$lib/shared/components/data/Tag.svelte';
 	import AttributeSourceTag from '$lib/shared/components/data/AttributeSourceTag.svelte';
+	import { attributeSourceTag } from '$lib/shared/utils/attribute-source';
 	import {
 		common_hostname,
 		common_name,
 		common_placeholderHostname,
 		hosts_details_namePlaceholder,
+		hosts_identity_editName,
 		hosts_identity_fromRung,
+		hosts_identity_manualOverride,
 		hosts_identity_nothingDiscovered,
 		hosts_identity_overrideHelp,
 		hosts_identity_overrideLabel,
-		hosts_identity_overridden,
 		hosts_unnamedHost
 	} from '$lib/paraglide/messages';
 
@@ -31,61 +35,85 @@
 	// Server data, so it stays what was discovered whatever the override field holds.
 	let discovered = $derived(discoveredName(formData.name_ladder ?? []));
 
-	// The override field's live value, for the "overridden" note. TanStack's field state is not
-	// tracked by `$derived`, so this follows the input instead. It resets when the editor loads a
-	// different host, keyed on the id: submit-time sync writes `formData.name` and must not reset it.
+	// The override field's live value, so the name above follows it as the user types. TanStack's
+	// field state is not tracked by `$derived`, so this follows the input instead. It resets when the
+	// editor loads a different host, keyed on the id: submit-time sync writes `formData.name` and
+	// must not reset it.
 	let liveOverride = $derived.by(() => {
 		void formData.id;
 		return untrack(() => overrideOf(formData.name ?? '', formData.name_source));
 	});
+
+	// The override field stays hidden until the edit button opens it, and closes again when the
+	// editor loads a different host.
+	let editingName = $derived.by(() => {
+		void formData.id;
+		return false;
+	});
+
+	// An override is stored as a `Manual` source. Coloured as that tier, labelled for what it does.
+	let manualTag = $derived(attributeSourceTag('Manual'));
 </script>
 
-<div class="card card-static space-y-5">
+<div class="space-y-5">
 	{#if isEditing}
-		<div class="space-y-1">
-			{#if discovered}
-				<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-					<span class="text-primary break-all text-lg font-semibold">{discovered.value}</span>
-					{#if discovered.source}
-						<AttributeSourceTag source={discovered.source} />
-					{/if}
-					{#if discovered.rung !== 'Name'}
-						<span class="text-secondary text-sm">
-							{hosts_identity_fromRung({ rung: rungLabel(discovered.rung) })}
-						</span>
-					{/if}
-				</div>
-				{#if liveOverride.trim()}
-					<div class="text-secondary text-sm italic">{hosts_identity_overridden()}</div>
+		<div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+			{#if liveOverride.trim()}
+				<span class="text-primary break-all text-lg font-semibold">{liveOverride}</span>
+				<Tag
+					label={hosts_identity_manualOverride()}
+					color={manualTag.color}
+					icon={manualTag.icon}
+					title={manualTag.title}
+				/>
+			{:else if discovered}
+				<span class="text-primary break-all text-lg font-semibold">{discovered.value}</span>
+				{#if discovered.rung !== 'Name'}
+					<Tag label={hosts_identity_fromRung({ rung: rungLabel(discovered.rung) })} color="Gray" />
+				{/if}
+				{#if discovered.source}
+					<AttributeSourceTag source={discovered.source} />
 				{/if}
 			{:else}
-				<div class="text-secondary text-lg font-semibold">{hosts_unnamedHost()}</div>
-				<div class="text-secondary text-sm">{hosts_identity_nothingDiscovered()}</div>
+				<span class="text-secondary text-lg font-semibold">{hosts_unnamedHost()}</span>
+				<span class="text-secondary text-sm">{hosts_identity_nothingDiscovered()}</span>
 			{/if}
+			<button
+				type="button"
+				class="text-secondary hover:text-primary rounded p-1 transition-colors hover:bg-white/10"
+				aria-label={hosts_identity_editName()}
+				title={hosts_identity_editName()}
+				aria-expanded={editingName}
+				onclick={() => (editingName = !editingName)}
+			>
+				<Pencil class="h-4 w-4" />
+			</button>
 		</div>
 
-		<div
-			oninput={(event) => {
-				if (event.target instanceof HTMLInputElement) liveOverride = event.target.value;
-			}}
-		>
-			<form.Field
-				name="name"
-				validators={{
-					onBlur: ({ value }: { value: string }) => max(100)(value)
+		{#if editingName}
+			<div
+				oninput={(event) => {
+					if (event.target instanceof HTMLInputElement) liveOverride = event.target.value;
 				}}
 			>
-				{#snippet children(field: AnyFieldApi)}
-					<TextInput
-						label={hosts_identity_overrideLabel()}
-						id="name"
-						placeholder={discovered?.value ?? hosts_unnamedHost()}
-						helpText={hosts_identity_overrideHelp()}
-						{field}
-					/>
-				{/snippet}
-			</form.Field>
-		</div>
+				<form.Field
+					name="name"
+					validators={{
+						onBlur: ({ value }: { value: string }) => max(100)(value)
+					}}
+				>
+					{#snippet children(field: AnyFieldApi)}
+						<TextInput
+							label={hosts_identity_overrideLabel()}
+							id="name"
+							placeholder={discovered?.value ?? hosts_unnamedHost()}
+							helpText={hosts_identity_overrideHelp()}
+							{field}
+						/>
+					{/snippet}
+				</form.Field>
+			</div>
+		{/if}
 	{:else}
 		<div class="grid grid-cols-2 gap-6">
 			<form.Field
