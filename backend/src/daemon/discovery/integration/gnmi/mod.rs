@@ -57,7 +57,7 @@ use crate::server::services::r#impl::patterns::ClientProbe;
 use crate::server::shared::attribution::AttributeSource;
 use parse::{
     absorb_notification, admin_status, if_type_from_identity, map_chassis, map_port, oper_status,
-    speed_from_identity,
+    speed_from_identity, unqualified,
 };
 use proto::gnmi::{Path, PathElem};
 use transport::{ConnectError, GnmiTransport, TonicTransport};
@@ -145,6 +145,10 @@ pub(crate) struct Collection {
     /// in place, and a device refusing the path as unsupported is non-authoritative too: SNMP's
     /// rule, `complete && !unsupported`.
     pub lldp_complete: bool,
+    /// Which LLDP model these neighbours actually came from. Reported at info: when an edge is
+    /// missing or wrong, "which model produced this" is the first thing worth knowing, and a
+    /// line that says openconfig while a vendor model was substituted is worse than no line.
+    pub lldp_model: LldpModel,
 }
 
 impl Collection {
@@ -160,38 +164,77 @@ impl Collection {
     }
 }
 
-/// The subtrees one collection subscribes to, each its own Subscribe. Wildcard keys rather
-/// than bare list elements: the spec treats both as "every entry", but `[name=*]` is the form
-/// every implementation has been exercised with (it is what gnmic sends).
+/// Which LLDP model a collection read, as far as the device's own `Capabilities` says.
+///
+/// Not a bare model name: "this device says it serves openconfig-lldp" and "this device named
+/// no LLDP model and openconfig was read regardless" are different facts, and an operator
+/// chasing a missing edge needs to tell them apart. The unreadable-`Capabilities` case is not
+/// here because it cannot reach a collection — `probe` fails the host on it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum LldpModel {
+    /// The device advertised this model, and it is the one that was read.
+    Advertised(&'static str),
+    /// The device advertised no LLDP model this collector has a profile for — including a
+    /// device that advertises none at all. [`OPENCONFIG_LLDP`] is read anyway: that is what
+    /// this collector asked every device before it asked at all, and a device may serve a model
+    /// it does not advertise.
+    #[default]
+    NoneAdvertised,
+}
+
+impl std::fmt::Display for LldpModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Advertised(module) => f.write_str(module),
+            Self::NoneAdvertised => f.write_str("none advertised"),
+        }
+    }
+}
+
+/// One Subscribe: a path, and the origin whose schema tree it is rooted in.
+///
+/// Wildcard keys rather than bare list elements: the spec treats both as "every entry", but
+/// `[name=*]` is the form every implementation has been exercised with (it is what gnmic sends).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Subtree {
-    /// `/interfaces/interface[name=*]/state`: the rows.
-    InterfaceState,
-    /// `/interfaces/interface[name=*]/ethernet/state`: MAC and port speed, where served.
-    EthernetState,
-    /// `/lldp/state`: the device's own chassis id, where served.
-    LldpLocal,
-    /// `/lldp/interfaces/interface[name=*]`: the neighbours.
-    LldpNeighbors,
+pub struct Subtree {
+    /// gNMI `origin` (`Path.origin`): which schema tree the path is rooted in. Empty means the
+    /// device's default tree, where openconfig is served on every device this collector has
+    /// been run against.
+    ///
+    /// A vendor's own tree conventionally needs its own origin — SR Linux `srl_nokia`, IOS-XR
+    /// `Cisco-IOS-XR-*` — so it belongs with the path rather than being assumed away. DriveNets
+    /// answers its native tree under the empty origin, which is why both profiles below set
+    /// none; the field exists so the next vendor is a profile and not a rewrite.
+    pub origin: &'static str,
+    /// Path elements, each `name` or `name[key=value]`.
+    pub elems: &'static [&'static str],
 }
 
 impl Subtree {
-    const ALL: [Subtree; 4] = [
-        Subtree::InterfaceState,
-        Subtree::EthernetState,
-        Subtree::LldpLocal,
-        Subtree::LldpNeighbors,
-    ];
+    /// `/interfaces/interface[name=*]/state`: the rows. Required — its failure aborts the
+    /// collection.
+    const INTERFACE_STATE: Self =
+        Self::default_origin(&["interfaces", "interface[name=*]", "state"]);
+    /// `/interfaces/interface[name=*]/ethernet/state`: MAC and port speed, where served.
+    /// Optional: its failure is a debug-level skip, because ArcOS serves no `mac-address` at
+    /// all (see the module header).
+    const ETHERNET_STATE: Self =
+        Self::default_origin(&["interfaces", "interface[name=*]", "ethernet", "state"]);
+
+    /// Always asked for, whichever LLDP model the device turns out to have.
+    const BASE: [Subtree; 2] = [Self::INTERFACE_STATE, Self::ETHERNET_STATE];
+
+    /// A path in the device's default schema tree — openconfig, and anything a vendor serves
+    /// without demanding an origin of its own.
+    const fn default_origin(elems: &'static [&'static str]) -> Self {
+        Self { origin: "", elems }
+    }
 
     pub(crate) fn path(self) -> Path {
-        let elems: &[&str] = match self {
-            Self::InterfaceState => &["interfaces", "interface[name=*]", "state"],
-            Self::EthernetState => &["interfaces", "interface[name=*]", "ethernet", "state"],
-            Self::LldpLocal => &["lldp", "state"],
-            Self::LldpNeighbors => &["lldp", "interfaces", "interface[name=*]"],
-        };
         Path {
-            elem: elems
+            origin: self.origin.to_string(),
+            elem: self
+                .elems
                 .iter()
                 .map(|e| match e.split_once('[') {
                     Some((name, key)) => {
@@ -212,6 +255,89 @@ impl Subtree {
                 .collect(),
             ..Default::default()
         }
+    }
+}
+
+/// Which LLDP YANG model a device serves, and what it takes to read it.
+///
+/// `openconfig-lldp` is not the only LLDP model in the field. DriveNets NOSes advertise
+/// `dn-lldp` and answer every `/lldp` path "Path does not exist: /lldp", so a DriveNets router
+/// contributed interfaces and never a neighbour. Below its own root that tree is
+/// openconfig-SHAPED — the same list keys (`interface[name=*]`, `neighbor[id=*]`) and the same
+/// leaf names (`system-name`, `chassis-id`, `port-id`, …) — so what differs between models is
+/// named here rather than parsed twice. One routing table in [`absorb_leaf`] means a vendor
+/// tree cannot drift away from the openconfig one it mirrors, and a further vendor is a static
+/// below rather than a branch in three places.
+///
+/// Everything from the state container down is identical across profiles, so nothing after the
+/// walk — `LldpChassisId`, `LldpPortId`, `collection_to_interfaces` — varies by profile.
+pub struct LldpModelProfile {
+    /// WHAT IS NOT IN HERE, so the next person knows which vendors the table absorbs: the list
+    /// KEY names (`interface[name=…]`, `neighbor[id=…]`) and the literal `lldp` element are
+    /// still fixed in `absorb_leaf` and `normalised_names`. A vendor openconfig-SHAPED except
+    /// for those needs code, not a static. `LldpMibProfile` draws the same line where it notes
+    /// the subtype enums are identical across MIB revisions.
+    ///
+    /// The YANG module name the device advertises in `Capabilities`, which is what selects this
+    /// profile. Compared unqualified, as every model name here is.
+    pub module: &'static str,
+    /// The subtrees to read for this model, each its own Subscribe: a device refuses a whole
+    /// request over one path it does not serve, and which paths those are varies by device.
+    pub subtrees: &'static [Subtree],
+    /// Path elements above the model's `lldp` root, stripped so what remains matches
+    /// openconfig's shape. Empty for a model already rooted at `/lldp`.
+    pub root: &'static [&'static str],
+    /// What this model calls the container openconfig calls `state`, rewritten to `state` on
+    /// the way in. Scoped to this model's own LLDP tree — see [`normalised_names`] for what
+    /// happens when it is not.
+    pub state_container: &'static str,
+}
+
+/// `openconfig-lldp`, rooted at `/lldp`: no root to strip and `state` already named `state`, so
+/// the normalisation below is the identity for it.
+pub static OPENCONFIG_LLDP: LldpModelProfile = LldpModelProfile {
+    module: "openconfig-lldp",
+    subtrees: &[
+        // `/lldp/state`: the device's own chassis id, where served — ArcOS refuses this path.
+        Subtree::default_origin(&["lldp", "state"]),
+        // `/lldp/interfaces/interface[name=*]`: the neighbours.
+        Subtree::default_origin(&["lldp", "interfaces", "interface[name=*]"]),
+    ],
+    root: &[],
+    state_container: "state",
+};
+
+/// `dn-lldp`, DriveNets' native LLDP under `/drivenets-top/protocols/lldp`.
+///
+/// One subtree rather than two because the native tree is small and cDNOS 26.2 answers the
+/// parent in a single Subscribe, local identity and neighbours together.
+pub static DN_LLDP: LldpModelProfile = LldpModelProfile {
+    module: "dn-lldp",
+    subtrees: &[Subtree::default_origin(&[
+        "drivenets-top",
+        "protocols",
+        "lldp",
+    ])],
+    root: &["drivenets-top", "protocols"],
+    state_container: "oper-items",
+};
+
+impl LldpModelProfile {
+    /// Every model this collector can read, in preference order: a device advertising both is
+    /// read over openconfig, the model this collector was built against.
+    const KNOWN: [&'static LldpModelProfile; 2] = [&OPENCONFIG_LLDP, &DN_LLDP];
+
+    /// The profile for a device, chosen from what it ADVERTISES rather than by trying one model
+    /// and catching the failure — which would cost a wasted round trip per scan and still could
+    /// not tell "not served" from "served and empty", the silent kind of wrong.
+    ///
+    /// `None` is the device that advertises no LLDP model this collector knows, including one
+    /// that advertises none at all. The caller falls back to [`OPENCONFIG_LLDP`] there, so a
+    /// device that advertises nothing behaves exactly as it did before this existed.
+    fn select(models: &[String]) -> Option<&'static LldpModelProfile> {
+        Self::KNOWN
+            .into_iter()
+            .find(|p| models.iter().any(|m| unqualified(m) == p.module))
     }
 }
 
@@ -278,21 +404,29 @@ pub(crate) fn collection_to_interfaces(
 /// without the LLDP model at all still has an interface table worth having.
 pub(crate) async fn collect(transport: &mut dyn GnmiTransport) -> anyhow::Result<Collection> {
     let mut coll = Collection::default();
-    for subtree in Subtree::ALL {
+    // TEMPORARY: always reads OPENCONFIG_LLDP's subtrees regardless of what the device
+    // advertises. Profile selection via `LldpModelProfile::select` lands in a later task; this
+    // is the minimal stand-in that keeps `collect` compiling against the struct form of
+    // `Subtree`.
+    let neighbors_subtree = OPENCONFIG_LLDP.subtrees[1];
+    for subtree in Subtree::BASE
+        .into_iter()
+        .chain(OPENCONFIG_LLDP.subtrees.iter().copied())
+    {
         match transport.subscribe_once(vec![subtree.path()]).await {
             Ok(notifications) => {
                 let mut parsed = true;
                 for n in &notifications {
                     parsed &= absorb_notification(&mut coll, n);
                 }
-                if subtree == Subtree::LldpNeighbors {
+                if subtree == neighbors_subtree {
                     coll.lldp_complete = parsed;
                 }
                 if !parsed {
                     tracing::debug!(?subtree, "gNMI subtree had updates that did not parse");
                 }
             }
-            Err(e) if subtree == Subtree::InterfaceState => {
+            Err(e) if subtree == Subtree::INTERFACE_STATE => {
                 return Err(e.context("openconfig-interfaces is required and was not served"));
             }
             // `lldp_complete` stays false: a refused or failed LLDP read keeps what is stored.

@@ -12,7 +12,7 @@ struct Leaf {
 }
 
 /// Strip the YANG module prefix json_ietf puts on names: `openconfig-interfaces:ifindex`.
-fn unqualified(name: &str) -> &str {
+pub(super) fn unqualified(name: &str) -> &str {
     name.rsplit(':').next().unwrap_or(name)
 }
 

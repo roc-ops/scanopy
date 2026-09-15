@@ -10,9 +10,9 @@ use proto::gnmi::{Notification, TypedValue, Update, typed_value};
 /// (`lldp/interfaces/interface[name=swp1]/neighbors/neighbor[id=1]/state/port-id`).
 #[derive(Default)]
 struct ScriptedDevice {
-    served: BTreeMap<&'static str, &'static str>,
+    served: BTreeMap<String, &'static str>,
     /// Subtrees whose Subscribe fails with this error rather than a refusal.
-    failures: BTreeMap<&'static str, &'static str>,
+    failures: BTreeMap<String, &'static str>,
     models: Vec<String>,
 }
 
@@ -34,13 +34,8 @@ impl ScriptedDevice {
     }
 }
 
-fn subtree_key(subtree: Subtree) -> &'static str {
-    match subtree {
-        Subtree::InterfaceState => "interfaces/interface[name=*]/state",
-        Subtree::EthernetState => "interfaces/interface[name=*]/ethernet/state",
-        Subtree::LldpLocal => "lldp/state",
-        Subtree::LldpNeighbors => "lldp/interfaces/interface[name=*]",
-    }
+fn subtree_key(subtree: Subtree) -> String {
+    subtree.elems.join("/")
 }
 
 fn render_path(path: &Path) -> String {
@@ -230,9 +225,9 @@ const ARCOS_LLDP_NEIGHBORS: &str = "
 fn arcos() -> ScriptedDevice {
     // `/lldp/state` is what leaf1 refuses: "Requested Path 'lldp/state' is not supported".
     ScriptedDevice::default()
-        .serve(Subtree::InterfaceState, ARCOS_INTERFACE_STATE)
-        .serve(Subtree::EthernetState, ARCOS_ETHERNET_STATE)
-        .serve(Subtree::LldpNeighbors, ARCOS_LLDP_NEIGHBORS)
+        .serve(Subtree::INTERFACE_STATE, ARCOS_INTERFACE_STATE)
+        .serve(Subtree::ETHERNET_STATE, ARCOS_ETHERNET_STATE)
+        .serve(OPENCONFIG_LLDP.subtrees[1], ARCOS_LLDP_NEIGHBORS)
 }
 
 async fn rows(device: &mut ScriptedDevice) -> (Collection, Vec<Interface>) {
@@ -351,12 +346,15 @@ async fn arcos_rows_join_interfaces_and_lldp() {
 #[tokio::test]
 async fn failed_lldp_read_keeps_rows_and_is_not_authoritative() {
     let refused = ScriptedDevice::default()
-        .serve(Subtree::InterfaceState, ARCOS_INTERFACE_STATE)
-        .serve(Subtree::EthernetState, ARCOS_ETHERNET_STATE);
+        .serve(Subtree::INTERFACE_STATE, ARCOS_INTERFACE_STATE)
+        .serve(Subtree::ETHERNET_STATE, ARCOS_ETHERNET_STATE);
     let timed_out = ScriptedDevice::default()
-        .serve(Subtree::InterfaceState, ARCOS_INTERFACE_STATE)
-        .serve(Subtree::EthernetState, ARCOS_ETHERNET_STATE)
-        .fail(Subtree::LldpNeighbors, "gNMI Subscribe stream timed out");
+        .serve(Subtree::INTERFACE_STATE, ARCOS_INTERFACE_STATE)
+        .serve(Subtree::ETHERNET_STATE, ARCOS_ETHERNET_STATE)
+        .fail(
+            OPENCONFIG_LLDP.subtrees[1],
+            "gNMI Subscribe stream timed out",
+        );
     for (case, mut device) in [("refused", refused), ("timed out", timed_out)] {
         let (coll, rows) = rows(&mut device).await;
         assert!(
@@ -397,7 +395,8 @@ fn unparseable_json_update_is_reported() {
 /// statuses) would shadow a real ifTable when SNMP runs against the same device.
 #[tokio::test]
 async fn interfaces_refused_is_an_error_even_with_lldp_present() {
-    let mut device = ScriptedDevice::default().serve(Subtree::LldpNeighbors, ARCOS_LLDP_NEIGHBORS);
+    let mut device =
+        ScriptedDevice::default().serve(OPENCONFIG_LLDP.subtrees[1], ARCOS_LLDP_NEIGHBORS);
     let err = collect(&mut device).await.expect_err("no /interfaces");
     let msg = format!("{err:#}");
     assert!(msg.contains("openconfig-interfaces is required"), "{msg}");
@@ -597,7 +596,8 @@ const DNOS_INTERFACE_STATE: &str = "
 /// `unsupported`, which never clears.
 #[tokio::test]
 async fn dnos_interfaces_without_any_lldp_model() {
-    let mut device = ScriptedDevice::default().serve(Subtree::InterfaceState, DNOS_INTERFACE_STATE);
+    let mut device =
+        ScriptedDevice::default().serve(Subtree::INTERFACE_STATE, DNOS_INTERFACE_STATE);
     let (coll, rows) = rows(&mut device).await;
     assert!(!coll.data_complete().lldp);
     assert_eq!(rows.len(), 6);
@@ -617,4 +617,31 @@ async fn capabilities_reports_the_models_the_device_advertises() {
     let mut device = ScriptedDevice::default().advertising(&["openconfig-interfaces", "dn-lldp"]);
     let models = device.capabilities().await.expect("capabilities");
     assert_eq!(models, vec!["openconfig-interfaces", "dn-lldp"]);
+}
+
+#[test]
+fn a_device_advertising_dn_lldp_selects_the_drivenets_profile() {
+    let models = vec!["openconfig-interfaces".to_string(), "dn-lldp".to_string()];
+    let profile = LldpModelProfile::select(&models).expect("a known profile");
+    assert_eq!(profile.module, "dn-lldp");
+    assert_eq!(profile.root, &["drivenets-top", "protocols"]);
+    assert_eq!(profile.state_container, "oper-items");
+}
+
+#[test]
+fn advertising_both_reads_openconfig() {
+    let models = vec!["dn-lldp".to_string(), "openconfig-lldp".to_string()];
+    assert_eq!(
+        LldpModelProfile::select(&models)
+            .expect("a known profile")
+            .module,
+        "openconfig-lldp",
+        "openconfig is the model this collector was built against"
+    );
+}
+
+#[test]
+fn advertising_no_known_lldp_model_selects_nothing() {
+    let models = vec!["openconfig-interfaces".to_string()];
+    assert!(LldpModelProfile::select(&models).is_none());
 }
