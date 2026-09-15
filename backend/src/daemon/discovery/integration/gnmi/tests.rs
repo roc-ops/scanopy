@@ -644,9 +644,14 @@ async fn dnos_interfaces_without_any_lldp_model() {
 }
 
 // Captured 2026-08-30 from clab-ml-20-edge-dnos (DriveNets cDNOS 26.2), Subscribe ONCE,
-// PROTO encoding, via gnmic. DNOS serves NO openconfig-lldp -- `/lldp` is answered
-// "Path does not exist: /lldp" -- and puts LLDP under its own model instead. Verbatim
-// except for trimming to the two ports that have neighbours.
+// PROTO encoding, via gnmic. DNOS serves NO openconfig-lldp -- it is absent from Capabilities
+// and every openconfig `/lldp` path is refused with InvalidArgument -- and puts LLDP under its
+// own model instead. Verbatim except for trimming to the two ports that have neighbours.
+//
+// The refusal message recorded at capture time was "Path does not exist: /lldp"; re-checked
+// against the same NOS version on 2026-09-15 it was "No valid requests in the session". The
+// collector keys off the advertised model list, not this string, which is why that drift is
+// harmless -- but do not turn either message into an assertion.
 const CDNOS_INTERFACE_STATE: &str = "
     interfaces/interface[name=ge100-0/0/1]/state/ifindex = 2
     interfaces/interface[name=ge100-0/0/1]/state/type = ethernetCsmacd

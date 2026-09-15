@@ -275,8 +275,11 @@ impl Subtree {
 /// Which LLDP YANG model a device serves, and what it takes to read it.
 ///
 /// `openconfig-lldp` is not the only LLDP model in the field. DriveNets NOSes advertise
-/// `dn-lldp` and answer every `/lldp` path "Path does not exist: /lldp", so a DriveNets router
-/// contributed interfaces and never a neighbour. Below its own root that tree is
+/// `dn-lldp`, do not list `openconfig-lldp` in `Capabilities` at all, and refuse every
+/// openconfig `/lldp` path with `InvalidArgument` — so a DriveNets router contributed
+/// interfaces and never a neighbour. (The refusal's *message* varies: a 2026-08-30 capture
+/// recorded "Path does not exist: /lldp", while the same NOS version on 2026-09-15 answered
+/// "No valid requests in the session". Match on the model list, never on that text.) Below its own root that tree is
 /// openconfig-SHAPED — the same list keys (`interface[name=*]`, `neighbor[id=*]`) and the same
 /// leaf names (`system-name`, `chassis-id`, `port-id`, …) — so what differs between models is
 /// named here rather than parsed twice. One routing table in [`absorb_leaf`] means a vendor
