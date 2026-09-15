@@ -410,9 +410,9 @@ impl CredentialTypeDiscriminants {
             Self::PodmanProxy | Self::PodmanSocket => semver::Version::new(0, 17, 2),
             // UniFi variants ship in 0.17.7.
             Self::UnifiApiKey | Self::UnifiLocalAdmin => semver::Version::new(0, 17, 7),
-            // gNMI ships in 0.17.12 (scanopy#690). An older daemon that receives this mapping
+            // gNMI ships in 0.17.16 (scanopy#690). An older daemon that receives this mapping
             // deserializes the unknown wire tag to `Unknown` and skips it.
-            Self::Gnmi => semver::Version::new(0, 17, 12),
+            Self::Gnmi => semver::Version::new(0, 17, 16),
             // Instant On ships in 0.17.11.
             Self::InstantOnAccount => semver::Version::new(0, 17, 11),
         }
