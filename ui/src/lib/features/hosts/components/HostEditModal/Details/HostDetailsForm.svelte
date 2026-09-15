@@ -29,9 +29,9 @@
 </script>
 
 <div class="space-y-6 p-6">
-	<IdentitySection {form} {formData} {isEditing} />
-
 	<div class="card card-static space-y-6">
+		<IdentitySection {form} {formData} {isEditing} />
+
 		<!-- Create only: an update keeps the host's existing network whatever the request says. -->
 		{#if !isEditing}
 			<SelectNetwork

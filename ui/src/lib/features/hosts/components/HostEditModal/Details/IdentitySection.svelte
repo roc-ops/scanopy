@@ -40,7 +40,7 @@
 	});
 </script>
 
-<div class="card card-static space-y-5">
+<div class="space-y-5">
 	{#if isEditing}
 		<div class="space-y-1">
 			{#if discovered}
