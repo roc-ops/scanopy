@@ -20,7 +20,7 @@ pub mod wire;
 
 use std::net::Ipv4Addr;
 
-use transport::{Handler, Registration, SimAgent};
+use transport::{BulkRejection, Handler, Registration, SimAgent};
 use wire::{DataFile, Ordering};
 
 use crate::daemon::discovery::integration::snmp::oids::{
@@ -89,6 +89,10 @@ pub struct SimDevice {
     /// and `ipNetToMediaTable` cannot be — without these overrides a device that is supposed to
     /// serve nothing would report the host's own addresses and ARP cache and would not be mute.
     pub suppresses: Vec<&'static str>,
+    /// A GETBULK above a repetition count answered with an error status, by
+    /// `snmp-bulk-refuser.py --reject-above` in front of the agent. `None` for every device but
+    /// `switch-hikvision-01` (GH #710).
+    pub rejects_getbulk: Option<BulkRejection>,
 }
 
 /// The file suffixes, kept here so the deployment and the registrations cannot disagree about
@@ -158,11 +162,6 @@ impl SimDevice {
             .and_then(|table| table.silent_column.map(|column| column(&table.mib.remote)))
             .map(|oid| vec![oid_parts(oid)])
             .unwrap_or_default()
-    }
-
-    /// Whether `snmp-bulk-refuser.py` sits in front of this device's agent.
-    pub fn needs_shim(&self) -> bool {
-        !self.refuses_getbulk().is_empty() || !self.silenced().is_empty()
     }
 
     /// The `pass` data files this device serves, in a fixed order that the registrations index
@@ -470,7 +469,8 @@ impl SimDevice {
     pub fn agent(&self) -> SimAgent {
         let agent = SimAgent::new(&self.data_files(), self.registrations())
             .refusing_getbulk(self.refuses_getbulk())
-            .silent_on(self.silenced());
+            .silent_on(self.silenced())
+            .rejecting_getbulk_above(self.rejects_getbulk);
         match self.credential {
             CredentialType::SnmpV1 { .. } => agent.without_getbulk(),
             _ => agent,

@@ -31,27 +31,64 @@ const BULK_MAX_REPETITIONS: u32 = 20;
 /// A single `getbulk` round-trip's non-error outcome. Transport failures (timeouts,
 /// session errors) are the `Err` arm of the returned `Result`; the legitimate non-error
 /// signals are an agent that refuses getbulk, which the walk retries via getnext, and one
-/// that says the page it was asked for will not fit, which the walk retries smaller.
+/// that refuses the page it was asked for, which the walk retries smaller.
 /// Varbinds borrow the session's response buffer (`snmp2::Value<'a>` holds `&'a [u8]`
 /// for octet strings), so a page is only valid while the session stays borrowed.
 pub type Varbinds<'a> = Vec<(Vec<u64>, Value<'a>)>;
 
-/// SNMP `tooBig(1)` — the response to this request would exceed what the agent can send.
-///
-/// RFC 3416 lets an agent answer an over-large getbulk this way instead of returning fewer
-/// varbinds, and it does so with an *empty* varbind list. `Pdu::validate` checks message type,
-/// request id and community and ignores `error-status` entirely, so without this the response
-/// arrived as a zero-varbind page and ended the column as [`WalkStop::EmptyResponse`] — a
-/// device answering "ask me for less" reported as one that had gone silent.
-const SNMP_ERR_TOO_BIG: u32 = 1;
+/// SNMP `noSuchName(2)`. SNMPv1's only way to say a GETNEXT has run off the end of the MIB view;
+/// RFC 3584 §4.2.2.2.2 maps v2's `endOfMibView` to exactly this for a v1 client.
+pub const SNMP_ERR_NO_SUCH_NAME: u32 = 2;
 
 pub enum WalkPage<'a> {
     /// Decoded varbinds in wire order, OIDs as sub-id vectors.
     Varbinds(Varbinds<'a>),
     /// Agent rejected getbulk (e.g. SNMPv1) — retry from the same OID with getnext.
     BulkUnsupported,
-    /// Agent answered `tooBig` — retry from the same OID with fewer repetitions.
-    TooBig,
+    /// Agent answered with a non-zero `error-status`, which the walk takes as a refusal of the
+    /// page size and retries from the same OID with fewer repetitions.
+    ///
+    /// `tooBig` is the status RFC 3416 names for this, sent with an empty varbind list. GH #710's
+    /// Hikvision sends `genErr` instead, with the request's varbind echoed, and serves the same
+    /// column at ten repetitions that it refuses at twenty.
+    Refused { error_status: u32 },
+}
+
+impl<'a> WalkPage<'a> {
+    /// A getbulk response as the walk reads it. Production and the simulator both come through
+    /// here, so a device test exercises the same reading of the PDU a live session does.
+    ///
+    /// Any non-zero status is a refusal and none of its varbinds is a row: an agent refusing a
+    /// request echoes the request's varbinds back (RFC 3416 §4.2). snmp2's `Pdu::validate` checks
+    /// type, request id and community and never the status, so this is the one place a refused
+    /// page is told from a real one. Read as rows, the Hikvision's echo of the column base was an
+    /// OID that neither sits in the subtree nor advances, which the staleness guard rightly took
+    /// for an answer to another request, and every table truncated with nothing.
+    pub fn from_bulk_response(error_status: u32, varbinds: Varbinds<'a>) -> Self {
+        if error_status == 0 {
+            Self::Varbinds(varbinds)
+        } else {
+            Self::Refused { error_status }
+        }
+    }
+}
+
+/// A getnext or get response as its callers read it. Shared by production and the simulator for
+/// the same reason as [`WalkPage::from_bulk_response`].
+///
+/// A non-zero status never hands its echoed varbinds back. `noSuchName` becomes `endOfMibView` at
+/// the requested OID, the v2 exception every caller already treats as "nothing more here"; any
+/// other status is an [`AgentErrorStatus`], since neither caller has a smaller question to ask.
+pub fn response_varbinds<'a>(
+    requested: &[u64],
+    error_status: u32,
+    varbinds: Varbinds<'a>,
+) -> Result<Varbinds<'a>> {
+    match error_status {
+        0 => Ok(varbinds),
+        SNMP_ERR_NO_SUCH_NAME => Ok(vec![(requested.to_vec(), Value::EndOfMibView)]),
+        status => Err(AgentErrorStatus(status).into()),
+    }
 }
 
 /// The SNMP operations the query layer needs. Abstracting them keeps the walk loop
@@ -144,8 +181,8 @@ impl SnmpWalkTransport for super::session::SnmpSession {
     ) -> Result<WalkPage<'a>> {
         let oid = Oid::from(from).map_err(|_| anyhow::anyhow!("invalid walk OID"))?;
         match timeout(SNMP_TIMEOUT, self.getbulk(&[&oid], 0, max_repetitions)).await {
-            Ok(Ok(pdu)) if pdu.error_status == SNMP_ERR_TOO_BIG => Ok(WalkPage::TooBig),
-            Ok(Ok(pdu)) => Ok(WalkPage::Varbinds(
+            Ok(Ok(pdu)) => Ok(WalkPage::from_bulk_response(
+                pdu.error_status,
                 pdu.varbinds.map(|(o, v)| (oid_to_vec(&o), v)).collect(),
             )),
             // A response that fails request-id or community validation is a session that has lost
@@ -164,7 +201,11 @@ impl SnmpWalkTransport for super::session::SnmpSession {
     async fn walk_getnext<'a>(&'a mut self, from: &[u64]) -> Result<Varbinds<'a>> {
         let oid = Oid::from(from).map_err(|_| anyhow::anyhow!("invalid walk OID"))?;
         match timeout(SNMP_TIMEOUT, self.getnext(&oid)).await {
-            Ok(Ok(pdu)) => Ok(pdu.varbinds.map(|(o, v)| (oid_to_vec(&o), v)).collect()),
+            Ok(Ok(pdu)) => response_varbinds(
+                from,
+                pdu.error_status,
+                pdu.varbinds.map(|(o, v)| (oid_to_vec(&o), v)).collect(),
+            ),
             Ok(Err(e)) => Err(anyhow::Error::new(e).context("getnext failed")),
             Err(_) => Err(anyhow::anyhow!("getnext timed out")),
         }
@@ -177,17 +218,24 @@ impl SnmpWalkTransport for super::session::SnmpSession {
     async fn get_scalar<'a>(&'a mut self, oid: &[u64]) -> Result<Option<Value<'a>>> {
         let requested = Oid::from(oid).map_err(|_| anyhow::anyhow!("invalid scalar OID"))?;
         match timeout(SNMP_TIMEOUT, self.get(&requested)).await {
-            Ok(Ok(mut response)) => Ok(response
-                .varbinds
-                .next()
-                .filter(|(resp, _)| oid_to_vec(resp) == oid)
-                .map(|(_, value)| value)
-                .filter(|value| {
-                    !matches!(
-                        value,
-                        Value::NoSuchObject | Value::NoSuchInstance | Value::EndOfMibView
-                    )
-                })),
+            Ok(Ok(response)) => Ok(response_varbinds(
+                oid,
+                response.error_status,
+                response
+                    .varbinds
+                    .map(|(o, v)| (oid_to_vec(&o), v))
+                    .collect(),
+            )?
+            .into_iter()
+            .next()
+            .filter(|(resp, _)| resp.as_slice() == oid)
+            .map(|(_, value)| value)
+            .filter(|value| {
+                !matches!(
+                    value,
+                    Value::NoSuchObject | Value::NoSuchInstance | Value::EndOfMibView
+                )
+            })),
             Ok(Err(e)) => Err(anyhow::Error::new(e).context("get failed")),
             Err(_) => Err(anyhow::anyhow!("get timed out")),
         }
@@ -284,6 +332,18 @@ fn is_desync(error: &anyhow::Error) -> bool {
     })
 }
 
+/// A getnext or get the agent answered with a non-zero `error-status` the caller has no remedy
+/// for. Its varbinds only echo the request, so the status is all the response says.
+#[derive(Debug, thiserror::Error)]
+#[error("agent answered error-status {0}")]
+pub struct AgentErrorStatus(pub u32);
+
+fn is_error_status(error: &anyhow::Error) -> bool {
+    error
+        .chain()
+        .any(|cause| cause.downcast_ref::<AgentErrorStatus>().is_some())
+}
+
 /// Returns why the walk stopped. [`WalkStop::is_complete`] is true when the subtree was walked
 /// to its natural end (or the agent said it has no such OID) and false when it was cut short by
 /// `MAX_WALK_ENTRIES`, a session error, a timeout, a non-advancing OID, or an abnormal empty
@@ -352,17 +412,20 @@ where
                     note_fallback = true;
                     continue 'walk;
                 }
-                Ok(WalkPage::TooBig) => {
-                    // The agent named its own remedy, so this is not a retry against a budget —
-                    // halving terminates on its own (20 → 10 → 5 → 2 → 1 → getnext) and each
-                    // round asks a strictly easier question than the one just refused.
+                Ok(WalkPage::Refused { error_status }) => {
+                    // Not a retry against a budget: halving terminates on its own (20 → 10 → 5 →
+                    // 2 → 1 → getnext) and each round asks a strictly easier question than the
+                    // one just refused. A device that refuses even a single-repetition page does
+                    // not serve getbulk, so the rest of the session skips it.
                     shrink_page(&mut max_reps, &mut use_bulk);
+                    note_fallback = !use_bulk;
                     debug!(
                         ip = %ip,
                         base = base_oid_str,
+                        error_status,
                         max_repetitions = max_reps,
                         getbulk = use_bulk,
-                        "Agent refused the page size; asking for less"
+                        "Agent refused the page; asking for less"
                     );
                     continue 'walk;
                 }
@@ -429,7 +492,11 @@ where
                     continue 'walk;
                 }
                 Err(e) => {
-                    stop = WalkStop::Transport;
+                    stop = if is_error_status(&e) {
+                        WalkStop::ErrorStatus
+                    } else {
+                        WalkStop::Transport
+                    };
                     stop_detail = Some(e.to_string());
                     break;
                 }
@@ -831,12 +898,14 @@ enum WalkStop {
     NonAdvancingOid,
     /// Left the subtree without advancing: not this walk's continuation at all.
     StaleResponse,
+    /// Agent kept answering getnext with an error status. The detail names the status.
+    ErrorStatus,
 }
 
 impl From<WalkStop> for Option<ShortfallReason> {
     /// Collapse the walk's own vocabulary into the four things an operator can act on
-    /// differently. The distinctions dropped here (`EmptyResponse` vs `Transport`) are
-    /// diagnostic detail, already in the truncation log with the host address.
+    /// differently. The distinctions dropped here (`EmptyResponse`, `ErrorStatus` and
+    /// `Transport`) are diagnostic detail, already in the truncation log with the host address.
     fn from(stop: WalkStop) -> Self {
         match stop {
             WalkStop::EndOfSubtree => None,
@@ -847,7 +916,9 @@ impl From<WalkStop> for Option<ShortfallReason> {
             WalkStop::NonAdvancingOid | WalkStop::StaleResponse => {
                 Some(ShortfallReason::Desynchronised)
             }
-            WalkStop::Transport | WalkStop::EmptyResponse => Some(ShortfallReason::NoAnswer),
+            WalkStop::Transport | WalkStop::EmptyResponse | WalkStop::ErrorStatus => {
+                Some(ShortfallReason::NoAnswer)
+            }
         }
     }
 }
@@ -2718,7 +2789,7 @@ mod walk_tests {
             self.asked.push(max);
             match self.answer() {
                 Ok(v) => Ok(WalkPage::Varbinds(v)),
-                Err(Answer::TooBig) => Ok(WalkPage::TooBig),
+                Err(Answer::TooBig) => Ok(WalkPage::Refused { error_status: 1 }),
                 Err(_) => Err(anyhow::anyhow!("getbulk timed out")),
             }
         }
@@ -3050,6 +3121,94 @@ mod walk_tests {
             "a walk that reaches the end of the subtree is complete"
         );
         assert_eq!(suffixes, vec![vec![1], vec![2], vec![3], vec![4]]);
+    }
+
+    /// GH #710's Hikvision answers a getbulk it will not serve with an error status and the
+    /// request echoed back, so the one varbind on the page is the column base. Read as a row, that
+    /// is an answer to some other question, and the walk spent its desync budget re-asking until
+    /// it truncated every table with nothing. No error status makes an echo a row.
+    #[test]
+    fn an_error_status_response_is_never_read_as_rows() {
+        let base = oids::oid_parts(BASE);
+        for error_status in 1..=18 {
+            let page =
+                WalkPage::from_bulk_response(error_status, vec![(base.clone(), Value::Null)]);
+            assert!(
+                matches!(page, WalkPage::Refused { .. }),
+                "a getbulk answered with error-status {error_status} was read as rows"
+            );
+
+            let read = response_varbinds(&base, error_status, vec![(base.clone(), Value::Null)]);
+            assert!(
+                !matches!(read.as_deref(), Ok([(_, Value::Null)])),
+                "a getnext answered with error-status {error_status} handed its echo back as a row"
+            );
+        }
+    }
+
+    /// The staleness guard still stands. The same echoed column base *without* an error status
+    /// is a valid response carrying another request's OID, which is what a forking `pass` handler
+    /// under load sends, and the walk re-asks it and then reports the column desynchronised.
+    #[tokio::test]
+    async fn the_echoed_base_without_an_error_status_is_still_a_stale_answer() {
+        let mut session = FlakyTransport::new(Vec::new()).then_always(Answer::Page(page(&[BASE])));
+
+        let mut seen = 0usize;
+        let stop = walk_subtree(&mut session, ip(), BASE, |_suffix, _v| seen += 1)
+            .await
+            .unwrap();
+
+        assert!(
+            matches!(stop, WalkStop::StaleResponse),
+            "a wrong OID with no error status is a desync, got {stop:?}"
+        );
+        assert_eq!(seen, 0);
+        assert_eq!(
+            session.requests,
+            1 + MAX_DESYNC_RETRIES as usize,
+            "the guard re-asks exactly its budget before giving up"
+        );
+    }
+
+    /// Getnext has no smaller question to fall back to. An agent that keeps refusing it ends the
+    /// column with the error status on record, not as a stale or non-advancing answer, and within
+    /// the retry budget.
+    #[tokio::test]
+    async fn a_getnext_the_agent_keeps_refusing_ends_as_an_error_status() {
+        struct RefusesGetnext {
+            requests: usize,
+        }
+
+        #[async_trait::async_trait]
+        impl SnmpWalkTransport for RefusesGetnext {
+            async fn walk_getbulk<'a>(
+                &'a mut self,
+                _from: &[u64],
+                _max: u32,
+            ) -> Result<WalkPage<'a>> {
+                Ok(WalkPage::BulkUnsupported)
+            }
+
+            async fn walk_getnext<'a>(&'a mut self, from: &[u64]) -> Result<Varbinds<'a>> {
+                self.requests += 1;
+                response_varbinds(from, 5, vec![(from.to_vec(), Value::Null)])
+            }
+        }
+
+        let mut session = RefusesGetnext { requests: 0 };
+        let stop = walk_subtree(&mut session, ip(), BASE, |_suffix, _v| {})
+            .await
+            .unwrap();
+
+        assert!(
+            matches!(stop, WalkStop::ErrorStatus),
+            "a refused getnext is neither stale nor non-advancing, got {stop:?}"
+        );
+        assert!(
+            session.requests <= 1 + MAX_TRANSPORT_RETRIES as usize,
+            "the walk must give up on a refusing agent within budget (made {} requests)",
+            session.requests
+        );
     }
 }
 

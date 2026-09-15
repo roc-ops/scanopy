@@ -48,6 +48,7 @@ pub fn device() -> SimDevice {
         tables: tables(),
         arp_handler: Default::default(),
         suppresses: Vec::new(),
+        rejects_getbulk: None,
     }
 }
 

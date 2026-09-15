@@ -34,6 +34,7 @@ pub fn device() -> SimDevice {
         tables: tables(),
         arp_handler: Handler::Stuck,
         suppresses: Vec::new(),
+        rejects_getbulk: None,
     }
 }
 

@@ -22,7 +22,27 @@
 use anyhow::Result;
 
 use super::wire::{DataFile, Row};
-use crate::daemon::discovery::integration::snmp::queries::{SnmpWalkTransport, Varbinds, WalkPage};
+use crate::daemon::discovery::integration::snmp::queries::{
+    SNMP_ERR_NO_SUCH_NAME, SnmpWalkTransport, Varbinds, WalkPage, response_varbinds,
+};
+
+/// A device that answers a GETBULK above a repetition count with an error status instead of rows.
+///
+/// The GH #710 Hikvision shape, and like the GH #668 refusal it sits in front of the agent rather
+/// than in a handler: a `pass` script sees one GETNEXT at a time and never the repetition count,
+/// and net-snmp's own `maxGetbulkRepeats` returns fewer varbinds rather than an error. Mirrors
+/// `snmp-bulk-refuser.py --reject-above`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BulkRejection {
+    pub above_repetitions: u32,
+    pub error_status: u32,
+}
+
+/// The varbinds an agent sends back with an error status: the request's own, value NULL, as
+/// RFC 3416 has it.
+fn echo(from: &[u64]) -> Varbinds<'static> {
+    vec![(from.to_vec(), snmp2::Value::Null)]
+}
 
 /// Which `pass` handler serves a registration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -103,6 +123,8 @@ pub struct SimAgent {
     /// out and the column ends having read nothing. The rest of the table answers normally, which
     /// is what makes the walk stop part way rather than never start.
     silent_on: Vec<Vec<u64>>,
+    /// A GETBULK above this size is answered with an error status and the request echoed back.
+    rejects_getbulk: Option<BulkRejection>,
     /// Set once a walk has fallen back to getnext, and read by every walk after it.
     ///
     /// One `SimAgent` serves a whole collection, exactly as one session serves one host, so this
@@ -130,6 +152,7 @@ impl SimAgent {
             bulk_unsupported: false,
             refuses_getbulk: Vec::new(),
             silent_on: Vec::new(),
+            rejects_getbulk: None,
             getbulk_unusable: false,
         }
     }
@@ -142,6 +165,12 @@ impl SimAgent {
 
     fn is_silent(&self, from: &[u64]) -> bool {
         self.silent_on.iter().any(|prefix| from.starts_with(prefix))
+    }
+
+    /// An agent behind a shim that answers an oversized GETBULK with an error status.
+    pub fn rejecting_getbulk_above(mut self, rejection: Option<BulkRejection>) -> Self {
+        self.rejects_getbulk = rejection;
+        self
     }
 
     /// An agent behind a shim that drops GETBULK for these subtrees and forwards everything else.
@@ -273,14 +302,34 @@ impl SnmpWalkTransport for SimAgent {
         {
             return Err(anyhow::anyhow!("getbulk timed out"));
         }
-        Ok(WalkPage::Varbinds(self.page(from, max_repetitions)))
+        if let Some(rejection) = self.rejects_getbulk
+            && max_repetitions > rejection.above_repetitions
+        {
+            return Ok(WalkPage::from_bulk_response(
+                rejection.error_status,
+                echo(from),
+            ));
+        }
+        Ok(WalkPage::from_bulk_response(
+            0,
+            self.page(from, max_repetitions),
+        ))
     }
 
     async fn walk_getnext<'a>(&'a mut self, from: &[u64]) -> Result<Varbinds<'a>> {
+        // A silenced column answers nothing by getnext either, which is what separates it from a
+        // refused getbulk.
         if self.is_silent(from) {
             return Err(anyhow::anyhow!("getnext timed out"));
         }
-        Ok(self.page(from, 1))
+        let page = self.page(from, 1);
+        // SNMPv1 has no `endOfMibView`. net-snmp answers a v1 client that walks off the end of
+        // its MIB view with `noSuchName` and the request echoed back (RFC 3584 §4.2.2.2.2), and
+        // `bulk_unsupported` is exactly the v1 agent.
+        if self.bulk_unsupported && matches!(page.as_slice(), [(_, snmp2::Value::EndOfMibView)]) {
+            return response_varbinds(from, SNMP_ERR_NO_SUCH_NAME, echo(from));
+        }
+        response_varbinds(from, 0, page)
     }
 }
 
