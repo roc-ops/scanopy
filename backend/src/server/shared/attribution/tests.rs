@@ -562,3 +562,27 @@ fn the_published_tier_table_covers_every_source_exactly_once() {
 
     assert_eq!(published, expected);
 }
+
+/// Every source renders with a label, and the `{probe}` slot sits exactly where there is a probe
+/// to fill it. A probe-carrying label without the slot would read the same for SNMP and Docker, and
+/// a slot anywhere else would reach the operator as a literal `{probe}`.
+#[test]
+fn every_source_has_a_label_with_a_probe_slot_exactly_where_it_carries_a_probe() {
+    use crate::server::shared::types::metadata::TypeMetadataProvider;
+
+    for source in AttributeSource::all() {
+        let discriminant = AttributeSourceDiscriminants::from(&source);
+        let name = discriminant.name();
+        assert!(!name.trim().is_empty(), "{source} has no label");
+
+        let carries_probe = matches!(
+            source,
+            AttributeSource::Probe(_) | AttributeSource::Authored(_)
+        );
+        assert_eq!(
+            name.contains("{probe}"),
+            carries_probe,
+            "{source} is labelled {name:?}"
+        );
+    }
+}

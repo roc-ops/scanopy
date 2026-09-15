@@ -34,7 +34,7 @@ use crate::server::{
             HostSysDescrValue, HostSysLocationValue, HostSysNameValue, HostSysObjectIdValue,
         },
         base::{Host, HostBase},
-        name::{HostName, HostNameSources, host_name_from_parts},
+        name::{HostName, HostNameSources},
         virtualization::{HostVirtualization, ProxmoxVirtualization},
     },
     interfaces::r#impl::base::{IfAdminStatus, IfOperStatus, Interface, InterfaceBase},
@@ -429,6 +429,14 @@ fn with_mac((host, mut ip_address): (Host, IPAddress), mac: [u8; 6]) -> (Host, I
     (host, ip_address)
 }
 
+/// Wraps a `create_host()` result to leave the host without a name, as a device nobody has named
+/// arrives. Its title then comes from the display-name ladder: the sysName `with_snmp` copied from
+/// the name it was built with, when there is one, and otherwise its address.
+fn unnamed((mut host, ip_address): (Host, IPAddress)) -> (Host, IPAddress) {
+    host.base.name = HostName::unnamed();
+    (host, ip_address)
+}
+
 /// Helper to create a service for a host.
 /// Returns (Service, Option<Port>) - the port must be added to the host's ports list.
 fn create_service(
@@ -716,6 +724,32 @@ mod tests {
                 .any(|svc| svc.base.service_definition.category() == ServiceCategory::Industrial),
             "expected at least one seeded service in the Industrial category"
         );
+    }
+
+    /// The host editor explains each host's title by the rung that produced it. The demo has to
+    /// show that explanation doing something: a named host, and nameless ones titled by their
+    /// sysName, their chassis ID and their address. Hostname is left out because discovery copies
+    /// a hostname into `name`, so a nameless host holding one is not a state a real network shows.
+    #[test]
+    fn demo_hosts_are_titled_from_every_rung_but_hostname() {
+        use crate::server::hosts::r#impl::name_ladder::HostNameRung;
+
+        let demo = DemoData::generate(Uuid::new_v4(), Uuid::new_v4());
+        let rungs: HashSet<HostNameRung> = demo
+            .hosts_with_services
+            .iter()
+            .filter_map(|hws| hws.host.resolved_name(&hws.ip_addresses))
+            .map(|(_, rung)| rung)
+            .collect();
+
+        for rung in [
+            HostNameRung::Name,
+            HostNameRung::SysName,
+            HostNameRung::ChassisId,
+            HostNameRung::Address,
+        ] {
+            assert!(rungs.contains(&rung), "no demo host is titled by {rung:?}");
+        }
     }
 
     #[test]

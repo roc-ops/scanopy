@@ -12643,19 +12643,19 @@
             ],
             "description": "Association between a service and a port / interface that the service is listening on",
             "example": {
-              "created_at": "2026-09-10T15:31:30.180942Z",
+              "created_at": "2026-09-13T18:34:24.392062Z",
               "first_discovery_id": null,
-              "id": "90716e8d-ac22-4abe-ac40-ed5c9ee4235a",
+              "id": "7b6aa940-a832-4c21-a490-063a591de8c6",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-09-10T15:31:30.180942Z",
+              "last_seen_at": "2026-09-13T18:34:24.392062Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-09-10T15:31:30.180942Z",
-              "valid_from": "2026-09-10T15:31:30.180942Z",
+              "updated_at": "2026-09-13T18:34:24.392062Z",
+              "valid_from": "2026-09-13T18:34:24.392062Z",
               "valid_to": null
             }
           },
@@ -13741,6 +13741,17 @@
                 "description": "What to call this host when `name` is empty: its hostname, sysName, chassis id or first\naddress, whichever it has. `None` when nothing identifies it.\n\nRead-only and separate from `name` rather than folded into it. `name` is what a person\ntyped and what the editor writes back, so filling it with a fallback would turn a chassis\nid into a name the next save persists. Computed from [`Host::display_name`], the same\nladder topology titles a host container with, so a host cannot be called one thing in the\nlist and another on the map.",
                 "readOnly": true
               },
+              "display_name_rung": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/HostNameRung",
+                    "description": "Which rung of the ladder produced `display_name`. `None` exactly when `display_name` is.\n\nResolved from the same [`Host::name_ladder`] call as `display_name`, so the UI can say\nwhere a host's title came from without walking the rungs itself."
+                  }
+                ]
+              },
               "firmware_revision": {
                 "type": [
                   "string",
@@ -13826,6 +13837,13 @@
               "name": {
                 "type": "string",
                 "description": "Human-facing name for the host."
+              },
+              "name_ladder": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/HostNameLadderEntry"
+                },
+                "description": "Every rung of the display-name ladder for this host, highest first, with what each holds."
               },
               "name_source": {
                 "$ref": "#/components/schemas/AttributeSource",
@@ -13973,6 +13991,7 @@
               "credential_assignments": [],
               "description": "Primary web server",
               "display_name": "web-server-01",
+              "display_name_rung": "Name",
               "firmware_revision": null,
               "firmware_revision_source": "Unspecified",
               "hidden": false,
@@ -14033,6 +14052,33 @@
               "manufacturer_source": "Unspecified",
               "model_source": "Unspecified",
               "name": "web-server-01",
+              "name_ladder": [
+                {
+                  "rung": "Name",
+                  "source": "Manual",
+                  "value": "web-server-01"
+                },
+                {
+                  "rung": "Hostname",
+                  "source": null,
+                  "value": "web-server-01.local"
+                },
+                {
+                  "rung": "SysName",
+                  "source": null,
+                  "value": null
+                },
+                {
+                  "rung": "ChassisId",
+                  "source": null,
+                  "value": null
+                },
+                {
+                  "rung": "Address",
+                  "source": null,
+                  "value": "192.168.1.100"
+                }
+              ],
               "name_source": "Manual",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "ports": [
@@ -14058,19 +14104,19 @@
                 {
                   "bindings": [
                     {
-                      "created_at": "2026-09-10T15:31:30.160855Z",
+                      "created_at": "2026-09-13T18:34:24.363612Z",
                       "first_discovery_id": null,
-                      "id": "f185bf37-9dc9-4ea6-a20c-3e78306e37ae",
+                      "id": "aed071bc-e960-4eb2-8435-e7f2faeafa73",
                       "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                       "last_discovery_id": null,
-                      "last_seen_at": "2026-09-10T15:31:30.160855Z",
+                      "last_seen_at": "2026-09-13T18:34:24.363612Z",
                       "lineage_id": null,
                       "network_id": "550e8400-e29b-41d4-a716-446655440002",
                       "port_id": "550e8400-e29b-41d4-a716-446655440006",
                       "service_id": "550e8400-e29b-41d4-a716-446655440007",
                       "type": "Port",
-                      "updated_at": "2026-09-10T15:31:30.160855Z",
-                      "valid_from": "2026-09-10T15:31:30.160855Z",
+                      "updated_at": "2026-09-13T18:34:24.363612Z",
+                      "valid_from": "2026-09-13T18:34:24.363612Z",
                       "valid_to": null
                     }
                   ],
@@ -14084,7 +14130,7 @@
                   "name": "nginx",
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "position": 0,
-                  "service_definition": "Syncthing",
+                  "service_definition": "Open WebUI",
                   "source": {
                     "type": "Manual"
                   },
@@ -15303,19 +15349,19 @@
             "example": {
               "bindings": [
                 {
-                  "created_at": "2026-09-10T15:31:30.176024Z",
+                  "created_at": "2026-09-13T18:34:24.386079Z",
                   "first_discovery_id": null,
-                  "id": "4510b9b1-1154-47cb-82f2-fed310621f51",
+                  "id": "c2ce1973-8624-4172-a786-492d86b08c77",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-09-10T15:31:30.176024Z",
+                  "last_seen_at": "2026-09-13T18:34:24.386079Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-09-10T15:31:30.176024Z",
-                  "valid_from": "2026-09-10T15:31:30.176024Z",
+                  "updated_at": "2026-09-13T18:34:24.386079Z",
+                  "valid_from": "2026-09-13T18:34:24.386079Z",
                   "valid_to": null
                 }
               ],
@@ -15329,7 +15375,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Syncthing",
+              "service_definition": "Open WebUI",
               "source": {
                 "type": "Manual"
               },
@@ -17577,19 +17623,19 @@
         ],
         "description": "Association between a service and a port / interface that the service is listening on",
         "example": {
-          "created_at": "2026-09-10T15:31:30.161258Z",
+          "created_at": "2026-09-13T18:34:24.364253Z",
           "first_discovery_id": null,
-          "id": "14d242ff-ded4-4074-a3e9-db42cbdf8fd5",
+          "id": "ffc08bd4-3080-4c60-9b33-edd6feda48f6",
           "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
           "last_discovery_id": null,
-          "last_seen_at": "2026-09-10T15:31:30.161258Z",
+          "last_seen_at": "2026-09-13T18:34:24.364253Z",
           "lineage_id": null,
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "port_id": "550e8400-e29b-41d4-a716-446655440006",
           "service_id": "550e8400-e29b-41d4-a716-446655440007",
           "type": "Port",
-          "updated_at": "2026-09-10T15:31:30.161258Z",
-          "valid_from": "2026-09-10T15:31:30.161258Z",
+          "updated_at": "2026-09-13T18:34:24.364253Z",
+          "valid_from": "2026-09-13T18:34:24.364253Z",
           "valid_to": null
         }
       },
@@ -18284,7 +18330,7 @@
               "id": "550e8400-e29b-41d4-a716-446655440007",
               "name": "nginx",
               "position": 0,
-              "service_definition": "Syncthing",
+              "service_definition": "Open WebUI",
               "tags": [],
               "virtualization_metadata": null,
               "virtualization_service_id": null
@@ -23057,6 +23103,49 @@
           }
         }
       },
+      "HostNameLadderEntry": {
+        "type": "object",
+        "description": "What one rung of the ladder holds for a particular host.",
+        "required": [
+          "rung",
+          "value",
+          "source"
+        ],
+        "properties": {
+          "rung": {
+            "$ref": "#/components/schemas/HostNameRung"
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AttributeSource",
+                "description": "Where the value came from. `None` when there is no value, and for the rungs whose field\ncarries no provenance (`Hostname` and `Address`)."
+              }
+            ]
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The rung's value, or `None` when the host has nothing there. A value holding only\nwhitespace counts as nothing."
+          }
+        }
+      },
+      "HostNameRung": {
+        "type": "string",
+        "description": "One rung of the display-name ladder, highest first.",
+        "enum": [
+          "Name",
+          "Hostname",
+          "SysName",
+          "ChassisId",
+          "Address"
+        ]
+      },
       "HostNamingFallback": {
         "type": "string",
         "enum": [
@@ -23136,6 +23225,17 @@
             ],
             "description": "What to call this host when `name` is empty: its hostname, sysName, chassis id or first\naddress, whichever it has. `None` when nothing identifies it.\n\nRead-only and separate from `name` rather than folded into it. `name` is what a person\ntyped and what the editor writes back, so filling it with a fallback would turn a chassis\nid into a name the next save persists. Computed from [`Host::display_name`], the same\nladder topology titles a host container with, so a host cannot be called one thing in the\nlist and another on the map.",
             "readOnly": true
+          },
+          "display_name_rung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/HostNameRung",
+                "description": "Which rung of the ladder produced `display_name`. `None` exactly when `display_name` is.\n\nResolved from the same [`Host::name_ladder`] call as `display_name`, so the UI can say\nwhere a host's title came from without walking the rungs itself."
+              }
+            ]
           },
           "firmware_revision": {
             "type": [
@@ -23222,6 +23322,13 @@
           "name": {
             "type": "string",
             "description": "Human-facing name for the host."
+          },
+          "name_ladder": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HostNameLadderEntry"
+            },
+            "description": "Every rung of the display-name ladder for this host, highest first, with what each holds."
           },
           "name_source": {
             "$ref": "#/components/schemas/AttributeSource",
@@ -23369,6 +23476,7 @@
           "credential_assignments": [],
           "description": "Primary web server",
           "display_name": "web-server-01",
+          "display_name_rung": "Name",
           "firmware_revision": null,
           "firmware_revision_source": "Unspecified",
           "hidden": false,
@@ -23429,6 +23537,33 @@
           "manufacturer_source": "Unspecified",
           "model_source": "Unspecified",
           "name": "web-server-01",
+          "name_ladder": [
+            {
+              "rung": "Name",
+              "source": "Manual",
+              "value": "web-server-01"
+            },
+            {
+              "rung": "Hostname",
+              "source": null,
+              "value": "web-server-01.local"
+            },
+            {
+              "rung": "SysName",
+              "source": null,
+              "value": null
+            },
+            {
+              "rung": "ChassisId",
+              "source": null,
+              "value": null
+            },
+            {
+              "rung": "Address",
+              "source": null,
+              "value": "192.168.1.100"
+            }
+          ],
           "name_source": "Manual",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "ports": [
@@ -23454,19 +23589,19 @@
             {
               "bindings": [
                 {
-                  "created_at": "2026-09-10T15:31:30.160388Z",
+                  "created_at": "2026-09-13T18:34:24.362671Z",
                   "first_discovery_id": null,
-                  "id": "f3727dc8-e988-429b-b349-f139a9adad2c",
+                  "id": "bb4bffc7-6822-4912-8e06-3cb476c83c2b",
                   "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                   "last_discovery_id": null,
-                  "last_seen_at": "2026-09-10T15:31:30.160388Z",
+                  "last_seen_at": "2026-09-13T18:34:24.362671Z",
                   "lineage_id": null,
                   "network_id": "550e8400-e29b-41d4-a716-446655440002",
                   "port_id": "550e8400-e29b-41d4-a716-446655440006",
                   "service_id": "550e8400-e29b-41d4-a716-446655440007",
                   "type": "Port",
-                  "updated_at": "2026-09-10T15:31:30.160388Z",
-                  "valid_from": "2026-09-10T15:31:30.160388Z",
+                  "updated_at": "2026-09-13T18:34:24.362671Z",
+                  "valid_from": "2026-09-13T18:34:24.362671Z",
                   "valid_to": null
                 }
               ],
@@ -23480,7 +23615,7 @@
               "name": "nginx",
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "position": 0,
-              "service_definition": "Syncthing",
+              "service_definition": "Open WebUI",
               "source": {
                 "type": "Manual"
               },
@@ -24611,11 +24746,13 @@
           },
           "created_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When a scan last reported this evidence. Resolution reads it as the evidence's freshness,\nso a group a scan could not finish reading keeps its previous value."
           },
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "This candidate row's own id. Candidates are replaced wholesale on every scan, so the id\ndoes not survive from one scan to the next."
           }
         }
       },
@@ -24632,11 +24769,13 @@
           },
           "interface_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The local interface that heard this neighbour advertisement."
           },
           "network_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The network the reporting interface belongs to."
           }
         }
       },
@@ -24742,7 +24881,8 @@
           },
           "interface_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The local interface this adjacency belongs to."
           },
           "neighbor": {
             "$ref": "#/components/schemas/Neighbor"
@@ -24752,7 +24892,8 @@
               "string",
               "null"
             ],
-            "format": "date-time"
+            "format": "date-time",
+            "description": "When a scan last saw the evidence behind this adjacency. Absent when no scan has recorded\na time for it."
           }
         }
       },
@@ -26508,6 +26649,17 @@
                   "description": "What to call this host when `name` is empty: its hostname, sysName, chassis id or first\naddress, whichever it has. `None` when nothing identifies it.\n\nRead-only and separate from `name` rather than folded into it. `name` is what a person\ntyped and what the editor writes back, so filling it with a fallback would turn a chassis\nid into a name the next save persists. Computed from [`Host::display_name`], the same\nladder topology titles a host container with, so a host cannot be called one thing in the\nlist and another on the map.",
                   "readOnly": true
                 },
+                "display_name_rung": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/HostNameRung",
+                      "description": "Which rung of the ladder produced `display_name`. `None` exactly when `display_name` is.\n\nResolved from the same [`Host::name_ladder`] call as `display_name`, so the UI can say\nwhere a host's title came from without walking the rungs itself."
+                    }
+                  ]
+                },
                 "firmware_revision": {
                   "type": [
                     "string",
@@ -26593,6 +26745,13 @@
                 "name": {
                   "type": "string",
                   "description": "Human-facing name for the host."
+                },
+                "name_ladder": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HostNameLadderEntry"
+                  },
+                  "description": "Every rung of the display-name ladder for this host, highest first, with what each holds."
                 },
                 "name_source": {
                   "$ref": "#/components/schemas/AttributeSource",
@@ -26740,6 +26899,7 @@
                 "credential_assignments": [],
                 "description": "Primary web server",
                 "display_name": "web-server-01",
+                "display_name_rung": "Name",
                 "firmware_revision": null,
                 "firmware_revision_source": "Unspecified",
                 "hidden": false,
@@ -26800,6 +26960,33 @@
                 "manufacturer_source": "Unspecified",
                 "model_source": "Unspecified",
                 "name": "web-server-01",
+                "name_ladder": [
+                  {
+                    "rung": "Name",
+                    "source": "Manual",
+                    "value": "web-server-01"
+                  },
+                  {
+                    "rung": "Hostname",
+                    "source": null,
+                    "value": "web-server-01.local"
+                  },
+                  {
+                    "rung": "SysName",
+                    "source": null,
+                    "value": null
+                  },
+                  {
+                    "rung": "ChassisId",
+                    "source": null,
+                    "value": null
+                  },
+                  {
+                    "rung": "Address",
+                    "source": null,
+                    "value": "192.168.1.100"
+                  }
+                ],
                 "name_source": "Manual",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
                 "ports": [
@@ -26825,19 +27012,19 @@
                   {
                     "bindings": [
                       {
-                        "created_at": "2026-09-10T15:31:30.151930Z",
+                        "created_at": "2026-09-13T18:34:24.344108Z",
                         "first_discovery_id": null,
-                        "id": "ea5b5a40-a0a2-4360-92b8-6ea337888108",
+                        "id": "5b54b116-3409-4039-816a-943603ab4f6d",
                         "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                         "last_discovery_id": null,
-                        "last_seen_at": "2026-09-10T15:31:30.151930Z",
+                        "last_seen_at": "2026-09-13T18:34:24.344108Z",
                         "lineage_id": null,
                         "network_id": "550e8400-e29b-41d4-a716-446655440002",
                         "port_id": "550e8400-e29b-41d4-a716-446655440006",
                         "service_id": "550e8400-e29b-41d4-a716-446655440007",
                         "type": "Port",
-                        "updated_at": "2026-09-10T15:31:30.151930Z",
-                        "valid_from": "2026-09-10T15:31:30.151930Z",
+                        "updated_at": "2026-09-13T18:34:24.344108Z",
+                        "valid_from": "2026-09-13T18:34:24.344108Z",
                         "valid_to": null
                       }
                     ],
@@ -26851,7 +27038,7 @@
                     "name": "nginx",
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "position": 0,
-                    "service_definition": "Syncthing",
+                    "service_definition": "Open WebUI",
                     "source": {
                       "type": "Manual"
                     },
@@ -26994,19 +27181,19 @@
               "example": {
                 "bindings": [
                   {
-                    "created_at": "2026-09-10T15:31:30.175163Z",
+                    "created_at": "2026-09-13T18:34:24.384947Z",
                     "first_discovery_id": null,
-                    "id": "d588f46d-ed49-4142-886f-44c947bbec68",
+                    "id": "08a95873-5651-41ae-9e53-b8d78f6fc831",
                     "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
                     "last_discovery_id": null,
-                    "last_seen_at": "2026-09-10T15:31:30.175163Z",
+                    "last_seen_at": "2026-09-13T18:34:24.384947Z",
                     "lineage_id": null,
                     "network_id": "550e8400-e29b-41d4-a716-446655440002",
                     "port_id": "550e8400-e29b-41d4-a716-446655440006",
                     "service_id": "550e8400-e29b-41d4-a716-446655440007",
                     "type": "Port",
-                    "updated_at": "2026-09-10T15:31:30.175163Z",
-                    "valid_from": "2026-09-10T15:31:30.175163Z",
+                    "updated_at": "2026-09-13T18:34:24.384947Z",
+                    "valid_from": "2026-09-13T18:34:24.384947Z",
                     "valid_to": null
                   }
                 ],
@@ -27020,7 +27207,7 @@
                 "name": "nginx",
                 "network_id": "550e8400-e29b-41d4-a716-446655440002",
                 "position": 0,
-                "service_definition": "Syncthing",
+                "service_definition": "Open WebUI",
                 "source": {
                   "type": "Manual"
                 },
@@ -29077,19 +29264,19 @@
         "example": {
           "bindings": [
             {
-              "created_at": "2026-09-10T15:31:30.161136Z",
+              "created_at": "2026-09-13T18:34:24.364066Z",
               "first_discovery_id": null,
-              "id": "3df454db-4eac-4995-a3be-06e5e7e79f7c",
+              "id": "b966fc44-d336-40e5-b06a-7c069e020ed3",
               "ip_address_id": "550e8400-e29b-41d4-a716-446655440005",
               "last_discovery_id": null,
-              "last_seen_at": "2026-09-10T15:31:30.161136Z",
+              "last_seen_at": "2026-09-13T18:34:24.364066Z",
               "lineage_id": null,
               "network_id": "550e8400-e29b-41d4-a716-446655440002",
               "port_id": "550e8400-e29b-41d4-a716-446655440006",
               "service_id": "550e8400-e29b-41d4-a716-446655440007",
               "type": "Port",
-              "updated_at": "2026-09-10T15:31:30.161136Z",
-              "valid_from": "2026-09-10T15:31:30.161136Z",
+              "updated_at": "2026-09-13T18:34:24.364066Z",
+              "valid_from": "2026-09-13T18:34:24.364066Z",
               "valid_to": null
             }
           ],
@@ -29103,7 +29290,7 @@
           "name": "nginx",
           "network_id": "550e8400-e29b-41d4-a716-446655440002",
           "position": 0,
-          "service_definition": "Syncthing",
+          "service_definition": "Open WebUI",
           "source": {
             "type": "Manual"
           },
@@ -30424,7 +30611,7 @@
             "default": {
               "Application": [
                 {
-                  "id": "3b7a441c-2a56-4fc9-b476-eba1dab599a0",
+                  "id": "f3cab64d-82a7-4406-8c81-484a025b060f",
                   "rule": {
                     "ByApplication": {
                       "tag_ids": []
@@ -30434,23 +30621,23 @@
               ],
               "L2Physical": [
                 {
-                  "id": "4237c571-dbcc-4e7a-b53f-356ebdea9c4f",
+                  "id": "2b601ec7-1650-4ad9-8e9e-50f00eb25bfb",
                   "rule": "ByHost"
                 }
               ],
               "L3Logical": [
                 {
-                  "id": "4f874b6c-d5d5-4356-a53d-bdef96aaba04",
+                  "id": "23ff76cb-594b-450b-b280-055167da6484",
                   "rule": "BySubnet"
                 },
                 {
-                  "id": "cc104f9d-0bc9-49bc-9719-a18d9841e259",
+                  "id": "aeb2678e-71c4-4081-9b24-b5f152816e61",
                   "rule": "MergeContainerBridges"
                 }
               ],
               "Workloads": [
                 {
-                  "id": "4237c571-dbcc-4e7a-b53f-356ebdea9c4f",
+                  "id": "2b601ec7-1650-4ad9-8e9e-50f00eb25bfb",
                   "rule": "ByHost"
                 }
               ]
@@ -30480,19 +30667,19 @@
             "description": "Rules deciding how entities are placed and inlined within containers.",
             "default": [
               {
-                "id": "56cdedae-a70f-4ce1-9f04-b1a83efb296b",
+                "id": "c40a6b11-ed22-49e0-875f-5aa6c61d8f51",
                 "rule": "ByTrunkPort"
               },
               {
-                "id": "33752687-ea3e-41bc-b047-1528357f196a",
+                "id": "e0c6fdb4-2680-4099-aaa4-e1d0563178a1",
                 "rule": "ByVLAN"
               },
               {
-                "id": "25a0a5c6-a825-437a-b889-3aeb3c261361",
+                "id": "0700478b-d55b-438c-a2d3-951574db870a",
                 "rule": "ByPortOpStatus"
               },
               {
-                "id": "fb632c8d-fde3-4bc5-affa-2d66153f59f4",
+                "id": "f72359e7-3f09-40e9-a966-e446f1ce98ad",
                 "rule": {
                   "ByServiceCategory": {
                     "categories": [
@@ -30510,7 +30697,7 @@
                 }
               },
               {
-                "id": "79a16e34-2b22-424c-b6c2-9bf76cf969d7",
+                "id": "ccdaf70f-c48e-4db3-89bb-92bbc5b14764",
                 "rule": {
                   "ByTag": {
                     "tag_ids": [],
@@ -30519,15 +30706,15 @@
                 }
               },
               {
-                "id": "81fe589d-2f58-46d1-a770-1551076f3cee",
+                "id": "efcd74fe-0f3b-44c7-8e23-9abf69040f3a",
                 "rule": "ByHypervisor"
               },
               {
-                "id": "230bbcf1-24fd-42d5-85ed-e33b2ef79071",
+                "id": "7dc0f515-ecc7-4032-bc95-de991390b2e6",
                 "rule": "ByContainerRuntime"
               },
               {
-                "id": "3c85adbc-cd17-419a-b11c-b39dca8b95d1",
+                "id": "eee9894c-34ef-4dc9-8e9e-92230fbf382f",
                 "rule": "ByStack"
               }
             ]

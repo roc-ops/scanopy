@@ -101,7 +101,12 @@ impl HostService {
         // whole object, so stamping `Manual` on every save would freeze a derived name — a host
         // named after its detected service could then never adopt its controller's name because
         // someone once toggled "hidden".
-        if updated_host.base.name.value().as_str() != name {
+        //
+        // A blank name is a person handing naming back to discovery. `apply_name` would read it as
+        // "no name to offer" and keep the stored one, so it is cleared explicitly.
+        if name.trim().is_empty() {
+            updated_host.base.clear_name();
+        } else if updated_host.base.name.value().as_str() != name {
             updated_host.base.apply_name(HostName::manual(name));
         }
 

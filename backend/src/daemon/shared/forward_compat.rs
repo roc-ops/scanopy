@@ -209,6 +209,10 @@ impl DaemonResponse for HostResponse {
             last_seen_at: _,
             name: _,
             display_name: _,
+            // A plain enum and a list of plain structs. The server adds rungs only alongside a
+            // daemon that reads them, and the daemon never reads these.
+            display_name_rung: _,
+            name_ladder: _,
             name_source: _,
             network_id: _,
             hostname: _,
