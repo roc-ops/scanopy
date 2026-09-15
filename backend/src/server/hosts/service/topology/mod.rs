@@ -831,10 +831,11 @@ impl HostService {
 /// Empty is nothing to match on. The `usable_identifier` half is GH #88 arriving at the tier that
 /// accidentally rescued the SR Linux row: a description is worth *storing* whatever it holds, and
 /// it is shown to operators, but a control character in it makes it no more a port name than it
-/// made the port id one. `lldp_port_desc` cannot carry U+FFFD — it is strictly decoded and
-/// NUL-stripped on the SNMP path where it is collected (gNMI and lldpd are not, so a NUL-padded
-/// description simply fails the exact-match lookup) — so control characters are the whole of what
-/// this catches.
+/// made the port id one. `lldp_port_desc` cannot carry U+FFFD on the SNMP path — it is strictly
+/// decoded and NUL-stripped there — but it is also collected on the gNMI and lldpd paths (their
+/// `mod.rs` / `lldpd.rs`), where the string arrives already decoded by that transport with no such
+/// guarantee, and a device can advertise a literal U+FFFD there. So both halves of
+/// `usable_identifier` are live for this field, not just the control-character one.
 ///
 /// Filtered at the lookup rather than at the write on purpose. The stored value is untouched and
 /// the caller's verdict stays `unresolved`, so the row is still counted and still warned about; it
