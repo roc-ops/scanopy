@@ -119,6 +119,24 @@ pub(crate) struct Collection {
     /// Local chassis identity, when the device serves `/lldp/state` (ArcOS does not).
     pub local_chassis_id: Option<String>,
     pub local_chassis_id_type: Option<String>,
+    /// Whether `/lldp/interfaces` answered and every update in it parsed. Only then is a missing
+    /// neighbour a vanished one. A refused, failed or garbled read leaves the stored neighbours
+    /// in place, and a device refusing the path as unsupported is non-authoritative too: SNMP's
+    /// rule, `complete && !unsupported`.
+    pub lldp_complete: bool,
+}
+
+impl Collection {
+    /// Which per-interface groups this collection read in full. The interface set itself is
+    /// always authoritative (`collect` fails without `/interfaces`); LLDP only when its read was.
+    pub(crate) fn data_complete(&self) -> InterfaceDataComplete {
+        InterfaceDataComplete {
+            lldp: self.lldp_complete,
+            cdp: false,
+            fdb: false,
+            vlan_membership: false,
+        }
+    }
 }
 
 /// The subtrees one collection subscribes to, each its own Subscribe. Wildcard keys rather
@@ -201,23 +219,25 @@ fn scalar_to_string(v: &typed_value::Value) -> Option<String> {
 /// Flatten one update to leaves. PROTO encoding gives one typed leaf per update; JSON
 /// encodings give a blob rooted at the update path, whose objects become path elements
 /// (list entries keyed by their `name`/`id` member, the way both models key their lists).
-fn flatten_update(prefix: &[PathElem], path: &[PathElem], val: &TypedValue) -> Vec<Leaf> {
+/// `None` when a JSON blob does not parse: the update carried data that was lost, which is not
+/// the same as an update with nothing in it.
+fn flatten_update(prefix: &[PathElem], path: &[PathElem], val: &TypedValue) -> Option<Vec<Leaf>> {
     let mut elems: Vec<PathElem> = prefix.iter().chain(path.iter()).cloned().collect();
     let Some(value) = val.value.as_ref() else {
-        return vec![];
+        return Some(vec![]);
     };
     match value {
         typed_value::Value::JsonIetfVal(bytes) | typed_value::Value::JsonVal(bytes) => {
-            let Ok(json) = serde_json::from_slice::<serde_json::Value>(bytes) else {
-                return vec![];
-            };
+            let json = serde_json::from_slice::<serde_json::Value>(bytes).ok()?;
             let mut out = Vec::new();
             flatten_json(&mut elems, &json, &mut out);
-            out
+            Some(out)
         }
-        other => scalar_to_string(other)
-            .map(|value| vec![Leaf { elems, value }])
-            .unwrap_or_default(),
+        other => Some(
+            scalar_to_string(other)
+                .map(|value| vec![Leaf { elems, value }])
+                .unwrap_or_default(),
+        ),
     }
 }
 
@@ -273,18 +293,26 @@ fn json_scalar(v: &serde_json::Value) -> Option<String> {
     }
 }
 
-/// Fold one notification's updates into the collection.
-pub(crate) fn absorb_notification(coll: &mut Collection, notification: &Notification) {
+/// Fold one notification's updates into the collection. Returns `false` when an update did not
+/// parse, so the caller knows the subtree was not read in full.
+pub(crate) fn absorb_notification(coll: &mut Collection, notification: &Notification) -> bool {
     let prefix = notification.prefix.as_ref().map(|p| p.elem.as_slice());
+    let mut parsed = true;
     for update in &notification.update {
         let Some(val) = update.val.as_ref() else {
             continue;
         };
         let path = update.path.as_ref().map(|p| p.elem.as_slice());
-        for leaf in flatten_update(prefix.unwrap_or(&[]), path.unwrap_or(&[]), val) {
-            absorb_leaf(coll, &leaf);
+        match flatten_update(prefix.unwrap_or(&[]), path.unwrap_or(&[]), val) {
+            Some(leaves) => {
+                for leaf in leaves {
+                    absorb_leaf(coll, &leaf);
+                }
+            }
+            None => parsed = false,
         }
     }
+    parsed
 }
 
 fn absorb_leaf(coll: &mut Collection, leaf: &Leaf) {
@@ -541,13 +569,21 @@ pub(crate) async fn collect(transport: &mut dyn GnmiTransport) -> anyhow::Result
     for subtree in Subtree::ALL {
         match transport.subscribe_once(vec![subtree.path()]).await {
             Ok(notifications) => {
+                let mut parsed = true;
                 for n in &notifications {
-                    absorb_notification(&mut coll, n);
+                    parsed &= absorb_notification(&mut coll, n);
+                }
+                if subtree == Subtree::LldpNeighbors {
+                    coll.lldp_complete = parsed;
+                }
+                if !parsed {
+                    tracing::debug!(?subtree, "gNMI subtree had updates that did not parse");
                 }
             }
             Err(e) if subtree == Subtree::InterfaceState => {
                 return Err(e.context("openconfig-interfaces is required and was not served"));
             }
+            // `lldp_complete` stays false: a refused or failed LLDP read keeps what is stored.
             Err(e) => {
                 tracing::debug!(?subtree, error = %e, "gNMI subtree not served; continuing");
             }
@@ -641,12 +677,7 @@ impl DiscoveryIntegration for GnmiIntegration {
             // `/interfaces` answered or `collect` would have failed: the set is the device's
             // own full account, so the server may prune what is no longer in it.
             true,
-            InterfaceDataComplete {
-                lldp: true,
-                cdp: false,
-                fdb: false,
-                vlan_membership: false,
-            },
+            coll.data_complete(),
         );
         Ok(Completeness::Complete)
     }
@@ -664,11 +695,18 @@ mod tests {
     #[derive(Default)]
     struct ScriptedDevice {
         served: BTreeMap<&'static str, &'static str>,
+        /// Subtrees whose Subscribe fails with this error rather than a refusal.
+        failures: BTreeMap<&'static str, &'static str>,
     }
 
     impl ScriptedDevice {
         fn serve(mut self, subtree: Subtree, script: &'static str) -> Self {
             self.served.insert(subtree_key(subtree), script);
+            self
+        }
+
+        fn fail(mut self, subtree: Subtree, error: &'static str) -> Self {
+            self.failures.insert(subtree_key(subtree), error);
             self
         }
     }
@@ -773,6 +811,9 @@ mod tests {
                 panic!("the collector subscribes one subtree at a time");
             };
             let key = render_path(path);
+            if let Some(error) = self.failures.get(key.as_str()) {
+                anyhow::bail!("{error}");
+            }
             match self.served.get(key.as_str()) {
                 Some(script) => Ok(script_to_notifications(script)),
                 None => anyhow::bail!(
@@ -896,7 +937,11 @@ mod tests {
     /// neighbour joined on name, `/lldp/state` refused without consequence.
     #[tokio::test]
     async fn arcos_rows_join_interfaces_and_lldp() {
-        let (_coll, rows) = rows(&mut arcos()).await;
+        let (coll, rows) = rows(&mut arcos()).await;
+        assert!(
+            coll.data_complete().lldp,
+            "/lldp answered: its neighbour set is authoritative"
+        );
         assert_eq!(
             rows.len(),
             7,
@@ -957,6 +1002,53 @@ mod tests {
             lldp(row(&rows, "swp46")).lldp_mgmt_addr,
             Some("fe80::deda:4dff:fe86:f4ea".parse().unwrap())
         );
+    }
+
+    /// A device whose LLDP read fails, refused or timed out, still yields its rows but not an
+    /// authoritative neighbour set, so the server keeps the neighbours it holds instead of
+    /// clearing them on one bad read.
+    #[tokio::test]
+    async fn failed_lldp_read_keeps_rows_and_is_not_authoritative() {
+        let refused = ScriptedDevice::default()
+            .serve(Subtree::InterfaceState, ARCOS_INTERFACE_STATE)
+            .serve(Subtree::EthernetState, ARCOS_ETHERNET_STATE);
+        let timed_out = ScriptedDevice::default()
+            .serve(Subtree::InterfaceState, ARCOS_INTERFACE_STATE)
+            .serve(Subtree::EthernetState, ARCOS_ETHERNET_STATE)
+            .fail(Subtree::LldpNeighbors, "gNMI Subscribe stream timed out");
+        for (case, mut device) in [("refused", refused), ("timed out", timed_out)] {
+            let (coll, rows) = rows(&mut device).await;
+            assert!(
+                !coll.data_complete().lldp,
+                "{case}: lldp must not be authoritative"
+            );
+            assert_eq!(
+                rows.len(),
+                7,
+                "{case}: interface rows come through without LLDP"
+            );
+            assert!(
+                rows.iter().all(|r| r.base.neighbor_candidates.is_empty()),
+                "{case}"
+            );
+        }
+    }
+
+    /// An update whose JSON blob does not parse is reported, so a garbled LLDP subtree counts as
+    /// a failed read rather than an empty one.
+    #[test]
+    fn unparseable_json_update_is_reported() {
+        let n = Notification {
+            update: vec![Update {
+                path: Some(parse_path("lldp")),
+                val: Some(TypedValue {
+                    value: Some(typed_value::Value::JsonIetfVal(b"{not json".to_vec())),
+                }),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert!(!absorb_notification(&mut Collection::default(), &n));
     }
 
     /// A device serving LLDP but not `openconfig-interfaces` is an error naming the refused
@@ -1148,12 +1240,15 @@ mod tests {
     ";
 
     /// A device with `openconfig-interfaces` and no LLDP model at all still yields an
-    /// authoritative interface set, neighbourless; vendor-private types land as `other`.
+    /// authoritative interface set, neighbourless; vendor-private types land as `other`. Its
+    /// neighbour set is not authoritative: `/lldp` refused as unsupported is SNMP's
+    /// `unsupported`, which never clears.
     #[tokio::test]
     async fn dnos_interfaces_without_any_lldp_model() {
         let mut device =
             ScriptedDevice::default().serve(Subtree::InterfaceState, DNOS_INTERFACE_STATE);
-        let (_coll, rows) = rows(&mut device).await;
+        let (coll, rows) = rows(&mut device).await;
+        assert!(!coll.data_complete().lldp);
         assert_eq!(rows.len(), 6);
         assert!(rows.iter().all(|r| r.base.neighbor_candidates.is_empty()));
         let ge = row(&rows, "ge10-0/0/0");
