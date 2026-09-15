@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { describeIdentity } from '$lib/features/hosts/host-identity';
+import { discoveredName, nameToSubmit, overrideOf } from '$lib/features/hosts/host-identity';
 import type { HostNameLadderEntry } from '$lib/features/hosts/types/base';
 
 /**
- * What the host editor says about a host's name.
+ * The host editor's split of a stored name into a discovered name and a person's override.
  *
  * The ladders below stand in for the server's `name_ladder`: every rung in the server's order,
- * blanks already dropped. The cases are the hosts the editor has to explain: one a person named,
- * one discovery named, one titled by its sysName, one titled by its address, and one with nothing.
+ * blanks already dropped, sources only where there is a value.
  */
 
 const SNMP = { Probe: 'Snmp' } as const;
@@ -22,110 +21,72 @@ function ladder(
 	}));
 }
 
-describe('describeIdentity', () => {
-	it('says a person named a host whose saved name was typed in Scanopy, and offers a way back', () => {
-		const view = describeIdentity({
-			ladder: ladder({ Name: ['Core Switch', 'Manual'], SysName: ['core-sw-01', SNMP] }),
-			savedName: 'Core Switch',
-			nameSource: 'Manual',
-			liveName: 'Core Switch'
-		});
-
-		expect(view.statement).toEqual({ kind: 'namedByPerson' });
-		expect(view.canRevert).toBe(true);
-		expect(view.winningRung).toBe('Name');
+describe('discoveredName', () => {
+	it('is the stored name when discovery wrote it', () => {
+		expect(
+			discoveredName(ladder({ Name: ['core-sw-01', SNMP], Hostname: ['switch.lan', null] }))
+		).toEqual({ value: 'core-sw-01', rung: 'Name', source: SNMP });
 	});
 
-	it('credits discovery with a name it supplied, and offers no revert to the same name', () => {
-		const view = describeIdentity({
-			ladder: ladder({ Name: ['core-sw-01', SNMP], SysName: ['core-sw-01', SNMP] }),
-			savedName: 'core-sw-01',
-			nameSource: SNMP,
-			liveName: 'core-sw-01'
-		});
-
-		expect(view.statement).toEqual({ kind: 'namedByDiscovery', source: SNMP });
-		expect(view.canRevert).toBe(false);
+	it('looks past a name a person set, to what discovery would call the host', () => {
+		expect(
+			discoveredName(ladder({ Name: ['Core Switch', 'Manual'], Hostname: ['switch.lan', null] }))
+		).toEqual({ value: 'switch.lan', rung: 'Hostname', source: null });
 	});
 
-	it('keeps an unattributed name distinct from one a person typed', () => {
-		const view = describeIdentity({
-			ladder: ladder({ Name: ['nas.lan', 'Unspecified'] }),
-			savedName: 'nas.lan',
-			nameSource: 'Unspecified',
-			liveName: 'nas.lan'
+	it('treats an unattributed stored name as discovered, not as an override', () => {
+		expect(discoveredName(ladder({ Name: ['nas.lan', 'Unspecified'] }))).toEqual({
+			value: 'nas.lan',
+			rung: 'Name',
+			source: 'Unspecified'
 		});
-
-		expect(view.statement).toEqual({ kind: 'namedByDiscovery', source: 'Unspecified' });
 	});
 
-	it('titles a nameless host by its sysName when that is the highest rung it holds', () => {
-		const view = describeIdentity({
-			ladder: ladder({ SysName: ['printer-hp-main', SNMP], Address: ['10.0.30.50', null] }),
-			savedName: '',
-			nameSource: 'Unspecified',
-			liveName: ''
-		});
-
-		expect(view.statement).toEqual({
-			kind: 'shownAs',
-			value: 'printer-hp-main',
-			rung: 'SysName',
-			source: SNMP
-		});
-		expect(view.winningRung).toBe('SysName');
+	it('falls to the sysName of a nameless host', () => {
+		expect(
+			discoveredName(ladder({ SysName: ['printer-hp-main', SNMP], Address: ['10.0.30.50', null] }))
+		).toEqual({ value: 'printer-hp-main', rung: 'SysName', source: SNMP });
 	});
 
-	it('titles a host with nothing else by its address, with no source to claim', () => {
-		const view = describeIdentity({
-			ladder: ladder({ Address: ['10.0.30.61', null] }),
-			savedName: '',
-			nameSource: 'Unspecified',
-			liveName: ''
-		});
-
-		expect(view.statement).toEqual({
-			kind: 'shownAs',
+	it('falls to the address of a host with nothing else', () => {
+		expect(discoveredName(ladder({ Address: ['10.0.30.61', null] }))).toEqual({
 			value: '10.0.30.61',
 			rung: 'Address',
 			source: null
 		});
 	});
 
-	it('previews the discovered name as soon as the Name field is cleared, before saving', () => {
-		const view = describeIdentity({
-			ladder: ladder({ Name: ['Core Switch', 'Manual'], Hostname: ['switch.lan', null] }),
-			savedName: 'Core Switch',
-			nameSource: 'Manual',
-			liveName: '   '
-		});
+	it('is null when nothing identifies the host', () => {
+		expect(discoveredName(ladder({}))).toBeNull();
+		expect(discoveredName(ladder({ Name: ['Rack 3', 'Manual'] }))).toBeNull();
+	});
+});
 
-		expect(view.statement).toMatchObject({ kind: 'shownAs', value: 'switch.lan' });
-		expect(view.winningRung).toBe('Hostname');
-		expect(view.canRevert).toBe(false);
+describe('the override round trip', () => {
+	it('shows only a name a person set as the override', () => {
+		expect(overrideOf('Core Switch', 'Manual')).toBe('Core Switch');
+		expect(overrideOf('core-sw-01', SNMP)).toBe('');
 	});
 
-	it('treats an unsaved new name as a rename, whatever named the host before', () => {
-		const view = describeIdentity({
-			ladder: ladder({ Name: ['core-sw-01', SNMP] }),
-			savedName: 'core-sw-01',
-			nameSource: SNMP,
-			liveName: 'Rack 3 Top Switch'
-		});
-
-		expect(view.statement).toEqual({ kind: 'renaming' });
-		expect(view.canRevert).toBe(true);
+	it('leaves a discovered name untouched when the override stays blank', () => {
+		const saved = { savedName: 'core-sw-01', nameSource: SNMP };
+		expect(
+			nameToSubmit({ override: overrideOf(saved.savedName, saved.nameSource), ...saved })
+		).toBe('core-sw-01');
 	});
 
-	it('says nothing identifies a host with no name and no evidence', () => {
-		const view = describeIdentity({
-			ladder: ladder({}),
-			savedName: '',
-			nameSource: 'Unspecified',
-			liveName: ''
-		});
+	it('clears a name a person set when the override is emptied', () => {
+		expect(nameToSubmit({ override: '  ', savedName: 'Core Switch', nameSource: 'Manual' })).toBe(
+			''
+		);
+	});
 
-		expect(view.statement).toEqual({ kind: 'unnamed' });
-		expect(view.winningRung).toBeNull();
+	it('sends a typed override as typed, whatever named the host before', () => {
+		expect(nameToSubmit({ override: 'Rack 3', savedName: 'core-sw-01', nameSource: SNMP })).toBe(
+			'Rack 3'
+		);
+		expect(nameToSubmit({ override: 'Rack 3', savedName: '', nameSource: undefined })).toBe(
+			'Rack 3'
+		);
 	});
 });

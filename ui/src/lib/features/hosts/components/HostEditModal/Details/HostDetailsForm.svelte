@@ -15,7 +15,7 @@
 
 	interface Props {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		form: { Field: any; setFieldValue: (field: 'name', value: string) => void };
+		form: { Field: any };
 		formData: HostFormData;
 		isEditing?: boolean;
 	}
@@ -29,10 +29,10 @@
 	// auto-default (first network) on the falsy initial capture.
 </script>
 
-<div class="space-y-8 p-6">
+<div class="space-y-6 p-6">
 	<IdentitySection {form} {formData} {isEditing} />
 
-	<section class="space-y-6">
+	<div class="card card-static space-y-6">
 		<h3 class="text-primary text-sm font-semibold">{hosts_details_organizeHeading()}</h3>
 
 		<SelectNetwork
@@ -57,7 +57,7 @@
 		</form.Field>
 
 		<TagPicker bind:selectedTagIds={formData.tags} />
-	</section>
+	</div>
 
 	{#if isEditing}
 		<DeviceFactsSection host={formData} />
