@@ -201,7 +201,9 @@ const ARCOS_ETHERNET_STATE: &str = "
 ///
 /// `swp53` hears one peer twice: both entries carry port-id `98:03:9b:7f:6f:58`, which is
 /// netlab-server's `ens1f0np0`, and only one of them also carries the management address and
-/// system name. That is a double listing.
+/// system name. That is a double listing — the neighbor id's `6-`/`7-` prefix is the LLDP
+/// port-id *subtype* (agent circuit id vs. locally assigned), so the device is advertising the
+/// same value under two different subtypes rather than reporting two distinct peers.
 ///
 /// `swp1` is NOT that, though an earlier version of this comment said it was. Its two entries
 /// carry DIFFERENT port-ids: `34:80:0d:44:44:f5` is netlab-server's `eno2` (confirmed from the
