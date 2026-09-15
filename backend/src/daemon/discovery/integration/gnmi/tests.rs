@@ -36,18 +36,20 @@ impl ScriptedDevice {
 }
 
 fn subtree_key(subtree: Subtree) -> String {
-    subtree.elems.join("/")
+    format!("{}:{}", subtree.origin, subtree.elems.join("/"))
 }
 
 fn render_path(path: &Path) -> String {
-    path.elem
+    let elems = path
+        .elem
         .iter()
         .map(|e| {
             let keys: String = e.key.iter().map(|(k, v)| format!("[{k}={v}]")).collect();
             format!("{}{keys}", e.name)
         })
         .collect::<Vec<_>>()
-        .join("/")
+        .join("/");
+    format!("{}:{}", path.origin, elems)
 }
 
 /// Split on `/` outside brackets only: key values carry slashes (`[name=ge10-0/0/0]`).
@@ -427,7 +429,7 @@ async fn interfaces_refused_is_an_error_even_with_lldp_present() {
     let msg = format!("{err:#}");
     assert!(msg.contains("openconfig-interfaces is required"), "{msg}");
     assert!(
-        msg.contains("'interfaces/interface[name=*]/state' is not supported"),
+        msg.contains("':interfaces/interface[name=*]/state' is not supported"),
         "{msg}"
     );
 }
@@ -780,6 +782,25 @@ fn every_profile_names_a_neighbours_subtree_it_actually_reads() {
             p.module
         );
     }
+}
+
+/// `Subtree::path()` is the only place `origin` is actually put on the wire — nothing else
+/// reads the field. Every profile above sets it empty (openconfig and DriveNets both answer
+/// their tree under the device's default schema tree), so nothing exercises the non-empty
+/// case without a synthetic subtree here. Guards against `path()` silently dropping the field,
+/// which `subtree_key`/`render_path` (both origin-aware, see above) would not by itself catch.
+#[test]
+fn a_non_empty_origin_reaches_the_rendered_path() {
+    let subtree = Subtree {
+        origin: "srl_nokia",
+        elems: &["lldp", "interfaces", "interface[name=*]"],
+    };
+    let path = subtree.path();
+    assert_eq!(path.origin, "srl_nokia");
+    assert_eq!(
+        render_path(&path),
+        "srl_nokia:lldp/interfaces/interface[name=*]"
+    );
 }
 
 /// Parse a gnmic-style path into a `Leaf` with no value, reusing the same path-parsing the
