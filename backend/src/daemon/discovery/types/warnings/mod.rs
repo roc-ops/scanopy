@@ -240,6 +240,23 @@ pub enum DiscoveryWarning {
         #[schema(value_type = String)]
         address: IpAddr,
     },
+    /// Two integrations that each read the device's full interface table both collected it, and
+    /// their interface sets were merged.
+    ///
+    /// A supported configuration, not a fault. It is reported because the merge keeps one row
+    /// per port: where both describe a port, the first to answer supplies the row and its
+    /// neighbours, and the second's are dropped. Someone chasing a missing link needs to know
+    /// that happened.
+    #[schema(title = "EqualReachIntegrationsMerged")]
+    EqualReachIntegrationsMerged {
+        /// The device both integrations read.
+        #[schema(value_type = String)]
+        address: IpAddr,
+        /// The integration that answered first. Its row stands on every port both describe.
+        first: CredentialQueryPayloadDiscriminants,
+        /// The integration that answered second.
+        second: CredentialQueryPayloadDiscriminants,
+    },
 
     // ---- Credential issues -----------------------------------------------
     /// The credential's address is not on any subnet this scan covers.
@@ -588,6 +605,7 @@ pub enum DiscoveryWarningCode {
     MalformedNeighboursUnreadableIndex,
     SnmpCollectedNothing,
     VlanRecordingFailed,
+    EqualReachIntegrationsMerged,
     CredentialTargetNotScanned,
     CredentialTargetNotResponding,
     CredentialGateClosed,
@@ -660,6 +678,9 @@ impl DiscoveryWarning {
             }
             Self::SnmpCollectedNothing { .. } => DiscoveryWarningCode::SnmpCollectedNothing,
             Self::VlanRecordingFailed { .. } => DiscoveryWarningCode::VlanRecordingFailed,
+            Self::EqualReachIntegrationsMerged { .. } => {
+                DiscoveryWarningCode::EqualReachIntegrationsMerged
+            }
             Self::CredentialTargetNotScanned { .. } => {
                 DiscoveryWarningCode::CredentialTargetNotScanned
             }
@@ -745,7 +766,10 @@ impl DiscoveryWarning {
             | Self::CredentialUnreachable(a)
             | Self::CredentialTimedOut(a) => Some(a.integration),
 
-            Self::ConnectionsWithoutProtocolResponse { .. }
+            // Two integrations, and neither one produced it: the merge in the daemon pipeline did.
+            // Naming either would count it against an integration that did nothing wrong.
+            Self::EqualReachIntegrationsMerged { .. }
+            | Self::ConnectionsWithoutProtocolResponse { .. }
             | Self::ScanTimeLimitWithEstimate { .. }
             | Self::ScanTimeLimit { .. }
             | Self::LldpNeighbourNotFound(_)

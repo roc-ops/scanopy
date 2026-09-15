@@ -1855,6 +1855,8 @@
 	"meta_warning_codes_CredentialTlsFailed_name": "TLS negotiation failed",
 	"meta_warning_codes_CredentialUnreachable_description": "The {credential} credential for {addresses} could not be reached — check the address, port and that the service is listening. ({detail})",
 	"meta_warning_codes_CredentialUnreachable_name": "Credential target unreachable",
+	"meta_warning_codes_EqualReachIntegrationsMerged_description": "{addresses} answered both {first} and {second}, and both integrations reported a full interface table. Scanopy merged the two sets. On a port both describe, {first} answered first, so Scanopy used its row and its neighbours. Running both is supported.",
+	"meta_warning_codes_EqualReachIntegrationsMerged_name": "Interfaces merged from two integrations",
 	"meta_warning_codes_FdbResolutionIncomplete_description": "Matching single-MAC forwarding-table entries to the devices they name was stopped after {budget_seconds}s, with {interfaces} interface(s) still carrying one. Physical Topology is missing links this scan would otherwise have drawn; the next scan retries from scratch. Narrow what the scan covers, or split the network across daemons, if it keeps happening.",
 	"meta_warning_codes_FdbResolutionIncomplete_name": "FDB link resolution did not finish",
 	"meta_warning_codes_InterfaceDetailsCutShort_description": "{addresses} returned every SNMP interface but stopped while reading their details, so some descriptions or speeds may be blank.",

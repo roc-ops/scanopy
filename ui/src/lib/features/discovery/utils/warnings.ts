@@ -285,6 +285,13 @@ const WARNING_PARAMS = {
 
 	SnmpCollectedNothing: (w) => ({ addresses: addressesOf(w) }),
 	VlanRecordingFailed: (w) => ({ addresses: addressesOf(w) }),
+	// One per host, like the credential codes. The two integrations identify the statement, so hosts
+	// read by the same pair in the same order share a sentence and a different pair stays apart.
+	EqualReachIntegrationsMerged: (w) => ({
+		addresses: addressesOf(w),
+		first: integration(w[0].first),
+		second: integration(w[0].second)
+	}),
 
 	CredentialTargetNotScanned: credentialParams,
 	CredentialTargetNotResponding: credentialParams,

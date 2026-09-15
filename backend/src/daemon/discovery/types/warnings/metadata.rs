@@ -142,6 +142,11 @@ impl DiscoveryWarningCode {
             | Self::SnmpCollectedNothing
             | Self::VlanRecordingFailed => &["addresses"],
 
+            // Shaped like the credential family: the integrations identify the statement and the
+            // addresses aggregate, so hosts read by the same pair in the same order share a
+            // sentence and a different pair gets its own.
+            Self::EqualReachIntegrationsMerged => &["addresses", "first", "second"],
+
             Self::SnmpWalkEntryCap => &["addresses", "groups", "limit"],
 
             Self::SnmpWalkUnsupported
@@ -269,6 +274,9 @@ impl DiscoveryWarningCode {
             // The old format was translated, so this scan lost nothing. It reports a daemon
             // that will lose something once the compatibility window closes.
             | Self::OutdatedDaemonFormat
+            // Running two full-ifTable integrations against one device is supported. Nothing was
+            // lost that the configuration did not choose.
+            | Self::EqualReachIntegrationsMerged
             | Self::Unknown => Severity::Informational,
             // Links are missing that the device did advertise, which is data loss for this scan
             // rather than something for the operator to confirm.
@@ -353,6 +361,8 @@ impl DiscoveryWarningCode {
             | Self::LldpPortNotFound
             | Self::LldpPortAmbiguous
             | Self::LldpPortNoStrategy
+            // A supported configuration, reported so a missing link can be traced to the merge.
+            | Self::EqualReachIntegrationsMerged
             // Carries whatever a newer binary sent, so there is nothing here to classify.
             | Self::Unknown => WarningRemedy::NothingToDo,
         }
@@ -409,6 +419,7 @@ impl TypeMetadataProvider for DiscoveryWarningCode {
             Self::MalformedNeighboursUnreadableIndex => "Neighbour position unreadable",
             Self::SnmpCollectedNothing => "SNMP answered but returned nothing",
             Self::VlanRecordingFailed => "VLANs could not be saved",
+            Self::EqualReachIntegrationsMerged => "Interfaces merged from two integrations",
             Self::CredentialTargetNotScanned => "Credential target outside the scan",
             Self::CredentialTargetNotResponding => "Credential target did not respond",
             Self::CredentialGateClosed => "Credential port not open",
@@ -509,6 +520,9 @@ impl TypeMetadataProvider for DiscoveryWarningCode {
             }
             Self::VlanRecordingFailed => {
                 "The VLANs reported by {addresses} could not be saved, so VLAN membership is missing from their interfaces. The devices answered correctly — this is a failure recording the result, and the daemon log has the underlying error."
+            }
+            Self::EqualReachIntegrationsMerged => {
+                "{addresses} answered both {first} and {second}, and both integrations reported a full interface table. Scanopy merged the two sets. On a port both describe, {first} answered first, so Scanopy used its row and its neighbours. Running both is supported."
             }
             Self::CredentialTargetNotScanned => {
                 "The {credential} credential for {addresses} was never contacted, because no subnet this scan covers reaches there — add the subnet to the discovery, or move the credential to a host inside it."
