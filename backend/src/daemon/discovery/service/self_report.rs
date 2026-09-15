@@ -12,6 +12,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::daemon::discovery::service::base::DiscoveryRunner;
+#[cfg(unix)]
 use crate::daemon::discovery::service::lldpd;
 use crate::daemon::discovery::service::ops::DiscoveryOps;
 use crate::daemon::utils::base::DaemonUtils;
@@ -141,6 +142,7 @@ impl DiscoveryRunner {
     /// for this submission. Absence of a socket is the everyday case and stays quiet; a socket
     /// that exists and does not serve is logged at the level its classification warrants, and
     /// the rows go up undecorated — exactly as they did before this read existed (GH #689).
+    #[cfg(unix)]
     async fn apply_lldpd_neighbours(&self, interfaces: &mut [Interface]) -> bool {
         let Some(socket) = lldpd::socket_path() else {
             return false;
@@ -171,6 +173,12 @@ impl DiscoveryRunner {
                 false
             }
         }
+    }
+
+    /// lldpd's control socket is a Unix socket, so there is nothing to read elsewhere.
+    #[cfg(not(unix))]
+    async fn apply_lldpd_neighbours(&self, _interfaces: &mut [Interface]) -> bool {
+        false
     }
 
     /// The daemon's own `HostBase`.

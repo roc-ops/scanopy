@@ -605,8 +605,10 @@ mod tests {
     struct TempDir(PathBuf);
 
     impl TempDir {
+        /// Under `/tmp` rather than `temp_dir()`: a socket path must fit `SUN_LEN` (104 bytes on
+        /// macOS), which a long `TMPDIR` plus this directory name does not.
         fn new() -> Self {
-            let dir = std::env::temp_dir().join(format!("scanopy-lldpd-{}", Uuid::new_v4()));
+            let dir = PathBuf::from("/tmp").join(format!("scanopy-lldpd-{}", Uuid::new_v4()));
             std::fs::create_dir_all(&dir).unwrap();
             Self(dir)
         }
