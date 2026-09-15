@@ -210,7 +210,7 @@ impl std::fmt::Display for LldpModel {
 /// Wildcard keys rather than bare list elements: the spec treats both as "every entry", but
 /// `[name=*]` is the form every implementation has been exercised with (it is what gnmic sends).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Subtree {
+pub(crate) struct Subtree {
     /// gNMI `origin` (`Path.origin`): which schema tree the path is rooted in. Empty means the
     /// device's default tree, where openconfig is served on every device this collector has
     /// been run against.
@@ -285,7 +285,7 @@ impl Subtree {
 ///
 /// Everything from the state container down is identical across profiles, so nothing after the
 /// walk — `LldpChassisId`, `LldpPortId`, `collection_to_interfaces` — varies by profile.
-pub struct LldpModelProfile {
+pub(crate) struct LldpModelProfile {
     /// WHAT IS NOT IN HERE, so the next person knows which vendors the table absorbs: the list
     /// KEY names (`interface[name=…]`, `neighbor[id=…]`) and the literal `lldp` element are
     /// still fixed in `absorb_leaf` and `normalised_names`. A vendor openconfig-SHAPED except
@@ -330,7 +330,7 @@ pub struct LldpModelProfile {
 
 /// `openconfig-lldp`, rooted at `/lldp`: no root to strip and `state` already named `state`, so
 /// the normalisation below is the identity for it.
-pub static OPENCONFIG_LLDP: LldpModelProfile = LldpModelProfile {
+pub(crate) static OPENCONFIG_LLDP: LldpModelProfile = LldpModelProfile {
     module: "openconfig-lldp",
     subtrees: &[
         // `/lldp/state`: the device's own chassis id, where served — ArcOS refuses this path.
@@ -347,7 +347,7 @@ pub static OPENCONFIG_LLDP: LldpModelProfile = LldpModelProfile {
 ///
 /// One subtree rather than two because the native tree is small and cDNOS 26.2 answers the
 /// parent in a single Subscribe, local identity and neighbours together.
-pub static DN_LLDP: LldpModelProfile = LldpModelProfile {
+pub(crate) static DN_LLDP: LldpModelProfile = LldpModelProfile {
     module: "dn-lldp",
     subtrees: &[Subtree::default_origin(&[
         "drivenets-top",
