@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:c527433a-6763-4c8a-8cb4-b64c95195a59",
+  "serialNumber": "urn:uuid:15d79b9c-4f8d-42c7-b868-79c7fcdac388",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-09-03T19:16:35Z",
+    "timestamp": "2026-09-15T15:46:29Z",
     "tools": {
       "components": [
         {
@@ -7341,52 +7341,6 @@
         {
           "name": "syft:location:0:path",
           "value": "/.github/workflows/service-request-responder.yml"
-        }
-      ]
-    },
-    {
-      "bom-ref": "pkg:github/actions/setup-java@v4?package-id=fbb92a20fd4b96bf",
-      "type": "library",
-      "name": "actions/setup-java",
-      "version": "v4",
-      "cpe": "cpe:2.3:a:actions\\/setup-java:actions\\/setup-java:v4:*:*:*:*:*:*:*",
-      "purl": "pkg:github/actions/setup-java@v4",
-      "properties": [
-        {
-          "name": "syft:package:foundBy",
-          "value": "github-actions-usage-cataloger"
-        },
-        {
-          "name": "syft:package:type",
-          "value": "github-action"
-        },
-        {
-          "name": "syft:package:metadataType",
-          "value": "github-actions-use-statement"
-        },
-        {
-          "name": "syft:cpe23",
-          "value": "cpe:2.3:a:actions\\/setup-java:actions\\/setup_java:v4:*:*:*:*:*:*:*"
-        },
-        {
-          "name": "syft:cpe23",
-          "value": "cpe:2.3:a:actions\\/setup_java:actions\\/setup-java:v4:*:*:*:*:*:*:*"
-        },
-        {
-          "name": "syft:cpe23",
-          "value": "cpe:2.3:a:actions\\/setup_java:actions\\/setup_java:v4:*:*:*:*:*:*:*"
-        },
-        {
-          "name": "syft:cpe23",
-          "value": "cpe:2.3:a:actions\\/setup:actions\\/setup-java:v4:*:*:*:*:*:*:*"
-        },
-        {
-          "name": "syft:cpe23",
-          "value": "cpe:2.3:a:actions\\/setup:actions\\/setup_java:v4:*:*:*:*:*:*:*"
-        },
-        {
-          "name": "syft:location:0:path",
-          "value": "/.github/workflows/release.yml"
         }
       ]
     },
@@ -35264,6 +35218,32 @@
       ]
     },
     {
+      "bom-ref": "pkg:github/ossign/ossign@1.1.0?package-id=6a949bd95fe09ca8",
+      "type": "library",
+      "name": "ossign/ossign",
+      "version": "1.1.0",
+      "cpe": "cpe:2.3:a:ossign\\/ossign:ossign\\/ossign:1.1.0:*:*:*:*:*:*:*",
+      "purl": "pkg:github/ossign/ossign@1.1.0",
+      "properties": [
+        {
+          "name": "syft:package:foundBy",
+          "value": "github-actions-usage-cataloger"
+        },
+        {
+          "name": "syft:package:type",
+          "value": "github-action"
+        },
+        {
+          "name": "syft:package:metadataType",
+          "value": "github-actions-use-statement"
+        },
+        {
+          "name": "syft:location:0:path",
+          "value": "/.github/workflows/release.yml"
+        }
+      ]
+    },
+    {
       "bom-ref": "pkg:cargo/outref@0.5.2?package-id=c3ab9c63961494eb",
       "type": "library",
       "name": "outref",
@@ -37961,18 +37941,12 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/pnet_datalink@0.35.0?package-id=edc6881099a3aa23",
+      "bom-ref": "pkg:cargo/pnet_datalink@0.35.0?package-id=2dd9879a36fdb57e",
       "type": "library",
       "name": "pnet_datalink",
       "version": "0.35.0",
       "cpe": "cpe:2.3:a:pnet-datalink:pnet-datalink:0.35.0:*:*:*:*:*:*:*",
       "purl": "pkg:cargo/pnet_datalink@0.35.0",
-      "externalReferences": [
-        {
-          "url": "registry+https://github.com/rust-lang/crates.io-index",
-          "type": "distribution"
-        }
-      ],
       "properties": [
         {
           "name": "syft:package:foundBy",
@@ -38650,10 +38624,10 @@
       ]
     },
     {
-      "bom-ref": "pkg:npm/postcss-selector-parser@6.1.2?package-id=dfaf405a10562e90",
+      "bom-ref": "pkg:npm/postcss-selector-parser@6.1.4?package-id=bdab78edb2938303",
       "type": "library",
       "name": "postcss-selector-parser",
-      "version": "6.1.2",
+      "version": "6.1.4",
       "licenses": [
         {
           "license": {
@@ -38661,8 +38635,8 @@
           }
         }
       ],
-      "cpe": "cpe:2.3:a:postcss-selector-parser:postcss-selector-parser:6.1.2:*:*:*:*:*:*:*",
-      "purl": "pkg:npm/postcss-selector-parser@6.1.2",
+      "cpe": "cpe:2.3:a:postcss-selector-parser:postcss-selector-parser:6.1.4:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/postcss-selector-parser@6.1.4",
       "properties": [
         {
           "name": "syft:package:foundBy",
@@ -38682,39 +38656,39 @@
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:postcss-selector-parser:postcss_selector_parser:6.1.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:postcss-selector-parser:postcss_selector_parser:6.1.4:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:postcss_selector_parser:postcss-selector-parser:6.1.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:postcss_selector_parser:postcss-selector-parser:6.1.4:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:postcss_selector_parser:postcss_selector_parser:6.1.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:postcss_selector_parser:postcss_selector_parser:6.1.4:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:postcss-selector:postcss-selector-parser:6.1.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:postcss-selector:postcss-selector-parser:6.1.4:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:postcss-selector:postcss_selector_parser:6.1.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:postcss-selector:postcss_selector_parser:6.1.4:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:postcss_selector:postcss-selector-parser:6.1.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:postcss_selector:postcss-selector-parser:6.1.4:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:postcss_selector:postcss_selector_parser:6.1.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:postcss_selector:postcss_selector_parser:6.1.4:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:postcss:postcss-selector-parser:6.1.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:postcss:postcss-selector-parser:6.1.4:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:postcss:postcss_selector_parser:6.1.2:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:postcss:postcss_selector_parser:6.1.4:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:location:0:path",
@@ -43938,12 +43912,12 @@
       ]
     },
     {
-      "bom-ref": "pkg:cargo/scanopy-server@0.17.14?package-id=a6933626a41b7cdf",
+      "bom-ref": "pkg:cargo/scanopy-server@0.17.15?package-id=0a3c180e2e934bdc",
       "type": "library",
       "name": "scanopy-server",
-      "version": "0.17.14",
-      "cpe": "cpe:2.3:a:scanopy-server:scanopy-server:0.17.14:*:*:*:*:*:*:*",
-      "purl": "pkg:cargo/scanopy-server@0.17.14",
+      "version": "0.17.15",
+      "cpe": "cpe:2.3:a:scanopy-server:scanopy-server:0.17.15:*:*:*:*:*:*:*",
+      "purl": "pkg:cargo/scanopy-server@0.17.15",
       "properties": [
         {
           "name": "syft:package:foundBy",
@@ -43963,23 +43937,23 @@
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy-server:scanopy_server:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy-server:scanopy_server:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy_server:scanopy-server:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy_server:scanopy-server:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy_server:scanopy_server:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy_server:scanopy_server:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy:scanopy-server:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy:scanopy-server:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy:scanopy_server:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy:scanopy_server:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:location:0:path",
@@ -43988,12 +43962,12 @@
       ]
     },
     {
-      "bom-ref": "pkg:npm/scanopy-ui@0.17.14?package-id=2c6ea0099759a4de",
+      "bom-ref": "pkg:npm/scanopy-ui@0.17.15?package-id=22ae69b7804123a3",
       "type": "library",
       "name": "scanopy-ui",
-      "version": "0.17.14",
-      "cpe": "cpe:2.3:a:scanopy-ui:scanopy-ui:0.17.14:*:*:*:*:*:*:*",
-      "purl": "pkg:npm/scanopy-ui@0.17.14",
+      "version": "0.17.15",
+      "cpe": "cpe:2.3:a:scanopy-ui:scanopy-ui:0.17.15:*:*:*:*:*:*:*",
+      "purl": "pkg:npm/scanopy-ui@0.17.15",
       "properties": [
         {
           "name": "syft:package:foundBy",
@@ -44013,23 +43987,23 @@
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy-ui:scanopy_ui:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy-ui:scanopy_ui:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy_ui:scanopy-ui:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy_ui:scanopy-ui:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy_ui:scanopy_ui:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy_ui:scanopy_ui:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy:scanopy-ui:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy:scanopy-ui:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:cpe23",
-          "value": "cpe:2.3:a:scanopy:scanopy_ui:0.17.14:*:*:*:*:*:*:*"
+          "value": "cpe:2.3:a:scanopy:scanopy_ui:0.17.15:*:*:*:*:*:*:*"
         },
         {
           "name": "syft:location:0:path",
@@ -60427,11 +60401,11 @@
       "hashes": [
         {
           "alg": "SHA-1",
-          "content": "77a63491f9c1ad27948bef78c06906d6c8bc640a"
+          "content": "b679bbeb83e8dd2e584bf467663b35cdfefe0011"
         },
         {
           "alg": "SHA-256",
-          "content": "ad4dc4b6ffdb4fa32c32954ac34f576b90dae3f1f6965e2d58e7ebf892074e45"
+          "content": "aeeaed986df8e80f4f612816945d82a9e2b1216fb95507b84efa5ad8f3c92934"
         }
       ]
     },
@@ -60502,11 +60476,11 @@
       "hashes": [
         {
           "alg": "SHA-1",
-          "content": "6834a53c0b51e912e15e1a77978c3313900649b9"
+          "content": "94e556b80b2d39b99859ed9c8d6a45a61538ab27"
         },
         {
           "alg": "SHA-256",
-          "content": "6cf263b1cfa28895d292586659a63948ec42d6bd1ecfa7311302dafd86eb270a"
+          "content": "7f21103f2123633032a8b6968791ebbf54a4304133557f18c56e579a7cd0f642"
         }
       ]
     },
@@ -60532,11 +60506,11 @@
       "hashes": [
         {
           "alg": "SHA-1",
-          "content": "1499ed98def28d9084e72f3a3a26c0fe5a78fc33"
+          "content": "cfab730137a92f5e94ce604f3df0413a46890bba"
         },
         {
           "alg": "SHA-256",
-          "content": "95d5181760f3229a8975696c8887e6725691d70b0bdbaaae10e8494efec1ee3a"
+          "content": "4e2dfe50ffc87286efb36767926e3827a88ce8aa2440b082c09d5c2e9cad819b"
         }
       ]
     }
@@ -63987,7 +63961,7 @@
       "dependsOn": [
         "pkg:cargo/ipnetwork@0.20.0?package-id=0b6cd0806640ad25",
         "pkg:cargo/pnet_base@0.35.0?package-id=f8301fb20ddac0ae",
-        "pkg:cargo/pnet_datalink@0.35.0?package-id=edc6881099a3aa23",
+        "pkg:cargo/pnet_datalink@0.35.0?package-id=2dd9879a36fdb57e",
         "pkg:cargo/pnet_packet@0.35.0?package-id=7051944e007e3c0b",
         "pkg:cargo/pnet_sys@0.35.0?package-id=15e0d18db55457b8",
         "pkg:cargo/pnet_transport@0.35.0?package-id=7cb52410cb157fb8"
@@ -64000,12 +63974,13 @@
       ]
     },
     {
-      "ref": "pkg:cargo/pnet_datalink@0.35.0?package-id=edc6881099a3aa23",
+      "ref": "pkg:cargo/pnet_datalink@0.35.0?package-id=2dd9879a36fdb57e",
       "dependsOn": [
         "pkg:cargo/ipnetwork@0.20.0?package-id=0b6cd0806640ad25",
         "pkg:cargo/libc@0.2.186?package-id=66a0bc5b0a2159ca",
         "pkg:cargo/pnet_base@0.35.0?package-id=f8301fb20ddac0ae",
         "pkg:cargo/pnet_sys@0.35.0?package-id=15e0d18db55457b8",
+        "pkg:cargo/tracing@0.1.41?package-id=4322088d4de9c2ec",
         "pkg:cargo/winapi@0.3.9?package-id=55bbc7d784bfb092"
       ]
     },
@@ -64763,7 +64738,7 @@
       ]
     },
     {
-      "ref": "pkg:cargo/scanopy-server@0.17.14?package-id=a6933626a41b7cdf",
+      "ref": "pkg:cargo/scanopy-server@0.17.15?package-id=0a3c180e2e934bdc",
       "dependsOn": [
         "pkg:cargo/anstyle-query@1.1.5?package-id=3eb3e92be11ef569",
         "pkg:cargo/anyhow@1.0.103?package-id=cc88ccfde1e2cc6a",
@@ -67231,11 +67206,11 @@
     {
       "ref": "pkg:npm/postcss-nested@6.2.0?package-id=7580c6e89af818ae",
       "dependsOn": [
-        "pkg:npm/postcss-selector-parser@6.1.2?package-id=dfaf405a10562e90"
+        "pkg:npm/postcss-selector-parser@6.1.4?package-id=bdab78edb2938303"
       ]
     },
     {
-      "ref": "pkg:npm/postcss-selector-parser@6.1.2?package-id=dfaf405a10562e90",
+      "ref": "pkg:npm/postcss-selector-parser@6.1.4?package-id=bdab78edb2938303",
       "dependsOn": [
         "pkg:npm/cssesc@3.0.0?package-id=f4d48cbab370045b",
         "pkg:npm/util-deprecate@1.0.2?package-id=677a46abc9631f6b"
@@ -67304,7 +67279,7 @@
       ]
     },
     {
-      "ref": "pkg:npm/scanopy-ui@0.17.14?package-id=2c6ea0099759a4de",
+      "ref": "pkg:npm/scanopy-ui@0.17.15?package-id=22ae69b7804123a3",
       "dependsOn": [
         "pkg:npm/%40beyonk/gdpr-cookie-consent-banner@16.0.2?package-id=cd6aef3707be3a0f",
         "pkg:npm/%40peculiar/x509@1.14.3?package-id=f9f09aa6bd0dd2b7",
@@ -67407,7 +67382,7 @@
         "pkg:npm/postcss-js@4.1.0?package-id=062a7cee1111feda",
         "pkg:npm/postcss-load-config@6.0.1?package-id=7e974bfafd974e92",
         "pkg:npm/postcss-nested@6.2.0?package-id=7580c6e89af818ae",
-        "pkg:npm/postcss-selector-parser@6.1.2?package-id=dfaf405a10562e90",
+        "pkg:npm/postcss-selector-parser@6.1.4?package-id=bdab78edb2938303",
         "pkg:npm/postcss@8.5.23?package-id=3a41d2a15bfb69f6",
         "pkg:npm/resolve@1.22.11?package-id=275977b2835e7901",
         "pkg:npm/sucrase@3.35.1?package-id=ff215c8fd0a00bb5"
