@@ -18,7 +18,6 @@ import conceptsJson from '$lib/data/concepts.json';
 import containerTypesJson from '$lib/data/container-types.json';
 import viewsJson from '$lib/data/views.json';
 import serviceCategoriesJson from '$lib/data/service-categories.json';
-import attributeMethodsJson from '$lib/data/attribute-methods.json';
 import attributeSourcesJson from '$lib/data/attribute-sources.json';
 import clientProbesJson from '$lib/data/client-probes.json';
 import {
@@ -104,7 +103,6 @@ export interface MetadataRegistry {
 	container_types: TypeMetadata[];
 	views: TypeMetadata[];
 	service_categories: TypeMetadata[];
-	attribute_methods: TypeMetadata[];
 	attribute_sources: TypeMetadata[];
 	client_probes: TypeMetadata[];
 }
@@ -287,7 +285,6 @@ export const metadata = writable<MetadataRegistry>({
 	container_types: containerTypesJson,
 	views: viewsJson,
 	service_categories: serviceCategoriesJson,
-	attribute_methods: attributeMethodsJson,
 	attribute_sources: attributeSourcesJson,
 	client_probes: clientProbesJson
 } as unknown as MetadataRegistry);
@@ -467,14 +464,6 @@ interface EntityTypeMetadata {
 export const entities = createTypeMetadataHelpers<'entities', EntityTypeMetadata>('entities');
 /** How an entity came to exist, keyed by `source.type`. */
 export const entitySources = createTypeMetadataHelpers<'entity_sources', object>('entity_sources');
-/**
- * Provenance tiers. `metadata.sources` lists the sources at each tier in the API's own shape, which
- * is how a value's recorded source reaches its tier's colour and icon.
- */
-export const attributeMethods = createTypeMetadataHelpers<
-	'attribute_methods',
-	{ sources?: components['schemas']['AttributeSource'][] } | null
->('attribute_methods');
 /**
  * Per-source labels, keyed by the source's variant. `Probe` and `Authored` are templates: read
  * them through `attributeSourceLabel`, not `getName`.

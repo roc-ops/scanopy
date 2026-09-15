@@ -2,15 +2,14 @@
  * Where one discovered value came from, as a label and a tag.
  *
  * The labels are backend metadata: `attribute-sources.json` names each source by its variant, and
- * `client-probes.json` names the probe that `Probe` and `Authored` carry. The colour and icon are
- * the source's tier from `attribute-methods.json`, the same grouping the backend ranks values by,
- * so a tag reads as trusted exactly as far as the applier trusts the value.
+ * `client-probes.json` names the probe that `Probe` and `Authored` carry. Every tag is the same
+ * neutral grey: the label says where a value came from, and colour adds no ranking on top of it.
  */
 
 import type { components } from '$lib/api/schema';
 import type { TagProps } from '$lib/shared/components/data/types';
 import { metaDescriptionWith, metaNameWith } from '$lib/i18n/metadata';
-import { attributeMethods, attributeSources, clientProbes } from '$lib/shared/stores/metadata';
+import { attributeSources, clientProbes } from '$lib/shared/stores/metadata';
 
 /** Derived from the backend enum rather than restated, so a new source cannot drift out of sync. */
 export type AttributeSource = components['schemas']['AttributeSource'];
@@ -51,22 +50,11 @@ export function attributeSourceDescription(source: AttributeSource): string {
 	return metaDescriptionWith('attribute_sources', variant, slots(probe), fallback);
 }
 
-/** The tier a source sits at, as the backend groups them. `null` for one the fixture omits. */
-function tierOf(source: AttributeSource): string | null {
-	const key = sourceKey(source);
-	const tier = attributeMethods
-		.getItems()
-		?.find((method) => (method.metadata?.sources ?? []).some((s) => sourceKey(s) === key));
-	return tier?.id ?? null;
-}
-
-/** A tag naming the source, coloured by its tier, with the source's description as its title. */
+/** A neutral tag naming the source, with the source's description as its title. */
 export function attributeSourceTag(source: AttributeSource): TagProps {
-	const tier = tierOf(source);
 	return {
 		label: attributeSourceLabel(source),
-		color: attributeMethods.getColorString(tier),
-		icon: attributeMethods.getIconComponent(tier),
+		color: 'Gray',
 		title: attributeSourceDescription(source)
 	};
 }

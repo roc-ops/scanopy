@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import attributeMethodsJson from '$lib/data/attribute-methods.json';
-import {
-	attributeSourceLabel,
-	attributeSourceTag,
-	type AttributeSource
-} from '$lib/shared/utils/attribute-source';
+import { attributeSourceLabel, type AttributeSource } from '$lib/shared/utils/attribute-source';
 import { clientProbes } from '$lib/shared/stores/metadata';
 
 /**
@@ -35,12 +31,6 @@ describe('attribute source labels', () => {
 			if (typeof source === 'string') continue;
 			const [probe] = Object.values(source);
 			expect(attributeSourceLabel(source)).toContain(clientProbes.getName(probe));
-		}
-	});
-
-	it('colours every source by a tier the backend placed it in', () => {
-		for (const source of EVERY_SOURCE) {
-			expect(attributeSourceTag(source).icon, JSON.stringify(source)).toBeTruthy();
 		}
 	});
 });

@@ -8,7 +8,7 @@
 	import TextInput from '$lib/shared/components/forms/input/TextInput.svelte';
 	import Tag from '$lib/shared/components/data/Tag.svelte';
 	import AttributeSourceTag from '$lib/shared/components/data/AttributeSourceTag.svelte';
-	import { attributeSourceTag } from '$lib/shared/utils/attribute-source';
+	import { attributeSourceDescription } from '$lib/shared/utils/attribute-source';
 	import {
 		common_hostname,
 		common_name,
@@ -50,9 +50,6 @@
 		void formData.id;
 		return false;
 	});
-
-	// An override is stored as a `Manual` source. Coloured as that tier, labelled for what it does.
-	let manualTag = $derived(attributeSourceTag('Manual'));
 </script>
 
 <div class="space-y-5">
@@ -62,9 +59,8 @@
 				<span class="text-primary break-all text-lg font-semibold">{liveOverride}</span>
 				<Tag
 					label={hosts_identity_manualOverride()}
-					color={manualTag.color}
-					icon={manualTag.icon}
-					title={manualTag.title}
+					color="Gray"
+					title={attributeSourceDescription('Manual')}
 				/>
 			{:else if discovered}
 				<span class="text-primary break-all text-lg font-semibold">{discovered.value}</span>
