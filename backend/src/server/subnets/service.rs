@@ -672,10 +672,7 @@ mod tests {
     #[test]
     fn the_same_range_is_the_same_subnet_however_it_was_learned() {
         assert!(
-            matches_existing_subnet(
-                &discovered("192.168.4.0/22"),
-                &inferred("192.168.4.0/22")
-            ),
+            matches_existing_subnet(&discovered("192.168.4.0/22"), &inferred("192.168.4.0/22")),
             "a range read from a daemon is the same range once inferred from a neighbour"
         );
 
